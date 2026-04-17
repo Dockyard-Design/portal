@@ -48,6 +48,7 @@ export function CreateProjectDialog() {
           <ProjectForm
             onSubmit={handleSubmit}
             isPending={isPending}
+            onCancel={() => setOpen(false)}
           />
         </div>
       </DialogContent>

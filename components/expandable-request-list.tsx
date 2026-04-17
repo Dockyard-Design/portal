@@ -1,7 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+
+// Persist expanded state to sessionStorage so it survives router.refresh() (#17)
+function usePersistedState(key: string, defaultValue: boolean) {
+  const [value, setValue] = useState<boolean>(() => {
+    if (typeof window === "undefined") return defaultValue;
+    try {
+      return sessionStorage.getItem(key) === "true";
+    } catch {
+      return defaultValue;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(key, String(value));
+    } catch {
+      // Ignore write failures (e.g. private browsing)
+    }
+  }, [key, value]);
+
+  return [value, setValue] as const;
+}
 
 interface RecentRequest {
   id: string;
@@ -14,7 +36,7 @@ interface RecentRequest {
 }
 
 export function ExpandableRequestList({ requests, limit = 5 }: { requests: RecentRequest[]; limit?: number }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = usePersistedState("request-list-expanded", false);
   const hasMore = requests.length > limit;
   const visible = expanded ? requests : requests.slice(0, limit);
 

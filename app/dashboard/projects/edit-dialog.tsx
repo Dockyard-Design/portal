@@ -52,6 +52,7 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
             initialData={project}
             onSubmit={handleSubmit}
             isPending={isPending}
+            onCancel={() => setOpen(false)}
           />
         </div>
       </DialogContent>

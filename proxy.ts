@@ -2,6 +2,9 @@ import { clerkMiddleware } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
+// ─── Public routes that don't require authentication ──────────────
+// Consider using a (public) route group folder convention for new
+// public pages instead of maintaining this array (#21).
 const PUBLIC_ROUTES = ["/", "/sign-in"];
 
 const isPublicRoute = (request: NextRequest) => {
@@ -16,6 +19,10 @@ const isApiRoute = (request: NextRequest) => {
   return request.nextUrl.pathname.startsWith("/api/");
 };
 
+// All /sign-up* paths redirect to / — this portal is invite-only.
+// NOTE: If Clerk's OAuth callback URLs ever hit /sign-up, they would also
+// be redirected. This is intentional for invite-only but should be
+// documented to avoid confusion (#22).
 const isSignUpRoute = (request: NextRequest) => {
   return request.nextUrl.pathname.startsWith("/sign-up");
 };

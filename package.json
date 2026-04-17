@@ -9,7 +9,9 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "check:env": "npx tsx scripts/check-env.ts",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm check:env"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
@@ -38,7 +40,6 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
     "tailwindcss": "^4",

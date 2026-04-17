@@ -46,12 +46,16 @@ export async function verifyApiKey(bearerToken: string): Promise<{ valid: boolea
   if (!data.is_active) return { valid: false };
   if (data.expires_at && new Date(data.expires_at) < new Date()) return { valid: false };
 
-  // Increment request count (fire and forget)
+  // Atomically increment request_count and update last_used_at via RPC.
+  // This avoids the read-then-write race condition and the operator-precedence
+  // bug in `(data as any).request_count ?? 0 + 1` (#2, #3).
   supabaseAdmin
-    .from("api_keys")
-    .update({ request_count: (data as any).request_count ?? 0 + 1, last_used_at: new Date().toISOString() })
-    .eq("id", data.id)
-    .then(() => {});
+    .rpc("increment_api_key_request_count", { key_id: data.id })
+    .then(({ error: rpcError }) => {
+      if (rpcError) {
+        console.error("[verifyApiKey] Failed to increment request_count:", rpcError.message);
+      }
+    });
 
   return { valid: true, keyId: data.id };
 }
@@ -80,48 +84,35 @@ const RATE_LIMIT_WINDOW_SECONDS = 60; // 1-minute sliding window
 const RATE_LIMIT_MAX_REQUESTS = 100; // requests per window per identifier
 
 /**
- * Sliding-window rate limiter backed by Supabase.
- * Uses an atomic upsert pattern: fetch current window, if expired or below
- * limit then increment; otherwise reject.
+ * Atomic sliding-window rate limiter backed by a Postgres RPC.
+ * Eliminates the race condition in the previous select-then-update pattern (#2).
  */
 export async function checkRateLimit(
   identifier: string,
   limit: number = RATE_LIMIT_MAX_REQUESTS,
   windowSeconds: number = RATE_LIMIT_WINDOW_SECONDS
 ): Promise<RateLimitResult> {
-  const now = new Date();
-  const windowStart = new Date(now.getTime() - (now.getTime() % (windowSeconds * 1000)));
-  const resetAt = new Date(windowStart.getTime() + windowSeconds * 1000);
+  const { data, error } = await supabaseAdmin.rpc("check_rate_limit", {
+    p_identifier: identifier,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
 
-  // Try to fetch the current window
-  const { data: existing } = await supabaseAdmin
-    .from("api_rate_limits")
-    .select("identifier, window_start, request_count")
-    .eq("identifier", identifier)
-    .single();
-
-  // No window yet or expired window — create a new one
-  if (!existing || new Date(existing.window_start) < windowStart) {
-    await supabaseAdmin
-      .from("api_rate_limits")
-      .upsert(
-        { identifier, window_start: now.toISOString(), request_count: 1 },
-        { onConflict: "identifier" }
-      );
-    return { allowed: true, remaining: limit - 1, limit, resetAt };
+  if (error || !data) {
+    // If the RPC fails (e.g. migration not yet applied), log and allow the request
+    // rather than blocking all traffic. This is a graceful degradation.
+    console.error("[checkRateLimit] RPC failed, allowing request:", error?.message);
+    const now = new Date();
+    const resetAt = new Date(now.getTime() + windowSeconds * 1000);
+    return { allowed: true, remaining: limit, limit, resetAt };
   }
 
-  // Window is active — check if under limit
-  if (existing.request_count < limit) {
-    await supabaseAdmin
-      .from("api_rate_limits")
-      .update({ request_count: existing.request_count + 1 })
-      .eq("identifier", identifier);
-    return { allowed: true, remaining: limit - existing.request_count - 1, limit, resetAt };
-  }
-
-  // Over limit
-  return { allowed: false, remaining: 0, limit, resetAt };
+  return {
+    allowed: data.allowed,
+    remaining: data.remaining,
+    limit: data.limit,
+    resetAt: new Date(data.reset_at),
+  };
 }
 
 // ─── Request Logging ─────────────────────────────────────────────────
@@ -186,6 +177,10 @@ export async function getApiMetrics(days: number = 30): Promise<ApiMetrics> {
   const since = new Date();
   since.setDate(since.getDate() - days);
   const sinceISO = since.toISOString();
+
+  // Note: This query is capped at 500 rows for in-memory aggregation (#10).
+  // As traffic grows, consider migrating to Supabase RPC with database-side
+  // aggregation or materialized views for better performance.
 
   // Fetch all logs in the window
   const { data: logs, error } = await supabaseAdmin

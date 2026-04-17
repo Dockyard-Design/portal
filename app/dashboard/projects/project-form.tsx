@@ -30,7 +30,7 @@ export const projectSchema = z.object({
   seo_title: z.string().max(70, "SEO title too long"),
   seo_description: z.string().max(160, "SEO description too long"),
   seo_keywords: z.string(),
-  featured_image_url: z.string().url("Invalid URL").or(z.string().length(0)),
+  featured_image_url: z.string().url("Invalid URL").or(z.literal("")),
 });
 
 export type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -39,9 +39,10 @@ interface ProjectFormProps {
   initialData?: ProjectFormValues;
   onSubmit: (data: ProjectFormValues) => Promise<void>;
   isPending: boolean;
+  onCancel?: () => void;
 }
 
-export function ProjectForm({ initialData, onSubmit, isPending }: ProjectFormProps) {
+export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: ProjectFormProps) {
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
     defaultValues: initialData || {
@@ -131,7 +132,7 @@ export function ProjectForm({ initialData, onSubmit, isPending }: ProjectFormPro
               <Label className="text-sm">Status</Label>
               <Select
                 defaultValue={initialData?.status || "draft"}
-                onValueChange={(v) => setValue("status", v as any)}
+                onValueChange={(v) => setValue("status", v as "draft" | "published" | "archived")}
                 name="status"
               >
                 <SelectTrigger className="bg-background border-border/40 text-sm">
@@ -226,6 +227,7 @@ export function ProjectForm({ initialData, onSubmit, isPending }: ProjectFormPro
           variant="outline"
           type="button"
           className="rounded-xl bg-secondary/30 border-border/40"
+          onClick={onCancel}
         >
           Cancel
         </Button>

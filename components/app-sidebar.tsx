@@ -17,7 +17,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { UserButton } from "@clerk/nextjs";
+import { UserButton, useUser } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -41,6 +41,7 @@ const NAV_ITEMS = [
 
 export default function AppSidebar() {
   const pathname = usePathname();
+  const { isLoaded, user } = useUser();
 
   return (
     <Sidebar className="border-r-border/40">
@@ -61,10 +62,10 @@ export default function AppSidebar() {
                   isActive={pathname === item.href}
                   className={`
                     transition-all duration-200
-                    ${pathname === item.href 
-                      ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                    ${pathname === item.href
+                      ? "bg-primary/10 text-primary hover:bg-primary/20"
                       : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    } 
+                    }
                     rounded-lg h-10 px-3
                   `}
                 >
@@ -79,18 +80,16 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <div className="mt-auto p-6 border-t border-border/40">
-        <button
-          onClick={() => document.querySelector('[data-clerk-user-button]')?.querySelector('button')?.click()}
-          className="flex items-center gap-3 w-full p-2 rounded-xl bg-secondary/30 border border-border/40 hover:bg-secondary/50 transition-colors text-left"
-        >
-          <div data-clerk-user-button>
-            <UserButton />
-          </div>
-          <div className="flex flex-col overflow-hidden">
-            <span className="text-sm font-medium truncate">Account</span>
-            <span className="text-xs text-muted-foreground truncate">Manage profile</span>
-          </div>
-        </button>
+        {/* Render Clerk's UserButton directly — no DOM-reaching hack (#15) */}
+        <div className="flex items-center gap-3 w-full p-2 rounded-xl bg-secondary/30 border border-border/40 hover:bg-secondary/50 transition-colors">
+          <UserButton />
+          {isLoaded && user && (
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-sm font-medium truncate">{user.firstName ?? user.username ?? "Account"}</span>
+              <span className="text-xs text-muted-foreground truncate">Manage profile</span>
+            </div>
+          )}
+        </div>
       </div>
       <SidebarRail />
     </Sidebar>
