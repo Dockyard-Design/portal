@@ -25,7 +25,7 @@ export default async function ProjectsPage() {
       <div className="grid gap-4">
         {projects.length === 0 ? (
           <div className="p-16 text-center rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground">
-            No posts yet. Click "New Post" to get started.
+            No projects yet. Click "New Project" to get started.
           </div>
         ) : (
           <div className="grid gap-3">

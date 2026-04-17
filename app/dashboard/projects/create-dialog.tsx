@@ -24,7 +24,7 @@ export function CreateProjectDialog() {
     setIsPending(true);
     try {
       await createProject(data);
-      toast.success("Post created");
+      toast.success("Project created");
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -36,15 +36,13 @@ export function CreateProjectDialog() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button className="rounded-xl bg-primary text-primary-foreground hover:scale-105 transition-all font-bold text-sm">
+      <DialogTrigger render={<Button className="rounded-xl bg-primary text-primary-foreground hover:scale-105 transition-all font-bold text-sm" />}>
           <Plus className="mr-2 h-4 w-4" />
-          Create Post
-        </Button>
+          New Project
       </DialogTrigger>
       <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto p-0 gap-0 border-border/40 bg-background">
         <DialogHeader className="p-6 border-b border-border/40">
-          <DialogTitle className="text-xl font-bold tracking-tight">New Post</DialogTitle>
+          <DialogTitle className="text-xl font-bold tracking-tight">New Project</DialogTitle>
         </DialogHeader>
         <div className="p-6">
           <ProjectForm

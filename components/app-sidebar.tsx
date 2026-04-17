@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
     icon: LayoutDashboard,
   },
   {
-    title: "Posts",
+    title: "Projects",
     href: "/dashboard/projects",
     icon: FolderKanban,
   },
@@ -45,12 +46,7 @@ export default function AppSidebar() {
     <Sidebar className="border-r-border/40">
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-3 group cursor-pointer">
-          <div className="size-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center font-bold text-lg transition-transform group-hover:scale-105">
-            A
-          </div>
-          <span className="font-bold text-lg tracking-tight">
-            Admin
-          </span>
+          <Image src="/logo.svg" alt="Dockyard" width={128} height={32} className="h-8 w-auto brightness-200" />
         </div>
       </SidebarHeader>
       <SidebarContent className="px-4">
@@ -83,13 +79,18 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <div className="mt-auto p-6 border-t border-border/40">
-        <div className="flex items-center gap-3 p-2 rounded-xl bg-secondary/30 border border-border/40">
-          <UserButton />
+        <button
+          onClick={() => document.querySelector('[data-clerk-user-button]')?.querySelector('button')?.click()}
+          className="flex items-center gap-3 w-full p-2 rounded-xl bg-secondary/30 border border-border/40 hover:bg-secondary/50 transition-colors text-left"
+        >
+          <div data-clerk-user-button>
+            <UserButton />
+          </div>
           <div className="flex flex-col overflow-hidden">
             <span className="text-sm font-medium truncate">Account</span>
             <span className="text-xs text-muted-foreground truncate">Manage profile</span>
           </div>
-        </div>
+        </button>
       </div>
       <SidebarRail />
     </Sidebar>

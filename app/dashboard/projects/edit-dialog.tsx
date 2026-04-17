@@ -28,7 +28,7 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
     setIsPending(true);
     try {
       await updateProject(project.id, data);
-      toast.success("Post updated");
+      toast.success("Project updated");
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -40,14 +40,12 @@ export function EditProjectDialog({ project }: EditProjectDialogProps) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger>
-        <Button variant="ghost" size="icon" className="hover:bg-primary/20 hover:text-primary transition-colors rounded-lg">
-          <Pencil className="h-4 w-4" />
-        </Button>
+      <DialogTrigger render={<Button variant="ghost" size="icon" className="hover:bg-primary/20 hover:text-primary transition-colors rounded-lg" />}>
+        <Pencil className="h-4 w-4" />
       </DialogTrigger>
       <DialogContent className="sm:max-w-5xl max-h-[85vh] overflow-y-auto p-0 gap-0 border-border/40 bg-background">
         <DialogHeader className="p-6 border-b border-border/40">
-          <DialogTitle className="text-xl font-bold tracking-tight">Edit Post</DialogTitle>
+          <DialogTitle className="text-xl font-bold tracking-tight">Edit Project</DialogTitle>
         </DialogHeader>
         <div className="p-6">
           <ProjectForm

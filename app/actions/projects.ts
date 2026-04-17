@@ -54,7 +54,12 @@ export async function createProject(
     .select()
     .single();
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === "23505") {
+      throw new Error("A project with this slug already exists. Choose a different slug.");
+    }
+    throw new Error(error.message);
+  }
   revalidatePath("/dashboard/projects");
   return data;
 }

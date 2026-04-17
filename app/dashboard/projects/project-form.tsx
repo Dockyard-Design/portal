@@ -234,7 +234,7 @@ export function ProjectForm({ initialData, onSubmit, isPending }: ProjectFormPro
           disabled={isPending}
           className="rounded-xl bg-primary text-primary-foreground px-6 font-semibold"
         >
-          {isPending ? "Saving..." : "Save Post"}
+          {isPending ? "Saving..." : "Save Project"}
         </Button>
       </div>
     </form>

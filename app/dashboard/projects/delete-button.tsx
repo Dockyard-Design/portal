@@ -31,7 +31,7 @@ export function DeleteProjectButton({ id, title }: DeleteProjectButtonProps) {
     setIsPending(true);
     try {
       await deleteProject(id);
-      toast.success("Post deleted");
+      toast.success("Project deleted");
       router.refresh();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to delete");
@@ -42,14 +42,12 @@ export function DeleteProjectButton({ id, title }: DeleteProjectButtonProps) {
 
   return (
     <AlertDialog>
-      <AlertDialogTrigger>
-        <Button variant="ghost" size="icon" className="text-destructive">
-          <Trash2 className="h-4 w-4" />
-        </Button>
+      <AlertDialogTrigger render={<Button variant="ghost" size="icon" className="text-destructive" />}>
+        <Trash2 className="h-4 w-4" />
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete post?</AlertDialogTitle>
+          <AlertDialogTitle>Delete project?</AlertDialogTitle>
           <AlertDialogDescription>
             This will permanently delete "{title}". This can't be undone.
           </AlertDialogDescription>

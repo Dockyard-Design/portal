@@ -4,7 +4,8 @@ import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
 import { getApiKeys } from "@/app/actions/api-keys";
 import { getDashboardApiMetrics } from "@/app/actions/metrics";
-import { Badge } from "@/components/ui/badge";
+import { ExpandableProjectList } from "@/components/expandable-project-list";
+import { ExpandableRequestList } from "@/components/expandable-request-list";
 
 export default async function DashboardPage() {
   const [projects, apiKeys, metrics] = await Promise.all([
@@ -26,7 +27,6 @@ export default async function DashboardPage() {
   const published = projects.filter((p) => p.status === "published").length;
   const publicCount = projects.filter((p) => p.is_public).length;
   const draft = projects.filter((p) => p.status === "draft").length;
-  const recent = projects.slice(0, 5);
   const activeKeys = apiKeys.filter((k) => k.is_active).length;
   const totalKeys = apiKeys.length;
 
@@ -37,7 +37,7 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {total} post{total !== 1 ? "s" : ""} total, {published} published, {draft} in draft.
+            {total} project{total !== 1 ? "s" : ""} total, {published} published, {draft} in draft.
           </p>
         </div>
         <Link
@@ -45,11 +45,11 @@ export default async function DashboardPage() {
           className="group flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm transition-all hover:scale-105 hover:shadow-[0_0_20px_-5px_var(--color-primary)] active:scale-95"
         >
           <Plus className="size-4" />
-          New Post
+          New Project
         </Link>
       </div>
 
-      {/* Post Stats */}
+      {/* Project Stats */}
       <div className="grid gap-5 grid-cols-2 md:grid-cols-4">
         <MetricCard label="Total" value={total} sub={`${published} published`} icon={LayoutGrid} color="text-blue-400" />
         <MetricCard label="Public" value={publicCount} sub="Visible to everyone" icon={Globe} color="text-emerald-400" />
@@ -57,59 +57,25 @@ export default async function DashboardPage() {
         <MetricCard label="API Keys" value={activeKeys} sub={`${totalKeys} total`} icon={Key} color="text-violet-400" />
       </div>
 
-      {/* Recent Posts */}
+      {/* Recent Projects */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent Posts</h2>
+          <h2 className="text-lg font-semibold">Recent Projects</h2>
           <Link href="/dashboard/projects" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
             View all <ArrowUpRight className="size-3.5" />
           </Link>
         </div>
 
-        {recent.length > 0 ? (
-          <div className="grid gap-3">
-            {recent.map((project) => (
-              <Link
-                key={project.id}
-                href={`/dashboard/projects?edit=${project.id}`}
-                className="group flex items-center justify-between p-4 rounded-2xl bg-secondary/30 border border-border/40 hover:border-primary/40 transition-all"
-              >
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-semibold group-hover:text-primary transition-colors">
-                      {project.title}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={`text-xs h-5 px-2 font-semibold
-                        ${project.status === 'published' ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10' : 'border-amber-500/40 text-amber-400 bg-amber-500/10'}`}
-                    >
-                      {project.status}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Globe className="size-3.5" />
-                      {project.is_public ? "Public" : "Private"}
-                    </span>
-                    <span className="opacity-30">·</span>
-                    <span className="font-mono text-xs">/{project.slug}</span>
-                  </div>
-                </div>
-                <span className="text-sm text-muted-foreground">
-                  {new Date(project.updated_at).toLocaleDateString()}
-                </span>
-              </Link>
-            ))}
-          </div>
+        {projects.length > 0 ? (
+          <ExpandableProjectList projects={projects} limit={5} />
         ) : (
           <div className="p-12 text-center rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground">
-            No posts yet. Create your first one.
+            No projects yet. Create your first one.
           </div>
         )}
       </div>
 
-      {/* API Metrics — separate section */}
+      {/* API Metrics */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -122,34 +88,10 @@ export default async function DashboardPage() {
         </div>
 
         <div className="grid gap-5 grid-cols-2 md:grid-cols-4">
-          <MetricCard
-            label="Requests"
-            value={metrics.totalRequests}
-            sub="Last 30 days"
-            icon={Zap}
-            color="text-blue-400"
-          />
-          <MetricCard
-            label="Avg Response"
-            value={`${metrics.avgResponseTime}ms`}
-            sub="Median latency"
-            icon={Clock}
-            color="text-emerald-400"
-          />
-          <MetricCard
-            label="Success Rate"
-            value={`${metrics.successRate}%`}
-            sub="2xx & 3xx responses"
-            icon={TrendingUp}
-            color="text-violet-400"
-          />
-          <MetricCard
-            label="Active Keys"
-            value={activeKeys}
-            sub={`${totalKeys} total`}
-            icon={Key}
-            color="text-amber-400"
-          />
+          <MetricCard label="Requests" value={metrics.totalRequests} sub="Last 30 days" icon={Zap} color="text-blue-400" />
+          <MetricCard label="Avg Response" value={`${metrics.avgResponseTime}ms`} sub="Median latency" icon={Clock} color="text-emerald-400" />
+          <MetricCard label="Success Rate" value={`${metrics.successRate}%`} sub="2xx & 3xx responses" icon={TrendingUp} color="text-violet-400" />
+          <MetricCard label="Active Keys" value={activeKeys} sub={`${totalKeys} total`} icon={Key} color="text-amber-400" />
         </div>
 
         {/* Recent API Requests */}
@@ -158,44 +100,7 @@ export default async function DashboardPage() {
             <div className="px-5 py-3 border-b border-border/40">
               <h3 className="text-sm font-semibold">Recent Requests</h3>
             </div>
-            <div className="divide-y divide-border/40">
-              {metrics.recentRequests.slice(0, 8).map((req) => (
-                <div key={req.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
-                      req.method === "GET" ? "bg-emerald-500/10 text-emerald-400" : "bg-blue-500/10 text-blue-400"
-                    }`}>
-                      {req.method}
-                    </span>
-                    <span className="text-sm font-mono text-muted-foreground">{req.path}</span>
-                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${
-                      req.status_code >= 200 && req.status_code < 300
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : req.status_code >= 400
-                        ? "bg-red-500/10 text-red-400"
-                        : "bg-amber-500/10 text-amber-400"
-                    }`}>
-                      {req.status_code}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      req.auth_method === "clerk"
-                        ? "bg-blue-500/10 text-blue-400"
-                        : "bg-violet-500/10 text-violet-400"
-                    }`}>
-                      {req.auth_method === "clerk" ? "Session" : "API Key"}
-                    </span>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {req.response_time_ms}ms
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      {new Date(req.created_at).toLocaleDateString()}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
+            <ExpandableRequestList requests={metrics.recentRequests} limit={5} />
           </div>
         )}
 
@@ -241,7 +146,7 @@ export default async function DashboardPage() {
   );
 }
 
-function MetricCard({ label, value, sub, icon: Icon, color }: any) {
+function MetricCard({ label, value, sub, icon: Icon, color }: { label: string; value: number | string; sub: string; icon: React.ComponentType<{ className?: string }>; color: string }) {
   return (
     <Card className="border-none bg-secondary/40 hover:bg-secondary/60 transition-all group cursor-default">
       <CardContent className="p-6">

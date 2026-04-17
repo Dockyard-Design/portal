@@ -55,11 +55,9 @@ export function CreateApiKeyDialog() {
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); else setOpen(true); }}>
-      <DialogTrigger>
-        <Button className="rounded-xl bg-primary text-primary-foreground hover:scale-105 transition-all font-bold text-sm">
+      <DialogTrigger render={<Button className="rounded-xl bg-primary text-primary-foreground hover:scale-105 transition-all font-bold text-sm" />}>
           <Plus className="mr-2 h-4 w-4" />
           New Key
-        </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 border-border/40 bg-background">
         <DialogHeader className="p-6 border-b border-border/40">

@@ -5,14 +5,27 @@ import type { NextRequest } from "next/server";
 const PUBLIC_ROUTES = ["/", "/sign-in"];
 
 const isPublicRoute = (request: NextRequest) => {
-  return PUBLIC_ROUTES.includes(request.nextUrl.pathname);
+  const { pathname } = request.nextUrl;
+  if (PUBLIC_ROUTES.includes(pathname)) return true;
+  // Match /sign-in and any sub-paths like /sign-in/something
+  if (pathname.startsWith("/sign-in")) return true;
+  return false;
 };
 
 const isApiRoute = (request: NextRequest) => {
   return request.nextUrl.pathname.startsWith("/api/");
 };
 
+const isSignUpRoute = (request: NextRequest) => {
+  return request.nextUrl.pathname.startsWith("/sign-up");
+};
+
 export default clerkMiddleware(async (auth, request) => {
+  // Block sign-up routes entirely — this portal is invite-only
+  if (isSignUpRoute(request)) {
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   // API routes use their own key-based auth — skip Clerk entirely
   if (isApiRoute(request)) {
     return NextResponse.next();
