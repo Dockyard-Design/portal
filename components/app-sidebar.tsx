@@ -1,14 +1,12 @@
+"use client";
+
 import {
   LayoutDashboard,
-  Key,
   FolderKanban,
-  Settings,
-  LogOut,
-  ChevronRight,
+  Key,
 } from "lucide-react";
 import {
   Sidebar,
-  Sidebar collapsible="icon",
   SidebarContent,
   SidebarGroup,
   SidebarGroupLabel,
@@ -17,7 +15,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarInset,
 } from "@/components/ui/sidebar";
 import { UserButton } from "@clerk/nextjs";
 import Link from "next/link";
@@ -25,12 +22,12 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   {
-    title: "Dashboard",
+    title: "Overview",
     href: "/dashboard",
     icon: LayoutDashboard,
   },
   {
-    title: "Projects",
+    title: "Posts",
     href: "/dashboard/projects",
     icon: FolderKanban,
   },
@@ -39,41 +36,45 @@ const NAV_ITEMS = [
     href: "/dashboard/api-keys",
     icon: Key,
   },
-  {
-    title: "Settings",
-    href: "/dashboard/settings",
-    icon: Settings,
-  },
 ];
 
-export default function AppSidebar({ children }: { children: React.ReactNode }) {
+export default function AppSidebar() {
   const pathname = usePathname();
 
   return (
-    <Sidebar selectable>
-      <SidebarHeader className="flex flex-col gap-4 p-4">
-        <div className="flex items-center gap-2 font-bold text-xl">
-          <div className="size-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground">
+    <Sidebar className="border-r-border/40">
+      <SidebarHeader className="p-6">
+        <div className="flex items-center gap-3 group cursor-pointer">
+          <div className="size-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center font-bold text-lg transition-transform group-hover:scale-105">
             A
           </div>
-          <span>AdminPanel</span>
+          <span className="font-bold text-lg tracking-tight">
+            Admin
+          </span>
         </div>
-        <UserButton afterSignOutUrl="/" />
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="px-4">
         <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
-          <SidebarMenu>
+          <SidebarGroupLabel className="px-2 text-xs font-semibold text-muted-foreground/60">
+            Navigation
+          </SidebarGroupLabel>
+          <SidebarMenu className="gap-1 mt-2">
             {NAV_ITEMS.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
-                  asChild
                   isActive={pathname === item.href}
-                  tooltip={item.title}
+                  className={`
+                    transition-all duration-200
+                    ${pathname === item.href 
+                      ? "bg-primary/10 text-primary hover:bg-primary/20" 
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    } 
+                    rounded-lg h-10 px-3
+                  `}
                 >
                   <Link href={item.href} className="flex items-center gap-3">
-                    <item.icon className="size-4" />
-                    <span>{item.title}</span>
+                    <item.icon className={`size-4 ${pathname === item.href ? "text-primary" : ""}`} />
+                    <span className="font-medium">{item.title}</span>
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
@@ -81,8 +82,16 @@ export default function AppSidebar({ children }: { children: React.ReactNode }) 
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
+      <div className="mt-auto p-6 border-t border-border/40">
+        <div className="flex items-center gap-3 p-2 rounded-xl bg-secondary/30 border border-border/40">
+          <UserButton />
+          <div className="flex flex-col overflow-hidden">
+            <span className="text-sm font-medium truncate">Account</span>
+            <span className="text-xs text-muted-foreground truncate">Manage profile</span>
+          </div>
+        </div>
+      </div>
       <SidebarRail />
-      {children}
     </Sidebar>
   );
 }

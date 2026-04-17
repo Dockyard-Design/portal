@@ -1,59 +1,30 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Key } from "lucide-react";
-import { Plus } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Trash2, Copy } from "lucide-react";
+import { getApiKeys } from "@/app/actions/api-keys";
+import { ApiKeyList } from "./api-key-list";
+import { CreateApiKeyDialog } from "./create-dialog";
 
-export default function ApiKeysPage() {
+export default async function ApiKeysPage() {
+  const keys = await getApiKeys();
+
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
+    <div className="flex flex-col gap-8 max-w-7xl mx-auto animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">API Keys</h1>
-          <p className="text-muted-foreground">Manage your API keys to access the platform from other projects.</p>
+          <p className="text-muted-foreground text-sm mt-1">
+            Keys are required to access the API. Keep them secret — revoke any that are compromised.
+          </p>
         </div>
-        <Button>
-          <Plus className="mr-2 size-4" /> Create New Key
-        </Button>
+        <CreateApiKeyDialog />
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Your API Keys</CardTitle>
-          <CardDescription>Each key provides access to your projects API.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Key</TableHead>
-                <TableHead>Created</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow>
-                <TableCell className="font-medium">Production Key</TableCell>
-                <TableCell className="font-mono text-xs">sk_live_xxxxxxxxxxxx</TableCell>
-                <TableCell>Oct 12, 2023</TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
-                    <Button variant="ghost" size="sm">
-                      <Copy className="size-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive">
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {keys.length === 0 ? (
+        <div className="p-16 text-center rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground">
+          No API keys yet. Create one to start using the API.
+        </div>
+      ) : (
+        <ApiKeyList keys={keys} />
+      )}
     </div>
   );
 }
