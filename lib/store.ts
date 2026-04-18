@@ -32,3 +32,32 @@ export const useKanbanStore = create<KanbanStore>()(
     }
   )
 );
+
+// Sidebar collapsible state store
+interface SidebarStore {
+  openGroups: Record<string, boolean>;
+  setGroupOpen: (groupTitle: string, isOpen: boolean) => void;
+}
+
+export const useSidebarStore = create<SidebarStore>()(
+  persist(
+    (set) => ({
+      // Default: all groups expanded (uncollapsed)
+      openGroups: {
+        "Customers": true,
+        "Dockyard": true,
+      },
+      
+      setGroupOpen: (groupTitle, isOpen) =>
+        set((state) => ({
+          openGroups: {
+            ...state.openGroups,
+            [groupTitle]: isOpen,
+          },
+        })),
+    }),
+    {
+      name: "sidebar-storage",
+    }
+  )
+);

@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, Lock, Unlock, Key } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, Lock, Unlock, Key, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { deleteUser, lockUser, unlockUser, resetUserPassword } from "@/app/actions/users";
 import type { SimpleUser } from "@/app/actions/users";
@@ -36,6 +36,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -209,56 +216,42 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
                     {new Date(user.createdAt).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => setEditUser(user)}
-                      >
-                        <Edit className="size-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8"
-                        onClick={() => setResetPasswordUser(user)}
-                        title="Reset Password"
-                      >
-                        <Key className="size-4" />
-                      </Button>
-                      {user.locked ? (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-emerald-600"
-                          onClick={() => handleUnlock(user.id)}
-                          disabled={isLoading}
-                          title="Unlock Account"
-                        >
-                          <Unlock className="size-4" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger render={
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="size-4" />
                         </Button>
-                      ) : (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-amber-600"
-                          onClick={() => handleLock(user.id)}
-                          disabled={isLoading}
-                          title="Lock Account"
+                      } />
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => setEditUser(user)}>
+                          <Edit className="size-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setResetPasswordUser(user)}>
+                          <Key className="size-4 mr-2" />
+                          Reset Password
+                        </DropdownMenuItem>
+                        {user.locked ? (
+                          <DropdownMenuItem onClick={() => handleUnlock(user.id)} disabled={isLoading}>
+                            <Unlock className="size-4 mr-2 text-emerald-600" />
+                            Unlock Account
+                          </DropdownMenuItem>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleLock(user.id)} disabled={isLoading}>
+                            <Lock className="size-4 mr-2 text-amber-600" />
+                            Lock Account
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem 
+                          onClick={() => openDeleteDialog(user.id)} 
+                          className="text-destructive focus:text-destructive"
                         >
-                          <Lock className="size-4" />
-                        </Button>
-                      )}
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => openDeleteDialog(user.id)}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    </div>
+                          <Trash2 className="size-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))

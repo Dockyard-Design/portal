@@ -43,6 +43,7 @@ import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useSidebarStore } from "@/lib/store";
 
 // Sidebar Menu Configuration
 // Easy to add/remove/modify menu items here
@@ -115,29 +116,15 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { isLoaded, user } = useUser();
   const { openUserProfile, signOut } = useClerk();
+  const { openGroups, setGroupOpen } = useSidebarStore();
   
-  // Track open state for each collapsible group
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
-    // Initialize based on active groups
-    const initial: Record<string, boolean> = {};
-    NAV_GROUPS.forEach(group => {
-      const isActive = group.items.some(item => pathname.startsWith(item.href));
-      initial[group.title] = isActive;
-    });
-    return initial;
-  });
-  
-  // Update open groups when pathname changes
+  // Auto-expand groups with active items on navigation
   useEffect(() => {
-    setOpenGroups(prev => {
-      const updated: Record<string, boolean> = { ...prev };
-      NAV_GROUPS.forEach(group => {
-        const shouldBeOpen = group.items.some(item => pathname.startsWith(item.href));
-        if (shouldBeOpen) {
-          updated[group.title] = true;
-        }
-      });
-      return updated;
+    NAV_GROUPS.forEach((group) => {
+      const isGroupActive = group.items.some((item) => pathname.startsWith(item.href));
+      if (isGroupActive) {
+        setGroupOpen(group.title, true);
+      }
     });
   }, [pathname]);
 
@@ -190,8 +177,8 @@ export default function AppSidebar() {
               return (
                 <Collapsible
                   key={group.title}
-                  open={openGroups[group.title] ?? false}
-                  onOpenChange={(open) => setOpenGroups(prev => ({ ...prev, [group.title]: open }))}
+                  open={openGroups[group.title] ?? true}
+                  onOpenChange={(open) => setGroupOpen(group.title, open)}
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
