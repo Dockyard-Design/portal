@@ -20,11 +20,22 @@ export interface Customer {
   notes: string | null;
 }
 
-export interface Task {
+export interface KanbanBoard {
   id: string;
   created_at: string;
   updated_at: string;
   customer_id: string;
+  name: string;
+  description: string | null;
+  is_default: boolean;
+  author_id: string;
+}
+
+export interface Task {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  board_id: string;
   assigned_to: string | null;
   title: string;
   description: string | null;
@@ -56,8 +67,21 @@ export interface UpdateCustomerInput {
   notes?: string;
 }
 
-export interface CreateTaskInput {
+export interface CreateBoardInput {
   customer_id: string;
+  name: string;
+  description?: string;
+  is_default?: boolean;
+}
+
+export interface UpdateBoardInput {
+  name?: string;
+  description?: string | null;
+  is_default?: boolean;
+}
+
+export interface CreateTaskInput {
+  board_id: string;
   assigned_to?: string | null;
   title: string;
   description?: string;
@@ -69,7 +93,7 @@ export interface CreateTaskInput {
 export interface UpdateTaskInput {
   assigned_to?: string | null;
   title?: string;
-  description?: string;
+  description?: string | null;
   status?: TaskStatus;
   priority?: TaskPriority;
   due_date?: string | null;

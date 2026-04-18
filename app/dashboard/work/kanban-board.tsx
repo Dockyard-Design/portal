@@ -1,24 +1,8 @@
-"use client";
-
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  KanbanSquare,
-  Plus,
-  Calendar,
-  AlertCircle,
-  Clock,
-  CheckCircle2,
-  Circle,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  User,
-  Building,
-  Search,
-  Check,
-  UserCircle,
-} from "lucide-react";
+import { useKanbanStore } from "@/lib/store";
+import { useKanbanRefresh } from "./kanban-data-provider";
+import { Building } from "lucide-react";
+import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -35,13 +19,6 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -53,27 +30,62 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  KanbanSquare,
+  Plus,
+  Calendar as CalendarIcon,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  Circle,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  User,
+  Search,
+  Check,
+  UserCircle,
+  LayoutGrid,
+  ChevronDown,
+} from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   createTask,
   updateTask,
   deleteTask,
   moveTask,
   createCustomer,
+  createBoard,
+  updateBoard,
+  deleteBoard,
 } from "@/app/actions/kanban";
-import { toast } from "sonner";
 import { format, parseISO, isPast, isToday, isTomorrow } from "date-fns";
 import type {
   Customer,
+  KanbanBoard as Board,
   Task,
   TasksByStatus,
   TaskStatus,
   TaskPriority,
   CreateTaskInput,
   CreateCustomerInput,
+  CreateBoardInput,
   ClerkUser,
 } from "@/types/kanban";
 import type { LucideIcon } from "lucide-react";
+import { useState, useCallback } from "react";
 
 interface ColumnConfig {
   id: TaskStatus;
@@ -177,26 +189,42 @@ interface CustomerFormState {
   notes: string;
 }
 
+interface BoardFormState {
+  name: string;
+  description: string;
+  is_default: boolean;
+}
+
 interface KanbanBoardProps {
   customers: Customer[];
+  boards: Board[];
   teamMembers: ClerkUser[];
   tasksByStatus: TasksByStatus;
   selectedCustomerId: string;
   selectedCustomer: Customer | undefined;
+  selectedBoard: Board | undefined;
+  isLoading?: boolean;
 }
 
 export function KanbanBoard({
   customers,
+  boards,
   teamMembers,
   tasksByStatus,
   selectedCustomerId,
   selectedCustomer,
+  selectedBoard,
+  isLoading,
 }: KanbanBoardProps) {
-  const router = useRouter();
+  const { setSelectedCustomer, setSelectedBoard } = useKanbanStore();
+  const refreshData = useKanbanRefresh();
   const [isTaskDialogOpen, setIsTaskDialogOpen] = useState(false);
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const [isBoardDialogOpen, setIsBoardDialogOpen] = useState(false);
   const [isCustomerSelectOpen, setIsCustomerSelectOpen] = useState(false);
+  const [isBoardSelectOpen, setIsBoardSelectOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [editingBoard, setEditingBoard] = useState<Board | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [taskForm, setTaskForm] = useState<TaskFormState>({
@@ -215,11 +243,21 @@ export function KanbanBoard({
     notes: "",
   });
 
+  const [boardForm, setBoardForm] = useState<BoardFormState>({
+    name: "",
+    description: "",
+    is_default: false,
+  });
+
   const handleCustomerChange = (customerId: string) => {
-    const params = new URLSearchParams();
-    if (customerId) params.set("customer", customerId);
-    router.push(`/dashboard/work?${params.toString()}`);
+    setSelectedCustomer(customerId || null);
     setIsCustomerSelectOpen(false);
+    setIsBoardSelectOpen(false);
+  };
+
+  const handleBoardChange = (boardId: string) => {
+    setSelectedBoard(boardId || null);
+    setIsBoardSelectOpen(false);
   };
 
   function resetTaskForm(): void {
@@ -240,7 +278,7 @@ export function KanbanBoard({
       title: task.title,
       description: task.description || "",
       priority: task.priority,
-      due_date: task.due_date ? task.due_date.slice(0, 16) : "",
+      due_date: task.due_date ? task.due_date.slice(0, 10) : "",
       status: task.status,
       assigned_to: task.assigned_to || "",
     });
@@ -249,7 +287,7 @@ export function KanbanBoard({
 
   async function handleSaveTask(e: React.FormEvent): Promise<void> {
     e.preventDefault();
-    if (!selectedCustomerId) return;
+    if (!selectedBoard?.id) return;
 
     setIsSubmitting(true);
     try {
@@ -264,7 +302,7 @@ export function KanbanBoard({
       } else {
         const taskInput: CreateTaskInput = {
           ...taskForm,
-          customer_id: selectedCustomerId,
+          board_id: selectedBoard.id,
           assigned_to: assignedToValue,
         };
         await createTask(taskInput);
@@ -272,7 +310,7 @@ export function KanbanBoard({
       }
       setIsTaskDialogOpen(false);
       resetTaskForm();
-      router.refresh();
+      refreshData();
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to save task";
@@ -286,7 +324,7 @@ export function KanbanBoard({
     try {
       await deleteTask(taskId);
       toast.success("Task deleted");
-      router.refresh();
+      refreshData();
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to delete task";
@@ -300,7 +338,7 @@ export function KanbanBoard({
   ): Promise<void> {
     try {
       await moveTask(task.id, newStatus, task.position);
-      router.refresh();
+      refreshData();
     } catch (error: unknown) {
       const message =
         error instanceof Error ? error.message : "Failed to move task";
@@ -327,6 +365,73 @@ export function KanbanBoard({
     }
   }
 
+  function resetBoardForm(): void {
+    setBoardForm({
+      name: "",
+      description: "",
+      is_default: false,
+    });
+    setEditingBoard(null);
+  }
+
+  function handleAddBoard(): void {
+    resetBoardForm();
+    setIsBoardDialogOpen(true);
+  }
+
+  function handleEditBoard(board: Board): void {
+    setEditingBoard(board);
+    setBoardForm({
+      name: board.name,
+      description: board.description || "",
+      is_default: board.is_default,
+    });
+    setIsBoardDialogOpen(true);
+  }
+
+  async function handleSaveBoard(e: React.FormEvent): Promise<void> {
+    e.preventDefault();
+    if (!selectedCustomerId) return;
+
+    setIsSubmitting(true);
+    try {
+      if (editingBoard) {
+        await updateBoard(editingBoard.id, boardForm);
+        toast.success("Board updated");
+      } else {
+        const boardInput: CreateBoardInput = {
+          ...boardForm,
+          customer_id: selectedCustomerId,
+        };
+        const newBoard = await createBoard(boardInput);
+        toast.success("Board created");
+        // Navigate to the new board
+        handleBoardChange(newBoard.id);
+      }
+      setIsBoardDialogOpen(false);
+      resetBoardForm();
+      refreshData();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to save board";
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteBoard(boardId: string): Promise<void> {
+    try {
+      await deleteBoard(boardId);
+      toast.success("Board deleted");
+      refreshData();
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error ? error.message : "Failed to delete board";
+      toast.error(message);
+    }
+  }
+
   function handleAddTask(columnId: TaskStatus): void {
     resetTaskForm();
     setTaskForm((prev) => ({ ...prev, status: columnId }));
@@ -335,256 +440,413 @@ export function KanbanBoard({
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header with Customer Selector */}
+      {/* Header with Customer and Board Selectors */}
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            {selectedCustomer?.name || "No customer selected"}
-          </h1>
+        <div className="flex items-center gap-2">
+          {selectedCustomer && (
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                <Building className="size-5 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-semibold">{selectedCustomer.name}</h1>
+                {selectedBoard && (
+                  <p className="text-sm text-muted-foreground">{selectedBoard.name}</p>
+                )}
+              </div>
+            </div>
+          )}
+          {!selectedCustomer && (
+            <h1 className="text-2xl font-semibold">Work Board</h1>
+          )}
         </div>
 
-        {/* Customer Combobox */}
-        <div className="relative">
-          <Button
-            variant="outline"
-            role="combobox"
-            aria-expanded={isCustomerSelectOpen}
-            className="w-72 justify-between"
-            onClick={() => setIsCustomerSelectOpen(true)}
-          >
-            {selectedCustomer ? (
-              <div className="flex items-center gap-2 overflow-hidden">
-                <Building className="size-4 shrink-0 text-muted-foreground" />
-                <span className="truncate">{selectedCustomer.name}</span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">
-                Select a customer...
-              </span>
-            )}
-            <Search className="size-4 shrink-0 text-muted-foreground" />
-          </Button>
+        <div className="flex items-center gap-3">
+          {/* Board Selector */}
+          {selectedCustomerId && boards.length > 0 && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                role="combobox"
+                aria-expanded={isBoardSelectOpen}
+                className="w-48 justify-between"
+                onClick={() => setIsBoardSelectOpen(true)}
+              >
+                {selectedBoard ? (
+                  <div className="flex items-center gap-2 overflow-hidden">
+                    <LayoutGrid className="size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">{selectedBoard.name}</span>
+                    {selectedBoard.is_default && (
+                      <Badge variant="secondary" className="text-xs shrink-0">Default</Badge>
+                    )}
+                  </div>
+                ) : (
+                  <span className="text-muted-foreground">Select board...</span>
+                )}
+                <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+              </Button>
 
-          {isCustomerSelectOpen && (
-            <div className="absolute top-full left-0 right-0 mt-1 z-50">
-              <Command className="rounded-lg border shadow-md bg-popover">
-                <CommandInput
-                  placeholder="Search customers..."
-                  className="h-9"
+              {isBoardSelectOpen && (
+                <div className="absolute top-full right-0 mt-1 z-50 w-64">
+                  <Command className="rounded-lg border shadow-md bg-popover">
+                    <CommandInput
+                      placeholder="Search boards..."
+                      className="h-9"
+                    />
+                    <CommandList>
+                      <CommandEmpty>No boards found.</CommandEmpty>
+                      <CommandGroup>
+                        {boards.map((board) => (
+                          <CommandItem
+                            key={board.id}
+                            value={board.name.toLowerCase()}
+                            onSelect={() => handleBoardChange(board.id)}
+                            className="cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2 flex-1">
+                              <LayoutGrid className="size-4 text-muted-foreground" />
+                              <div className="flex flex-col flex-1">
+                                <span>{board.name}</span>
+                                {board.description && (
+                                  <span className="text-xs text-muted-foreground line-clamp-1">
+                                    {board.description}
+                                  </span>
+                                )}
+                              </div>
+                              {board.id === selectedBoard?.id && (
+                                <Check className="size-4 text-primary" />
+                              )}
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                      <CommandGroup>
+                        <CommandItem
+                          onSelect={handleAddBoard}
+                          className="cursor-pointer text-primary"
+                        >
+                          <Plus className="size-4 mr-2" />
+                          Create new board
+                        </CommandItem>
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </div>
+              )}
+
+              {isBoardSelectOpen && (
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsBoardSelectOpen(false)}
                 />
-                <CommandList>
-                  <CommandEmpty>No customers found.</CommandEmpty>
-                  <CommandGroup>
-                    {customers.map((customer) => (
-                      <CommandItem
-                        key={customer.id}
-                        value={customer.name.toLowerCase()}
-                        onSelect={() => handleCustomerChange(customer.id)}
-                        className="cursor-pointer"
-                      >
-                        <div className="flex items-center gap-2 flex-1">
-                          <Building className="size-4 text-muted-foreground" />
-                          <span className="flex-1">{customer.name}</span>
-                          {customer.company && (
-                            <span className="text-muted-foreground text-sm">
-                              {customer.company}
-                            </span>
-                          )}
-                          {customer.id === selectedCustomerId && (
-                            <Check className="size-4 text-primary" />
-                          )}
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
+              )}
             </div>
           )}
 
-          {/* Click outside to close */}
-          {isCustomerSelectOpen && (
-            <div
-              className="fixed inset-0 z-40"
-              onClick={() => setIsCustomerSelectOpen(false)}
-            />
-          )}
+          {/* Customer Combobox */}
+          <div className="relative">
+            <Button
+              variant="outline"
+              role="combobox"
+              aria-expanded={isCustomerSelectOpen}
+              className="w-72 justify-between"
+              onClick={() => setIsCustomerSelectOpen(true)}
+            >
+              {selectedCustomer ? (
+                <div className="flex items-center gap-2 overflow-hidden">
+                  <Building className="size-4 shrink-0 text-muted-foreground" />
+                  <span className="truncate">{selectedCustomer.name}</span>
+                </div>
+              ) : (
+                <span className="text-muted-foreground">
+                  Select a customer...
+                </span>
+              )}
+              <Search className="size-4 shrink-0 text-muted-foreground" />
+            </Button>
+
+            {isCustomerSelectOpen && (
+              <div className="absolute top-full left-0 right-0 mt-1 z-50">
+                <Command className="rounded-lg border shadow-md bg-popover">
+                  <CommandInput
+                    placeholder="Search customers..."
+                    className="h-9"
+                  />
+                  <CommandList>
+                    <CommandEmpty>No customers found.</CommandEmpty>
+                    <CommandGroup>
+                      {customers.map((customer) => (
+                        <CommandItem
+                          key={customer.id}
+                          value={customer.name.toLowerCase()}
+                          onSelect={() => handleCustomerChange(customer.id)}
+                          className="cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 flex-1">
+                            <Building className="size-4 text-muted-foreground" />
+                            <span className="flex-1">{customer.name}</span>
+                            {customer.company && (
+                              <span className="text-muted-foreground text-sm">
+                                {customer.company}
+                              </span>
+                            )}
+                            {customer.id === selectedCustomerId && (
+                              <Check className="size-4 text-primary" />
+                            )}
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                    <CommandGroup>
+                      <CommandItem
+                        onSelect={() => {
+                          setIsCustomerDialogOpen(true);
+                          setIsCustomerSelectOpen(false);
+                        }}
+                        className="cursor-pointer text-primary"
+                      >
+                        <Plus className="size-4 mr-2" />
+                        Create new customer
+                      </CommandItem>
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </div>
+            )}
+
+            {isCustomerSelectOpen && (
+              <div
+                className="fixed inset-0 z-40"
+                onClick={() => setIsCustomerSelectOpen(false)}
+              />
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Empty State */}
+      {/* Empty State - No Customer */}
       {!selectedCustomerId && (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed border-border/50 bg-card/30">
           <KanbanSquare className="size-16 text-muted-foreground/30 mb-4" />
           <h3 className="text-lg font-medium mb-2">No customer selected</h3>
           <p className="text-muted-foreground max-w-md mb-6">
-            Select a customer from the dropdown above to view and manage their
-            Kanban board.
+            Select a customer from the dropdown to view and manage their Kanban boards.
           </p>
         </div>
       )}
 
+      {/* Empty State - Customer Selected but No Boards */}
+      {selectedCustomerId && boards.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed border-border/50 bg-card/30">
+          <LayoutGrid className="size-16 text-muted-foreground/30 mb-4" />
+          <h3 className="text-lg font-medium mb-2">No boards yet</h3>
+          <p className="text-muted-foreground max-w-md mb-6">
+            Create your first kanban board for {selectedCustomer?.name}.
+          </p>
+          <Button onClick={handleAddBoard}>
+            <Plus className="size-4 mr-2" />
+            Create Board
+          </Button>
+        </div>
+      )}
+
       {/* Kanban Columns */}
-      {selectedCustomerId && (
-        <div className="grid grid-cols-4 gap-4 flex-1 min-h-0">
-          {COLUMNS.map((column) => (
-            <div key={column.id} className="flex flex-col min-h-0">
-              {/* Column Header */}
-              <div className="flex items-center justify-between mb-3 px-1">
-                <div className="flex items-center gap-2">
-                  <div className={cn("size-3 rounded-full", column.color)} />
-                  <span className="font-medium text-sm">{column.title}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    {tasksByStatus[column.id]?.length || 0}
-                  </Badge>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="size-7"
-                  onClick={() => handleAddTask(column.id)}
+      {selectedBoard && (
+        <div className="flex flex-col h-full">
+          {/* Loading overlay */}
+          {isLoading && (
+            <div className="absolute inset-0 bg-background/50 flex items-center justify-center z-10">
+              <div className="size-8 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
+            </div>
+          )}
+          {/* Board Actions */}
+          <div className="flex items-center gap-2 mb-4">
+            <DropdownMenu>
+              <DropdownMenuTrigger className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm">
+                <MoreHorizontal className="size-4 mr-1" />
+                Board Actions
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuItem onClick={() => handleEditBoard(selectedBoard)}>
+                  <Pencil className="size-4 mr-2" />
+                  Edit Board
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onClick={() => handleDeleteBoard(selectedBoard.id)}
                 >
-                  <Plus className="size-4" />
-                </Button>
-              </div>
+                  <Trash2 className="size-4 mr-2" />
+                  Delete Board
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            
+            <div className="text-sm text-muted-foreground">
+              {boards.length} board{boards.length !== 1 ? 's' : ''} for this customer
+            </div>
+          </div>
 
-              {/* Tasks */}
-              <div className="flex-1 space-y-2 min-h-0 overflow-y-auto">
-                {tasksByStatus[column.id]?.map((task) => {
-                  const taskAssignee = teamMembers.find(
-                    (u) => u.id === task.assigned_to,
-                  );
-                  return (
-                    <div
-                      key={task.id}
-                      className="group p-4 rounded-lg bg-card border border-border hover:border-primary/30 transition-colors cursor-pointer"
-                      onClick={() => handleEditTask(task)}
-                    >
-                      {/* Header: Title + Menu */}
-                      <div className="flex items-start justify-between gap-2 mb-3">
-                        <h3 className="font-medium text-sm line-clamp-2 flex-1">
-                          {task.title}
-                        </h3>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger
-                            className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent
-                            align="end"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <DropdownMenuItem
-                              onClick={() => handleEditTask(task)}
+          <div className="grid grid-cols-4 gap-4 flex-1 min-h-0">
+            {COLUMNS.map((column) => (
+              <div key={column.id} className="flex flex-col min-h-0">
+                {/* Column Header */}
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <div className="flex items-center gap-2">
+                    <div className={cn("size-3 rounded-full", column.color)} />
+                    <span className="font-medium text-sm">{column.title}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      {tasksByStatus[column.id]?.length || 0}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-7"
+                    onClick={() => handleAddTask(column.id)}
+                  >
+                    <Plus className="size-4" />
+                  </Button>
+                </div>
+
+                {/* Tasks */}
+                <div className="flex-1 space-y-2 min-h-0 overflow-y-auto">
+                  {tasksByStatus[column.id]?.map((task) => {
+                    const taskAssignee = teamMembers.find(
+                      (u) => u.id === task.assigned_to,
+                    );
+                    return (
+                      <div
+                        key={task.id}
+                        className="group p-4 rounded-lg bg-card border border-border hover:border-primary/30 transition-colors cursor-pointer"
+                        onClick={() => handleEditTask(task)}
+                      >
+                        {/* Header: Title + Menu */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <h3 className="font-medium text-sm line-clamp-2 flex-1">
+                            {task.title}
+                          </h3>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-accent"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Pencil className="size-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            {column.id !== "backlog" && (
-                              <DropdownMenuItem
-                                onClick={() => handleMoveTask(task, "backlog")}
-                              >
-                                Move to Backlog
-                              </DropdownMenuItem>
-                            )}
-                            {column.id !== "todo" && (
-                              <DropdownMenuItem
-                                onClick={() => handleMoveTask(task, "todo")}
-                              >
-                                Move to To Do
-                              </DropdownMenuItem>
-                            )}
-                            {column.id !== "in_progress" && (
-                              <DropdownMenuItem
-                                onClick={() =>
-                                  handleMoveTask(task, "in_progress")
-                                }
-                              >
-                                Move to In Progress
-                              </DropdownMenuItem>
-                            )}
-                            {column.id !== "complete" && (
-                              <DropdownMenuItem
-                                onClick={() => handleMoveTask(task, "complete")}
-                              >
-                                Move to Complete
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              variant="destructive"
-                              onClick={() => handleDeleteTask(task.id)}
+                              <MoreHorizontal className="size-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <Trash2 className="size-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-
-                      {/* Description - Always takes space */}
-                      <div className="min-h-[1.5rem] mb-3">
-                        {task.description && (
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {task.description}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Assignee - Always takes space */}
-                      <div className="h-6 mb-3">
-                        {taskAssignee ? (
-                          <div className="flex items-center gap-1.5">
-                            <div className="size-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary border border-primary/20">
-                              {getUserInitials(taskAssignee)}
-                            </div>
-                            <span className="text-xs text-muted-foreground truncate">
-                              {getUserDisplayName(taskAssignee).split(" ")[0]}
-                            </span>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      {/* Footer: Priority & Due Date */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          {getPriorityBadge(task.priority)}
-                          <span className="text-xs text-muted-foreground capitalize">
-                            {task.priority}
-                          </span>
+                              <DropdownMenuItem
+                                onClick={() => handleEditTask(task)}
+                              >
+                                <Pencil className="size-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              {column.id !== "backlog" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleMoveTask(task, "backlog")}
+                                >
+                                  Move to Backlog
+                                </DropdownMenuItem>
+                              )}
+                              {column.id !== "todo" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleMoveTask(task, "todo")}
+                                >
+                                  Move to To Do
+                                </DropdownMenuItem>
+                              )}
+                              {column.id !== "in_progress" && (
+                                <DropdownMenuItem
+                                  onClick={() =>
+                                    handleMoveTask(task, "in_progress")
+                                  }
+                                >
+                                  Move to In Progress
+                                </DropdownMenuItem>
+                              )}
+                              {column.id !== "complete" && (
+                                <DropdownMenuItem
+                                  onClick={() => handleMoveTask(task, "complete")}
+                                >
+                                  Move to Complete
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                variant="destructive"
+                                onClick={() => handleDeleteTask(task.id)}
+                              >
+                                <Trash2 className="size-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </div>
 
-                        {task.due_date && (
-                          <div
-                            className={cn(
-                              "flex items-center gap-1 text-xs",
-                              getDueDateColor(task.due_date),
-                            )}
-                          >
-                            <Calendar className="size-3" />
-                            {formatDueDate(task.due_date)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
+                        {/* Description - Always takes space */}
+                        <div className="min-h-[1.5rem] mb-3">
+                          {task.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {task.description}
+                            </p>
+                          )}
+                        </div>
 
-                {/* Add Task Button at bottom */}
-                <Button
-                  variant="ghost"
-                  className="w-full h-8 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-border"
-                  onClick={() => handleAddTask(column.id)}
-                >
-                  <Plus className="size-4 mr-1" />
-                  Add task
-                </Button>
+                        {/* Assignee - Always takes space */}
+                        <div className="h-6 mb-3">
+                          {taskAssignee ? (
+                            <div className="flex items-center gap-1.5">
+                              <div className="size-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary border border-primary/20">
+                                {getUserInitials(taskAssignee)}
+                              </div>
+                              <span className="text-xs text-muted-foreground truncate">
+                                {getUserDisplayName(taskAssignee).split(" ")[0]}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+
+                        {/* Footer: Priority & Due Date */}
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            {getPriorityBadge(task.priority)}
+                            <span className="text-xs text-muted-foreground capitalize">
+                              {task.priority}
+                            </span>
+                          </div>
+
+                          {task.due_date && (
+                            <div
+                              className={cn(
+                                "flex items-center gap-1 text-xs",
+                                getDueDateColor(task.due_date),
+                              )}
+                            >
+                              <CalendarIcon className="size-3" />
+                              {formatDueDate(task.due_date)}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Add Task Button at bottom */}
+                  <Button
+                    variant="ghost"
+                    className="w-full h-8 text-muted-foreground hover:text-foreground border border-dashed border-border hover:border-border"
+                    onClick={() => handleAddTask(column.id)}
+                  >
+                    <Plus className="size-4 mr-1" />
+                    Add task
+                  </Button>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
@@ -596,7 +858,7 @@ export function KanbanBoard({
             <DialogDescription>
               {editingTask
                 ? "Update the task details below"
-                : `Create a new task for ${selectedCustomer?.name || "this customer"}`}
+                : `Create a new task on ${selectedBoard?.name || "this board"}`}
             </DialogDescription>
           </DialogHeader>
 
@@ -632,7 +894,7 @@ export function KanbanBoard({
               <Label htmlFor="assigned_to">Assigned To</Label>
               <Select
                 value={taskForm.assigned_to || "unassigned"}
-                onValueChange={(v: string | null) =>
+                onValueChange={(v) =>
                   setTaskForm({
                     ...taskForm,
                     assigned_to: !v || v === "unassigned" ? "" : v,
@@ -640,7 +902,30 @@ export function KanbanBoard({
                 }
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Assign to..." />
+                  <SelectValue placeholder="Assign to...">
+                    {(() => {
+                      const member = teamMembers.find(m => m.id === taskForm.assigned_to);
+                      if (!taskForm.assigned_to || taskForm.assigned_to === "unassigned") {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <UserCircle className="size-4 text-muted-foreground" />
+                            <span>Unassigned</span>
+                          </div>
+                        );
+                      }
+                      if (member) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <div className="size-5 rounded-full bg-primary/10 flex items-center justify-center text-[10px] font-medium text-primary border border-primary/20">
+                              {getUserInitials(member)}
+                            </div>
+                            <span>{getUserDisplayName(member)}</span>
+                          </div>
+                        );
+                      }
+                      return <span>Assign to...</span>;
+                    })()}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="unassigned">
@@ -706,15 +991,35 @@ export function KanbanBoard({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="due_date">Due Date</Label>
-              <Input
-                id="due_date"
-                type="datetime-local"
-                value={taskForm.due_date}
-                onChange={(e) =>
-                  setTaskForm({ ...taskForm, due_date: e.target.value })
-                }
-              />
+              <Label>Due Date</Label>
+              <Popover>
+                <PopoverTrigger
+                  className={cn(
+                    "w-full justify-start text-left font-normal flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
+                    !taskForm.due_date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="h-4 w-4" />
+                  {taskForm.due_date ? (
+                    format(parseISO(taskForm.due_date), "PPP")
+                  ) : (
+                    <span>Pick a date</span>
+                  )}
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={taskForm.due_date ? parseISO(taskForm.due_date) : undefined}
+                    onSelect={(date) =>
+                      setTaskForm({
+                        ...taskForm,
+                        due_date: date ? format(date, "yyyy-MM-dd") : "",
+                      })
+                    }
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div className="flex justify-end gap-3">
@@ -808,6 +1113,79 @@ export function KanbanBoard({
               </Button>
               <Button type="submit" disabled={isSubmitting}>
                 Create Customer
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Board Dialog */}
+      <Dialog
+        open={isBoardDialogOpen}
+        onOpenChange={setIsBoardDialogOpen}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editingBoard ? "Edit Board" : "New Board"}</DialogTitle>
+            <DialogDescription>
+              {editingBoard
+                ? "Update the board details"
+                : `Create a new kanban board for ${selectedCustomer?.name || "this customer"}`}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSaveBoard} className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="b-name">Board Name</Label>
+              <Input
+                id="b-name"
+                value={boardForm.name}
+                onChange={(e) =>
+                  setBoardForm({ ...boardForm, name: e.target.value })
+                }
+                placeholder="Board name..."
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="b-description">Description (optional)</Label>
+              <Textarea
+                id="b-description"
+                value={boardForm.description}
+                onChange={(e) =>
+                  setBoardForm({ ...boardForm, description: e.target.value })
+                }
+                placeholder="Brief description of this board..."
+                rows={2}
+              />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="b-default"
+                checked={boardForm.is_default}
+                onChange={(e) =>
+                  setBoardForm({ ...boardForm, is_default: e.target.checked })
+                }
+                className="rounded border-gray-300"
+              />
+              <Label htmlFor="b-default" className="text-sm cursor-pointer">
+                Set as default board for this customer
+              </Label>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsBoardDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
+                {editingBoard ? "Update Board" : "Create Board"}
               </Button>
             </div>
           </form>

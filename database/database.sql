@@ -6,8 +6,9 @@ DROP TABLE IF EXISTS api_request_logs CASCADE;
 DROP TABLE IF EXISTS settings CASCADE;
 DROP TABLE IF EXISTS api_keys CASCADE;
 DROP TABLE IF EXISTS projects CASCADE;
-DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS kanban_tasks CASCADE;
+DROP TABLE IF EXISTS kanban_boards CASCADE;
+DROP TABLE IF EXISTS customers CASCADE;
 
 DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
 DROP FUNCTION IF EXISTS increment_api_key_request_count CASCADE;
@@ -181,12 +182,24 @@ CREATE TABLE customers (
   notes TEXT
 );
 
--- Kanban tasks table
-CREATE TABLE kanban_tasks (
+-- Kanban boards table (multiple boards per customer)
+CREATE TABLE kanban_boards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  is_default BOOLEAN DEFAULT FALSE,
+  author_id TEXT NOT NULL
+);
+
+-- Kanban tasks table (now references board instead of customer directly)
+CREATE TABLE kanban_tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  board_id UUID NOT NULL REFERENCES kanban_boards(id) ON DELETE CASCADE,
   assigned_to TEXT, -- Clerk User ID
   title TEXT NOT NULL,
   description TEXT,
@@ -199,13 +212,15 @@ CREATE TABLE kanban_tasks (
 
 -- Indexes for Kanban performance
 CREATE INDEX idx_customers_name ON customers(name);
-CREATE INDEX idx_kanban_tasks_customer ON kanban_tasks(customer_id);
+CREATE INDEX idx_kanban_boards_customer ON kanban_boards(customer_id);
+CREATE INDEX idx_kanban_tasks_board ON kanban_tasks(board_id);
 CREATE INDEX idx_kanban_tasks_assigned ON kanban_tasks(assigned_to);
 CREATE INDEX idx_kanban_tasks_status ON kanban_tasks(status);
 CREATE INDEX idx_kanban_tasks_position ON kanban_tasks(position);
 
 -- Triggers for updated_at
 CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+CREATE TRIGGER update_kanban_boards_updated_at BEFORE UPDATE ON kanban_boards FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 CREATE TRIGGER update_kanban_tasks_updated_at BEFORE UPDATE ON kanban_tasks FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 -- Contact submissions table

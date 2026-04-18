@@ -505,12 +505,17 @@ export default function ContactPage() {
   const handleToggleArchive = useCallback(async (id: string, currentArchived: boolean) => {
     try {
       const makeArchived = !currentArchived;
-      // When archiving, also set status to closed
       if (makeArchived) {
+        // When archiving, also set status to closed
         await updateSubmissionStatus(id, "closed");
+        await toggleArchiveSubmission(id, true);
+        toast.success("Archived and closed");
+      } else {
+        // When unarchiving, restore to "read" status so it appears in the active table
+        await toggleArchiveSubmission(id, false);
+        await updateSubmissionStatus(id, "read");
+        toast.success("Unarchived and restored to Read");
       }
-      await toggleArchiveSubmission(id, makeArchived);
-      toast.success(makeArchived ? "Archived and closed" : "Unarchived submission");
       await fetchSubmissions();
     } catch (error) {
       toast.error("Failed to update archive status");
@@ -599,10 +604,13 @@ export default function ContactPage() {
       
       for (let i = 0; i < ids.length; i += batchSize) {
         const batch = ids.slice(i, i + batchSize);
-        await Promise.all(batch.map(id => toggleArchiveSubmission(id, false)));
+        await Promise.all(batch.map(id => Promise.all([
+          toggleArchiveSubmission(id, false),
+          updateSubmissionStatus(id, "read")
+        ])));
       }
       
-      toast.success(`Unarchived: ${totalSelectedCount} submissions`);
+      toast.success(`Unarchived and restored to Read: ${totalSelectedCount} submissions`);
       await fetchSubmissions();
     } catch (error) {
       toast.error("Failed to unarchive some submissions");

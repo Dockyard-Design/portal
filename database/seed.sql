@@ -36,29 +36,79 @@ VALUES
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'TechStart Inc', 'hello@techstart.io', 'TechStart', 'Startup with rapid development needs'),
 ('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Global Solutions', 'info@globalsolutions.com', 'Global Solutions Ltd', 'International client with multiple projects');
 
--- 5. Seed Kanban Tasks
-INSERT INTO kanban_tasks (customer_id, assigned_to, title, description, status, priority, position, author_id, due_date)
+-- 5. Seed Kanban Boards (multiple boards per customer)
+INSERT INTO kanban_boards (id, customer_id, name, description, is_default, author_id)
 VALUES
--- Backlog tasks for Demo Customer A
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', null, 'Initial consultation', 'Setup kickoff meeting with stakeholders', 'backlog', 'high', 0, 'seed-author-id', NOW() + INTERVAL '7 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', null, 'Requirements gathering', 'Document all technical requirements', 'backlog', 'medium', 1, 'seed-author-id', NOW() + INTERVAL '14 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'seed-author-id', 'Budget planning', 'Estimate project costs and timeline', 'backlog', 'low', 2, 'seed-author-id', NOW() + INTERVAL '21 days'),
--- Todo tasks for Demo Customer A
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'seed-author-id', 'Wireframe approval', 'Get sign-off on initial wireframes', 'todo', 'high', 0, 'seed-author-id', NOW() + INTERVAL '3 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', null, 'Technical planning', 'Create architecture diagram', 'todo', 'medium', 1, 'seed-author-id', NOW() + INTERVAL '5 days'),
--- In Progress tasks for Demo Customer B
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'seed-author-id', 'Database schema design', 'Design and document database structure', 'in_progress', 'urgent', 0, 'seed-author-id', NOW() + INTERVAL '2 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', null, 'API endpoints', 'Build REST API endpoints', 'in_progress', 'high', 1, 'seed-author-id', NOW() + INTERVAL '4 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'seed-author-id', 'Authentication flow', 'Implement user auth with Clerk', 'in_progress', 'medium', 2, 'seed-author-id', NOW() + INTERVAL '5 days'),
--- Complete tasks for Demo Customer B  
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', null, 'Project setup', 'Initialize repository and CI/CD', 'complete', 'medium', 0, 'seed-author-id', NOW() - INTERVAL '5 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'seed-author-id', 'Design system', 'Create component library', 'complete', 'low', 1, 'seed-author-id', NOW() - INTERVAL '3 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', null, 'Team onboarding', 'Setup accounts for team members', 'complete', 'low', 2, 'seed-author-id', NOW() - INTERVAL '2 days'),
--- Tasks for Acme Corporation
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', null, 'Security audit', 'Complete SOC2 compliance assessment', 'backlog', 'urgent', 0, 'seed-author-id', NOW() + INTERVAL '30 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'seed-author-id', 'Performance review', 'Optimize database queries', 'todo', 'high', 0, 'seed-author-id', NOW() + INTERVAL '7 days'),
--- Tasks for TechStart
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'seed-author-id', 'MVP launch prep', 'Prepare marketing materials', 'in_progress', 'urgent', 0, 'seed-author-id', NOW() + INTERVAL '3 days'),
--- Tasks for Global Solutions
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', null, 'Multi-region deployment', 'Setup EU and APAC instances', 'backlog', 'high', 0, 'seed-author-id', NOW() + INTERVAL '60 days'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'seed-author-id', 'Localization', 'Translate app to 5 languages', 'todo', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '30 days');
+-- Demo Customer A boards
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Main Board', 'Primary project board for Demo Customer A', true, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Website Redesign', 'Website redesign project board', false, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Q4 Marketing', 'Marketing campaigns for Q4', false, 'seed-author-id'),
+
+-- Demo Customer B boards
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'Main Board', 'Primary project board for Demo Customer B', true, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'Mobile App', 'Mobile app development board', false, 'seed-author-id'),
+
+-- Acme Corporation boards
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Main Board', 'Primary project board for Acme Corp', true, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Security Audit', 'SOC2 compliance and security audit board', false, 'seed-author-id'),
+
+-- TechStart Inc boards
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'Main Board', 'Primary project board for TechStart', true, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a09', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'MVP Launch', 'MVP launch preparation board', false, 'seed-author-id'),
+
+-- Global Solutions boards
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Main Board', 'Primary project board for Global Solutions', true, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'International Expansion', 'Multi-region deployment board', false, 'seed-author-id'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Localization', 'App translation project board', false, 'seed-author-id');
+
+-- 6. Seed Kanban Tasks (now reference board_id instead of customer_id)
+INSERT INTO kanban_tasks (board_id, assigned_to, title, description, status, priority, position, author_id, due_date)
+VALUES
+-- Demo Customer A - Main Board tasks
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', null, 'Initial consultation', 'Setup kickoff meeting with stakeholders', 'backlog', 'high', 0, 'seed-author-id', NOW() + INTERVAL '7 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', null, 'Requirements gathering', 'Document all technical requirements', 'backlog', 'medium', 1, 'seed-author-id', NOW() + INTERVAL '14 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'seed-author-id', 'Budget planning', 'Estimate project costs and timeline', 'backlog', 'low', 2, 'seed-author-id', NOW() + INTERVAL '21 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'seed-author-id', 'Wireframe approval', 'Get sign-off on initial wireframes', 'todo', 'high', 0, 'seed-author-id', NOW() + INTERVAL '3 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', null, 'Technical planning', 'Create architecture diagram', 'todo', 'medium', 1, 'seed-author-id', NOW() + INTERVAL '5 days'),
+
+-- Demo Customer A - Website Redesign Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'seed-author-id', 'Homepage mockups', 'Design new homepage layouts', 'in_progress', 'high', 0, 'seed-author-id', NOW() + INTERVAL '5 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', null, 'Color palette selection', 'Choose brand colors and typography', 'backlog', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '10 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'seed-author-id', 'Wireframe review', 'Present wireframes to client', 'complete', 'high', 0, 'seed-author-id', NOW() - INTERVAL '2 days'),
+
+-- Demo Customer B - Main Board tasks
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'seed-author-id', 'Database schema design', 'Design and document database structure', 'in_progress', 'urgent', 0, 'seed-author-id', NOW() + INTERVAL '2 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', null, 'API endpoints', 'Build REST API endpoints', 'in_progress', 'high', 1, 'seed-author-id', NOW() + INTERVAL '4 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'seed-author-id', 'Authentication flow', 'Implement user auth with Clerk', 'in_progress', 'medium', 2, 'seed-author-id', NOW() + INTERVAL '5 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', null, 'Project setup', 'Initialize repository and CI/CD', 'complete', 'medium', 0, 'seed-author-id', NOW() - INTERVAL '5 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'seed-author-id', 'Design system', 'Create component library', 'complete', 'low', 1, 'seed-author-id', NOW() - INTERVAL '3 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', null, 'Team onboarding', 'Setup accounts for team members', 'complete', 'low', 2, 'seed-author-id', NOW() - INTERVAL '2 days'),
+
+-- Demo Customer B - Mobile App Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', null, 'iOS prototype', 'Build iOS wireframe prototype', 'backlog', 'high', 0, 'seed-author-id', NOW() + INTERVAL '14 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'seed-author-id', 'User research', 'Interview potential users', 'todo', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '7 days'),
+
+-- Acme Corporation - Main Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'seed-author-id', 'Performance review', 'Optimize database queries', 'todo', 'high', 0, 'seed-author-id', NOW() + INTERVAL '7 days'),
+
+-- Acme Corporation - Security Audit Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', null, 'Security audit', 'Complete SOC2 compliance assessment', 'backlog', 'urgent', 0, 'seed-author-id', NOW() + INTERVAL '30 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'seed-author-id', 'Penetration testing', 'Schedule external security testing', 'backlog', 'high', 1, 'seed-author-id', NOW() + INTERVAL '45 days'),
+
+-- TechStart Inc - Main Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'seed-author-id', 'Feature planning', 'Prioritize MVP features', 'backlog', 'high', 0, 'seed-author-id', NOW() + INTERVAL '7 days'),
+
+-- TechStart Inc - MVP Launch Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a09', 'seed-author-id', 'MVP launch prep', 'Prepare marketing materials', 'in_progress', 'urgent', 0, 'seed-author-id', NOW() + INTERVAL '3 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a09', null, 'Beta testing', 'Recruit beta testers', 'todo', 'high', 0, 'seed-author-id', NOW() + INTERVAL '5 days'),
+
+-- Global Solutions - Main Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', null, 'Account setup', 'Configure enterprise account', 'in_progress', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '2 days'),
+
+-- Global Solutions - International Expansion Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', null, 'Multi-region deployment', 'Setup EU and APAC instances', 'backlog', 'high', 0, 'seed-author-id', NOW() + INTERVAL '60 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'seed-author-id', 'Compliance review', 'Meet regional compliance requirements', 'backlog', 'urgent', 1, 'seed-author-id', NOW() + INTERVAL '45 days'),
+
+-- Global Solutions - Localization Board
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'seed-author-id', 'Localization', 'Translate app to 5 languages', 'todo', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '30 days'),
+('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', null, 'Translation review', 'Review translated content', 'backlog', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '45 days');
