@@ -14,6 +14,7 @@ import {
   ChevronRight,
   Briefcase,
   Users,
+  Receipt,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -94,6 +95,11 @@ const NAV_GROUPS: MenuGroup[] = [
         title: "Contact Submissions",
         href: "/dashboard/contact",
         icon: MessageSquare,
+      },
+      {
+        title: "Expense Tracker",
+        href: "/dashboard/expenses",
+        icon: Receipt,
       },
     ],
   },

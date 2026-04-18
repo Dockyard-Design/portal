@@ -13,6 +13,8 @@ DROP TABLE IF EXISTS projects CASCADE;
 DROP TABLE IF EXISTS kanban_tasks CASCADE;
 DROP TABLE IF EXISTS kanban_boards CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
+DROP TABLE IF EXISTS expenses CASCADE;
+DROP TABLE IF EXISTS expense_categories CASCADE;
 
 DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
 DROP FUNCTION IF EXISTS increment_api_key_request_count CASCADE;
@@ -336,5 +338,85 @@ CREATE TRIGGER update_quotes_updated_at
 
 CREATE TRIGGER update_invoices_updated_at 
   BEFORE UPDATE ON invoices 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+-- Expenses table for tracking business expenses
+CREATE TABLE expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  title TEXT NOT NULL,
+  description TEXT,
+  amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  currency TEXT DEFAULT 'GBP',
+  category TEXT NOT NULL
+    CHECK (category IN ('office', 'utilities', 'software', 'hardware', 'marketing', 'travel', 'salaries', 'freelance', 'other')),
+  expense_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  receipt_url TEXT,
+  is_recurring BOOLEAN DEFAULT FALSE,
+  recurring_frequency TEXT
+    CHECK (recurring_frequency IS NULL OR recurring_frequency IN ('monthly', 'quarterly', 'yearly')),
+  tax_deductible BOOLEAN DEFAULT FALSE,
+  vendor TEXT,
+  author_id TEXT NOT NULL
+);
+
+-- Indexes for expenses
+CREATE INDEX idx_expenses_category ON expenses(category);
+CREATE INDEX idx_expenses_date ON expenses(expense_date);
+CREATE INDEX idx_expenses_tax_deductible ON expenses(tax_deductible) WHERE tax_deductible = TRUE;
+
+-- Trigger for expenses updated_at
+CREATE TRIGGER update_expenses_updated_at 
+  BEFORE UPDATE ON expenses 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+-- Expense categories table (dynamic)
+CREATE TABLE expense_categories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  name TEXT NOT NULL,
+  color TEXT NOT NULL DEFAULT 'bg-blue-500',
+  icon TEXT NOT NULL DEFAULT 'MoreHorizontal',
+  description TEXT,
+  is_active BOOLEAN DEFAULT TRUE
+);
+
+-- Expenses table for tracking business expenses
+CREATE TABLE expenses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  title TEXT NOT NULL,
+  description TEXT,
+  amount DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  currency TEXT DEFAULT 'GBP',
+  category_id UUID NOT NULL REFERENCES expense_categories(id) ON DELETE RESTRICT,
+  expense_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  receipt_url TEXT,
+  is_recurring BOOLEAN DEFAULT FALSE,
+  recurring_frequency TEXT
+    CHECK (recurring_frequency IS NULL OR recurring_frequency IN ('monthly', 'quarterly', 'yearly')),
+  tax_deductible BOOLEAN DEFAULT FALSE,
+  vendor TEXT,
+  author_id TEXT NOT NULL
+);
+
+-- Indexes for expenses
+CREATE INDEX idx_expenses_category ON expenses(category_id);
+CREATE INDEX idx_expenses_date ON expenses(expense_date);
+CREATE INDEX idx_expenses_tax_deductible ON expenses(tax_deductible) WHERE tax_deductible = TRUE;
+
+-- Triggers for expenses and categories
+CREATE TRIGGER update_expenses_updated_at 
+  BEFORE UPDATE ON expenses 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_expense_categories_updated_at 
+  BEFORE UPDATE ON expense_categories 
   FOR EACH ROW 
   EXECUTE PROCEDURE update_updated_at_column();

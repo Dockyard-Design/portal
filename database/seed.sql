@@ -151,3 +151,54 @@ VALUES
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'Consulting Services', 20, 150.00, 3000.00, 0),
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'Consulting Services', 20, 150.00, 3000.00, 0),
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'Consulting Services', 20, 150.00, 3000.00, 0);
+
+-- 9. Seed Expense Categories
+INSERT INTO expense_categories (id, name, color, icon, description)
+VALUES
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Office Rent', 'bg-blue-500', 'Building', 'Monthly office rental payments'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Utilities', 'bg-yellow-500', 'Zap', 'Electricity, water, internet'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'Software', 'bg-purple-500', 'Monitor', 'Software subscriptions and licenses'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'Hardware', 'bg-gray-500', 'Laptop', 'Computers, equipment, devices'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'Marketing', 'bg-pink-500', 'Megaphone', 'Advertising and marketing campaigns'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'Travel', 'bg-green-500', 'Plane', 'Business travel and accommodation'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'Freelance', 'bg-orange-500', 'User', 'Contractor and freelancer payments'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'Supplies', 'bg-slate-500', 'Package', 'Office supplies and misc items');
+
+-- 10. Seed Expenses
+INSERT INTO expenses (category_id, title, description, amount, expense_date, tax_deductible, is_recurring, recurring_frequency, vendor, author_id)
+VALUES
+-- Office Rent (Recurring)
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Office Rent - January', 'Monthly office rent', 1200.00, NOW() - INTERVAL '2 months', true, true, 'monthly', 'London Office Co', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Office Rent - February', 'Monthly office rent', 1200.00, NOW() - INTERVAL '1 month', true, true, 'monthly', 'London Office Co', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Office Rent - March', 'Monthly office rent', 1200.00, NOW(), true, true, 'monthly', 'London Office Co', 'seed-author-id'),
+
+-- Software subscriptions
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'Figma Pro', 'Design tool subscription', 45.00, NOW() - INTERVAL '15 days', true, true, 'monthly', 'Figma', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'GitHub Team', 'Code repository', 44.00, NOW() - INTERVAL '10 days', true, true, 'monthly', 'GitHub', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'Vercel Pro', 'Hosting platform', 20.00, NOW() - INTERVAL '5 days', true, true, 'monthly', 'Vercel', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'Clerk', 'Authentication service', 25.00, NOW() - INTERVAL '3 days', true, true, 'monthly', 'Clerk', 'seed-author-id'),
+
+-- Utilities
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Electricity Bill', 'Office electricity Q1', 350.00, NOW() - INTERVAL '20 days', true, false, NULL, 'British Gas', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Internet Service', 'High speed fibre', 65.00, NOW() - INTERVAL '1 month', true, true, 'monthly', 'BT Business', 'seed-author-id'),
+
+-- Hardware
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'MacBook Pro', 'New developer laptop', 1999.00, NOW() - INTERVAL '30 days', true, false, NULL, 'Apple Store', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'External Monitors', '2x 4K displays', 650.00, NOW() - INTERVAL '25 days', true, false, NULL, 'Amazon Business', 'seed-author-id'),
+
+-- Marketing
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'Google Ads', 'Spring campaign', 500.00, NOW() - INTERVAL '10 days', true, false, NULL, 'Google', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'LinkedIn Ads', 'B2B lead generation', 300.00, NOW() - INTERVAL '5 days', true, false, NULL, 'LinkedIn', 'seed-author-id'),
+
+-- Travel
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'Client Meeting - Manchester', 'Train tickets', 85.00, NOW() - INTERVAL '12 days', true, false, NULL, 'Trainline', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a06', 'Tech Conference', 'Conference ticket', 450.00, NOW() - INTERVAL '18 days', true, false, NULL, 'Eventbrite', 'seed-author-id'),
+
+-- Freelance
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'Freelance Designer', 'Website redesign project', 1500.00, NOW() - INTERVAL '7 days', true, false, NULL, 'Upwork', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'SEO Consultant', 'Monthly retainer', 800.00, NOW() - INTERVAL '1 month', true, true, 'monthly', 'Freelancer', 'seed-author-id'),
+
+-- Supplies
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'Office Stationery', 'Pens, paper, printer ink', 125.00, NOW() - INTERVAL '14 days', true, false, NULL, 'Staples', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'Coffee & Snacks', 'Kitchen supplies', 85.00, NOW() - INTERVAL '3 days', true, false, NULL, 'Sainsburys', 'seed-author-id'),
+('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'Ergonomic Chair', 'Office chair', 450.00, NOW() - INTERVAL '35 days', true, false, NULL, 'Herman Miller', 'seed-author-id');

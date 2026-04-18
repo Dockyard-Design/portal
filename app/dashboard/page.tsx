@@ -6,6 +6,7 @@ import {
   Clock,
   Shield,
   LayoutGrid,
+  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
@@ -20,8 +21,10 @@ import {
 } from "@/app/actions/contact";
 import { getKanbanMetrics } from "@/app/actions/kanban-metrics";
 import { getAgencyMetrics } from "@/app/actions/agency-metrics";
+import { getExpenseMetrics } from "@/app/actions/expense-metrics";
 import { KanbanMetrics } from "./kanban-metrics";
 import { AgencyMetrics } from "./agency-metrics";
+import { ExpenseMetrics } from "./expense-metrics";
 import { ApiRequestsTable } from "./api-requests-table";
 
 export default async function DashboardPage() {
@@ -34,6 +37,7 @@ export default async function DashboardPage() {
     kanbanMetrics,
     contactSubmissions,
     agencyMetrics,
+    expenseMetrics,
   ] = await Promise.all([
     getProjects(),
     getApiKeys(),
@@ -66,6 +70,16 @@ export default async function DashboardPage() {
       invoices: { total: 0, draft: 0, sent: 0, paid: 0, partial: 0, overdue: 0, cancelled: 0, totalValue: 0, paidValue: 0, outstandingValue: 0, overdueValue: 0 },
       monthlyData: [],
     })),
+    getExpenseMetrics().catch(() => ({
+      totalExpenses: 0,
+      totalAmount: 0,
+      currentMonthAmount: 0,
+      previousMonthAmount: 0,
+      byCategory: [],
+      monthlyTrend: [],
+      taxDeductibleAmount: 0,
+      recurringAmount: 0,
+    })),
   ]);
 
   const activeKeys = apiKeys.filter((k) => k.is_active).length;
@@ -76,6 +90,13 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
       {/* Agency Metrics */}
       <AgencyMetrics metrics={agencyMetrics} />
+
+      {/* Expense Metrics */}
+      <div className="flex items-center gap-2 pt-4">
+        <Receipt className="size-5 text-primary" />
+        <h2 className="text-lg font-semibold">Expense Tracker</h2>
+      </div>
+      <ExpenseMetrics metrics={expenseMetrics} />
 
       {/* Kanban Metrics */}
       <div className="flex items-center gap-2 pt-10">
