@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useKanbanStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,31 +15,33 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Building, Plus, Mail, Briefcase, LayoutGrid, ExternalLink, ChevronDown } from "lucide-react";
+import { 
+  Building, 
+  Plus, 
+  Mail, 
+  Briefcase, 
+  LayoutGrid, 
+  ExternalLink, 
+  ChevronDown,
+  Search,
+  ArrowRight,
+  FileText,
+  DollarSign
+} from "lucide-react";
 import Link from "next/link";
+import type { Customer, KanbanBoard } from "@/types/kanban";
 
-interface Customer {
-  id: string;
-  name: string;
-  company?: string | null;
-  email?: string | null;
-  notes?: string | null;
-  boards?: Board[];
-  boardCount?: number;
-}
-
-interface Board {
-  id: string;
-  name: string;
-  is_default?: boolean;
-  customer_id: string;
+interface CustomerWithBoards extends Customer {
+  boards: KanbanBoard[];
+  boardCount: number;
 }
 
 export default function CustomersPage() {
   const router = useRouter();
   const { setSelectedCustomer, setSelectedBoard } = useKanbanStore();
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<CustomerWithBoards[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function loadData() {
@@ -63,6 +66,17 @@ export default function CustomersPage() {
     loadData();
   }, []);
 
+  const filteredCustomers = useMemo(() => {
+    if (!searchQuery.trim()) return customers;
+    
+    const query = searchQuery.toLowerCase();
+    return customers.filter((customer) => 
+      customer.name.toLowerCase().includes(query) ||
+      customer.company?.toLowerCase().includes(query) ||
+      customer.email?.toLowerCase().includes(query)
+    );
+  }, [customers, searchQuery]);
+
   const handleOpenCustomer = (customerId: string, boardId?: string) => {
     setSelectedCustomer(customerId);
     if (boardId) {
@@ -76,7 +90,7 @@ export default function CustomersPage() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
           <Building className="size-6 text-primary" />
           <div>
@@ -93,6 +107,17 @@ export default function CustomersPage() {
             New Customer
           </Link>
         </Button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+        <Input
+          placeholder="Search customers by name, company, or email..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10"
+        />
       </div>
 
       {/* Customers Grid */}
@@ -114,20 +139,26 @@ export default function CustomersPage() {
             </div>
           ))}
         </div>
-      ) : customers.length === 0 ? (
+      ) : filteredCustomers.length === 0 ? (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed border-border/50 bg-card/30">
           <Building className="size-16 text-muted-foreground/30 mb-4" />
-          <h3 className="text-lg font-medium mb-2">No customers yet</h3>
+          <h3 className="text-lg font-medium mb-2">
+            {searchQuery ? "No matching customers" : "No customers yet"}
+          </h3>
           <p className="text-muted-foreground max-w-md mb-6">
-            Create your first customer from the Work page.
+            {searchQuery 
+              ? "Try adjusting your search terms" 
+              : "Create your first customer from the Work page."}
           </p>
-          <Button asChild>
-            <Link href="/dashboard/work">Go to Work</Link>
-          </Button>
+          {!searchQuery && (
+            <Button asChild>
+              <Link href="/dashboard/work">Go to Work</Link>
+            </Button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {customers.map((customer) => (
+          {filteredCustomers.map((customer) => (
             <div
               key={customer.id}
               className="p-4 rounded-xl bg-card border border-border/50 hover:border-primary/30 transition-colors"
@@ -138,7 +169,12 @@ export default function CustomersPage() {
                     <Building className="size-5 text-primary" />
                   </div>
                   <div>
-                    <h3 className="font-medium">{customer.name}</h3>
+                    <Link 
+                      href={`/dashboard/customers/${customer.id}`}
+                      className="font-medium hover:text-primary transition-colors"
+                    >
+                      {customer.name}
+                    </Link>
                     {customer.company && (
                       <p className="text-sm text-muted-foreground flex items-center gap-1">
                         <Briefcase className="size-3" />
@@ -162,55 +198,56 @@ export default function CustomersPage() {
                 </p>
               )}
 
-              {/* Board Actions */}
-              <div className="mt-4 pt-3 border-t border-border/50">
+              {/* Actions Row */}
+              <div className="mt-4 pt-3 border-t border-border/50 flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  asChild
+                >
+                  <Link href={`/dashboard/customers/${customer.id}`}>
+                    <FileText className="size-4 mr-1" />
+                    Details
+                    <ArrowRight className="size-3 ml-auto" />
+                  </Link>
+                </Button>
+                
+                {/* Board Dropdown */}
                 {customer.boardCount && customer.boardCount > 0 ? (
-                  <div className="flex gap-2">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        className="flex-1 flex justify-between items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground"
-                      >
-                        <span className="flex items-center gap-1">
-                          <LayoutGrid className="size-4" />
-                          {customer.boardCount} board{customer.boardCount !== 1 ? 's' : ''}
-                        </span>
-                        <ChevronDown className="size-3 opacity-50" />
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-48">
-                        <DropdownMenuGroup>
-                          <DropdownMenuLabel>Boards</DropdownMenuLabel>
-                          <DropdownMenuSeparator />
-                          {customer.boards?.map((board) => (
-                            <DropdownMenuItem 
-                              key={board.id}
-                              onClick={() => handleOpenCustomer(customer.id, board.id)}
-                            >
-                              <span className="flex-1 truncate">{board.name}</span>
-                              {board.is_default && (
-                                <Badge variant="secondary" className="text-xs ml-2">Default</Badge>
-                              )}
-                            </DropdownMenuItem>
-                          ))}
-                        </DropdownMenuGroup>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                    <Button 
-                      variant="default" 
-                      size="sm"
-                      onClick={() => handleOpenCustomer(customer.id)}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium border rounded-md"
                     >
-                      <ExternalLink className="size-4" />
-                    </Button>
-                  </div>
+                      <LayoutGrid className="size-4" />
+                      {customer.boardCount}
+                      <ChevronDown className="size-3 opacity-50" />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48">
+                      <DropdownMenuGroup>
+                        <DropdownMenuLabel>Boards</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        {customer.boards?.map((board: KanbanBoard) => (
+                          <DropdownMenuItem 
+                            key={board.id}
+                            onClick={() => handleOpenCustomer(customer.id, board.id)}
+                          >
+                            <span className="flex-1 truncate">{board.name}</span>
+                            {board.is_default && (
+                              <Badge variant="secondary" className="text-xs ml-2">Default</Badge>
+                            )}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 ) : (
                   <Button 
                     variant="outline" 
-                    size="sm" 
-                    className="w-full"
+                    size="sm"
                     onClick={() => handleOpenCustomer(customer.id)}
                   >
                     <LayoutGrid className="size-4 mr-1" />
-                    Create Board
+                    Board
                   </Button>
                 )}
               </div>
