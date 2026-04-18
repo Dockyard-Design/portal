@@ -1,4 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
+
+export const dynamic = "force-dynamic";
+
 import {
   ArrowUpRight,
   Plus,
