@@ -457,7 +457,7 @@ export function KanbanBoard({
             </div>
           )}
           {!selectedCustomer && (
-            <h1 className="text-2xl font-semibold">Work Board</h1>
+            <h1 className="text-2xl font-semibold">Kanban Board</h1>
           )}
         </div>
 
@@ -520,15 +520,17 @@ export function KanbanBoard({
                           </CommandItem>
                         ))}
                       </CommandGroup>
-                      <CommandGroup>
-                        <CommandItem
-                          onSelect={handleAddBoard}
-                          className="cursor-pointer text-primary"
-                        >
-                          <Plus className="size-4 mr-2" />
-                          Create new board
-                        </CommandItem>
-                      </CommandGroup>
+                      {customers.length > 0 && (
+                        <CommandGroup>
+                          <CommandItem
+                            onSelect={handleAddBoard}
+                            className="cursor-pointer text-primary"
+                          >
+                            <Plus className="size-4 mr-2" />
+                            Create new board
+                          </CommandItem>
+                        </CommandGroup>
+                      )}
                     </CommandList>
                   </Command>
                 </div>

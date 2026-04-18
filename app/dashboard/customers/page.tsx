@@ -148,11 +148,11 @@ export default function CustomersPage() {
           <p className="text-muted-foreground max-w-md mb-6">
             {searchQuery 
               ? "Try adjusting your search terms" 
-              : "Create your first customer from the Work page."}
+              : "Create your first customer from the kanban page."}
           </p>
           {!searchQuery && (
             <Button asChild>
-              <Link href="/dashboard/work">Go to Work</Link>
+              <Link href="/dashboard/kanban">Go to Kanban</Link>
             </Button>
           )}
         </div>
