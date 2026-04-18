@@ -13,6 +13,7 @@ import {
   Building,
   ChevronRight,
   Briefcase,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -98,6 +99,11 @@ const NAV_GROUPS: MenuGroup[] = [
 ];
 
 const NAV_SETTINGS: SingleMenuItem[] = [
+  {
+    title: "User Management",
+    href: "/dashboard/users",
+    icon: Users,
+  },
   {
     title: "API Keys",
     href: "/dashboard/api-keys",
