@@ -29,7 +29,7 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -150,10 +150,7 @@ export default function AppSidebar() {
       </SidebarHeader>
       <SidebarContent className="px-4">
         <SidebarGroup>
-          <SidebarGroupLabel className="px-2 text-xs font-semibold text-muted-foreground/60">
-            Navigation
-          </SidebarGroupLabel>
-          <SidebarMenu className="gap-1 mt-2">
+          <SidebarMenu className="gap-1">
             {/* Overview - Single Item */}
             <SidebarMenuItem>
               <SidebarMenuButton
@@ -192,9 +189,9 @@ export default function AppSidebar() {
                   className="group/collapsible"
                 >
                   <SidebarMenuItem>
-                    <SidebarMenuButton 
+                    <CollapsibleTrigger
                       className={cn(
-                        "transition-all duration-200 rounded-lg h-10 px-3",
+                        "w-full flex items-center gap-3 px-3 h-10 rounded-lg cursor-pointer transition-all duration-200",
                         isGroupActive 
                           ? "hover:bg-primary/10" 
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary"
@@ -204,8 +201,8 @@ export default function AppSidebar() {
                       <span className="font-medium flex-1 text-left">
                         {group.title}
                       </span>
-                      <ChevronRight className={cn("size-4 transition-transform group-data-[state=open]/collapsible:rotate-90")} />
-                    </SidebarMenuButton>
+                      <ChevronRight className="size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </CollapsibleTrigger>
                   </SidebarMenuItem>
                   <CollapsibleContent>
                     <SidebarMenuSub>
@@ -226,7 +223,7 @@ export default function AppSidebar() {
                                   href={item.href}
                                   className="flex items-center gap-2"
                                 >
-                                  <item.icon className={cn("size-4", isItemActive && "text-primary")} />
+                                  <item.icon className={cn("size-4", isItemActive && "!text-primary")} />
                                   <span>{item.title}</span>
                                 </Link>
                               }
