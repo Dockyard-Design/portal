@@ -10,9 +10,41 @@ async function requireAuth() {
   return userId;
 }
 
-export type ClerkUser = User;
+export interface SimpleUser {
+  id: string;
+  firstName: string | null;
+  lastName: string | null;
+  username: string | null;
+  emailAddresses: Array<{
+    id: string;
+    emailAddress: string;
+  }>;
+  primaryEmailAddressId: string | null;
+  imageUrl: string | null;
+  locked: boolean;
+  lastSignInAt: number | null;
+  createdAt: number;
+}
 
-export async function getUsers(): Promise<User[]> {
+function serializeUser(user: User): SimpleUser {
+  return {
+    id: user.id,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    username: user.username,
+    emailAddresses: user.emailAddresses.map((email) => ({
+      id: email.id,
+      emailAddress: email.emailAddress,
+    })),
+    primaryEmailAddressId: user.primaryEmailAddressId,
+    imageUrl: user.imageUrl,
+    locked: user.locked,
+    lastSignInAt: user.lastSignInAt,
+    createdAt: user.createdAt,
+  };
+}
+
+export async function getUsers(): Promise<SimpleUser[]> {
   await requireAuth();
 
   const client = await clerkClient();
@@ -21,7 +53,7 @@ export async function getUsers(): Promise<User[]> {
     orderBy: "-created_at",
   });
 
-  return data;
+  return data.map(serializeUser);
 }
 
 export async function createUser(params: {
@@ -29,7 +61,7 @@ export async function createUser(params: {
   firstName?: string;
   lastName?: string;
   password?: string;
-}): Promise<User> {
+}): Promise<SimpleUser> {
   await requireAuth();
 
   const client = await clerkClient();
@@ -41,7 +73,7 @@ export async function createUser(params: {
   });
 
   revalidatePath("/dashboard/users");
-  return user;
+  return serializeUser(user);
 }
 
 export async function updateUser(
@@ -51,7 +83,7 @@ export async function updateUser(
     lastName?: string;
     primaryEmailAddressID?: string;
   }
-): Promise<User> {
+): Promise<SimpleUser> {
   await requireAuth();
 
   const client = await clerkClient();
@@ -62,7 +94,7 @@ export async function updateUser(
   });
 
   revalidatePath("/dashboard/users");
-  return user;
+  return serializeUser(user);
 }
 
 export async function deleteUser(userId: string): Promise<void> {
@@ -74,14 +106,38 @@ export async function deleteUser(userId: string): Promise<void> {
   revalidatePath("/dashboard/users");
 }
 
-export async function disableUser(userId: string): Promise<void> {
+export async function lockUser(userId: string): Promise<SimpleUser> {
   await requireAuth();
 
   const client = await clerkClient();
-  // Lock the user by setting password to null and disabling
-  await client.users.updateUser(userId, {
-    password: null as unknown as string, // Type workaround - actually we need to use lock
+  const user = await client.users.lockUser(userId);
+
+  revalidatePath("/dashboard/users");
+  return serializeUser(user);
+}
+
+export async function unlockUser(userId: string): Promise<SimpleUser> {
+  await requireAuth();
+
+  const client = await clerkClient();
+  const user = await client.users.unlockUser(userId);
+
+  revalidatePath("/dashboard/users");
+  return serializeUser(user);
+}
+
+export async function resetUserPassword(
+  userId: string,
+  newPassword: string
+): Promise<SimpleUser> {
+  await requireAuth();
+
+  const client = await clerkClient();
+  const user = await client.users.updateUser(userId, {
+    password: newPassword,
+    signOutOfOtherSessions: true, // Sign out user from all devices
   });
 
   revalidatePath("/dashboard/users");
+  return serializeUser(user);
 }

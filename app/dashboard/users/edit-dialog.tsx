@@ -15,10 +15,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { updateUser } from "@/app/actions/users";
-import type { ClerkUser } from "@/app/actions/users";
+import type { SimpleUser } from "@/app/actions/users";
 
 interface EditUserDialogProps {
-  user: ClerkUser;
+  user: SimpleUser;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -54,8 +54,8 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
     }
   };
 
-  const email = user.primaryEmailAddress?.emailAddress || 
-                user.emailAddresses?.[0]?.emailAddress || 
+  const email = user.emailAddresses.find(e => e.id === user.primaryEmailAddressId)?.emailAddress || 
+                user.emailAddresses[0]?.emailAddress || 
                 "No email";
 
   return (

@@ -15,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { deleteUser } from "@/app/actions/users";
-import type { ClerkUser } from "@/app/actions/users";
+import type { SimpleUser } from "@/app/actions/users";
 import { CreateUserDialog } from "./create-dialog";
 import { EditUserDialog } from "./edit-dialog";
 import {
@@ -32,11 +32,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ITEMS_PER_PAGE = 10;
 
-export function UsersTable({ users }: { users: ClerkUser[] }) {
+export function UsersTable({ users }: { users: SimpleUser[] }) {
   const [page, setPage] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
-  const [editUser, setEditUser] = useState<ClerkUser | null>(null);
+  const [editUser, setEditUser] = useState<SimpleUser | null>(null);
   const router = useRouter();
   const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
   const paginatedUsers = users.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
@@ -63,16 +63,18 @@ export function UsersTable({ users }: { users: ClerkUser[] }) {
     }
   };
 
-  const getUserEmail = (user: ClerkUser) => {
-    return user.primaryEmailAddress?.emailAddress || user.emailAddresses?.[0]?.emailAddress || "No email";
+  const getUserEmail = (user: SimpleUser) => {
+    return user.emailAddresses.find(e => e.id === user.primaryEmailAddressId)?.emailAddress || 
+           user.emailAddresses[0]?.emailAddress || 
+           "No email";
   };
 
-  const getUserName = (user: ClerkUser) => {
+  const getUserName = (user: SimpleUser) => {
     const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
     return name || user.username || "Unnamed User";
   };
 
-  const getInitials = (user: ClerkUser) => {
+  const getInitials = (user: SimpleUser) => {
     const first = user.firstName?.[0] || user.username?.[0] || "U";
     const last = user.lastName?.[0] || "";
     return `${first}${last}`.toUpperCase() || "U";
@@ -117,7 +119,7 @@ export function UsersTable({ users }: { users: ClerkUser[] }) {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <Avatar className="size-9">
-                        <AvatarImage src={user.imageUrl} />
+                        <AvatarImage src={user.imageUrl ?? undefined} />
                         <AvatarFallback>{getInitials(user)}</AvatarFallback>
                       </Avatar>
                       <div className="flex flex-col">
