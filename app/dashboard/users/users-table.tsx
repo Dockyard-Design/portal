@@ -12,9 +12,9 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, UserX } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, Lock, Unlock, Key } from "lucide-react";
 import { toast } from "sonner";
-import { deleteUser } from "@/app/actions/users";
+import { deleteUser, lockUser, unlockUser, resetUserPassword } from "@/app/actions/users";
 import type { SimpleUser } from "@/app/actions/users";
 import { CreateUserDialog } from "./create-dialog";
 import { EditUserDialog } from "./edit-dialog";
@@ -28,6 +28,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ITEMS_PER_PAGE = 10;
@@ -37,6 +47,9 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [editUser, setEditUser] = useState<SimpleUser | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<SimpleUser | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const totalPages = Math.ceil(users.length / ITEMS_PER_PAGE);
   const paginatedUsers = users.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
@@ -60,6 +73,48 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
     } finally {
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
+    }
+  };
+
+  const handleLock = async (userId: string) => {
+    setIsLoading(true);
+    try {
+      await lockUser(userId);
+      toast.success("User locked");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to lock user");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleUnlock = async (userId: string) => {
+    setIsLoading(true);
+    try {
+      await unlockUser(userId);
+      toast.success("User unlocked");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to unlock user");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!resetPasswordUser || !newPassword) return;
+    setIsLoading(true);
+    try {
+      await resetUserPassword(resetPasswordUser.id, newPassword);
+      toast.success("Password reset successful");
+      setNewPassword("");
+      setResetPasswordUser(null);
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reset password");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -166,6 +221,38 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
                       <Button 
                         variant="ghost" 
                         size="icon" 
+                        className="h-8 w-8"
+                        onClick={() => setResetPasswordUser(user)}
+                        title="Reset Password"
+                      >
+                        <Key className="size-4" />
+                      </Button>
+                      {user.locked ? (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-emerald-600"
+                          onClick={() => handleUnlock(user.id)}
+                          disabled={isLoading}
+                          title="Unlock Account"
+                        >
+                          <Unlock className="size-4" />
+                        </Button>
+                      ) : (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 text-amber-600"
+                          onClick={() => handleLock(user.id)}
+                          disabled={isLoading}
+                          title="Lock Account"
+                        >
+                          <Lock className="size-4" />
+                        </Button>
+                      )}
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => openDeleteDialog(user.id)}
                       >
@@ -222,6 +309,55 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
           onOpenChange={(open) => !open && setEditUser(null)} 
         />
       )}
+
+      {/* Reset Password Dialog */}
+      <Dialog open={!!resetPasswordUser} onOpenChange={(open) => {
+        if (!open) {
+          setResetPasswordUser(null);
+          setNewPassword("");
+        }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset Password</DialogTitle>
+            <DialogDescription>
+              Set a new password for {resetPasswordUser?.firstName || resetPasswordUser?.emailAddresses[0]?.emailAddress}.
+              They will be signed out of all devices.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input
+                id="newPassword"
+                type="password"
+                placeholder="Enter new password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                minLength={8}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setResetPasswordUser(null);
+                setNewPassword("");
+              }} 
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleResetPassword} 
+              disabled={isLoading || newPassword.length < 8}
+            >
+              {isLoading ? "Resetting..." : "Reset Password"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
