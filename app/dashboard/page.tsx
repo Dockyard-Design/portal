@@ -14,7 +14,10 @@ import {
   getDashboardApiMetrics,
   getLastApiRequests,
 } from "@/app/actions/metrics";
-import { getContactSummary, getContactSubmissions } from "@/app/actions/contact";
+import {
+  getContactSummary,
+  getContactSubmissions,
+} from "@/app/actions/contact";
 import { getKanbanMetrics } from "@/app/actions/kanban-metrics";
 import { KanbanMetrics } from "./kanban-metrics";
 import { ApiRequestsTable } from "./api-requests-table";
@@ -64,7 +67,7 @@ export default async function DashboardPage() {
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
       {/* Kanban Metrics */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 pt-10">
         <LayoutGrid className="size-5 text-primary" />
         <h2 className="text-lg font-semibold">Kanban Boards</h2>
       </div>
@@ -122,7 +125,9 @@ export default async function DashboardPage() {
           <CardContent className="p-0">
             <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <h2 className="font-semibold text-foreground">Contact Submissions</h2>
+                <h2 className="font-semibold text-foreground">
+                  Contact Submissions
+                </h2>
                 {contactSummary.new > 0 && (
                   <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full">
                     {contactSummary.new} new
