@@ -46,7 +46,7 @@ export function KanbanMetrics({ metrics }: KanbanMetricsProps) {
         </Link>
 
         {/* Total Tasks */}
-        <Link href="/dashboard/work">
+        <Link href="/dashboard/kanban">
           <Card className="border-border/40 shadow-sm hover:border-primary/40 transition-colors group h-full">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -69,7 +69,7 @@ export function KanbanMetrics({ metrics }: KanbanMetricsProps) {
         </Link>
 
         {/* Backlog */}
-        <Link href="/dashboard/work">
+        <Link href="/dashboard/kanban">
           <Card className="border-border/40 shadow-sm hover:border-primary/40 transition-colors group h-full">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -92,7 +92,7 @@ export function KanbanMetrics({ metrics }: KanbanMetricsProps) {
         </Link>
 
         {/* Todo */}
-        <Link href="/dashboard/work">
+        <Link href="/dashboard/kanban">
           <Card className="border-border/40 shadow-sm hover:border-primary/40 transition-colors group h-full">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -115,7 +115,7 @@ export function KanbanMetrics({ metrics }: KanbanMetricsProps) {
         </Link>
 
         {/* In Progress */}
-        <Link href="/dashboard/work">
+        <Link href="/dashboard/kanban">
           <Card className="border-border/40 shadow-sm hover:border-primary/40 transition-colors group h-full">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">
@@ -138,7 +138,7 @@ export function KanbanMetrics({ metrics }: KanbanMetricsProps) {
         </Link>
 
         {/* Complete */}
-        <Link href="/dashboard/work">
+        <Link href="/dashboard/kanban">
           <Card className="border-border/40 shadow-sm hover:border-primary/40 transition-colors group h-full">
             <CardContent className="p-4">
               <div className="flex items-start justify-between">

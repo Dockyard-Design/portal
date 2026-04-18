@@ -6,6 +6,7 @@ import {
 import AppSidebar from "@/components/app-sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
+import { Breadcrumbs } from "@/components/breadcrumbs";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -13,9 +14,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <SidebarProvider>
         <AppSidebar />
         <SidebarInset>
-          <header className="flex h-16 shrink-0 items-center gap-2 px-4 border-b">
+          <header className="flex h-16 shrink-0 items-center gap-4 px-4 border-b">
             <SidebarTrigger />
-            <div className="flex-1" />
+            <Breadcrumbs />
           </header>
           <main className="flex-1 p-6">
             {children}

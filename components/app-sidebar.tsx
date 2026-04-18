@@ -77,7 +77,7 @@ const NAV_GROUPS: MenuGroup[] = [
     title: "Customers",
     icon: Briefcase,
     items: [
-      { title: "Kanban Board", href: "/dashboard/work", icon: KanbanSquare },
+      { title: "Kanban Board", href: "/dashboard/kanban", icon: KanbanSquare },
       {
         title: "Customer Management",
         href: "/dashboard/customers",

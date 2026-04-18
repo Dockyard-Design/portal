@@ -61,7 +61,7 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
 
         <div className="flex gap-2">
           <Button variant="outline" asChild>
-            <Link href="/dashboard/work">
+            <Link href="/dashboard/kanban">
               <LayoutGrid className="size-4 mr-1" />
               Kanban
             </Link>

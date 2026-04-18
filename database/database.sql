@@ -1,5 +1,9 @@
 -- RESET SCRIPT
 -- Drop all tables and functions to start fresh
+DROP TABLE IF EXISTS quote_items CASCADE;
+DROP TABLE IF EXISTS quotes CASCADE;
+DROP TABLE IF EXISTS invoice_items CASCADE;
+DROP TABLE IF EXISTS invoices CASCADE;
 DROP TABLE IF EXISTS contact_submissions CASCADE;
 DROP TABLE IF EXISTS api_rate_limits CASCADE;
 DROP TABLE IF EXISTS api_request_logs CASCADE;
@@ -243,3 +247,94 @@ CREATE TRIGGER set_updated_at_contact_submissions
 
 CREATE INDEX idx_contact_submissions_status ON contact_submissions(status);
 CREATE INDEX idx_contact_submissions_archived ON contact_submissions(archived);
+-- Quotes table for storing project quotes
+CREATE TABLE quotes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  description TEXT,
+  subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  tax_rate DECIMAL(5, 2) DEFAULT 0,
+  tax_amount DECIMAL(12, 2) DEFAULT 0,
+  total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  currency TEXT DEFAULT 'USD',
+  status TEXT NOT NULL DEFAULT 'draft' 
+    CHECK (status IN ('draft', 'sent', 'accepted', 'rejected', 'expired')),
+  valid_until TIMESTAMP WITH TIME ZONE,
+  accepted_at TIMESTAMP WITH TIME ZONE,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  notes TEXT,
+  terms TEXT,
+  author_id TEXT NOT NULL
+);
+
+CREATE TABLE quote_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quote_id UUID NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL DEFAULT 1,
+  unit_price DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  quote_id UUID REFERENCES quotes(id) ON DELETE SET NULL,
+  invoice_number TEXT UNIQUE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  subtotal DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  tax_rate DECIMAL(5, 2) DEFAULT 0,
+  tax_amount DECIMAL(12, 2) DEFAULT 0,
+  total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  amount_paid DECIMAL(12, 2) DEFAULT 0,
+  balance_due DECIMAL(12, 2) DEFAULT 0,
+  currency TEXT DEFAULT 'USD',
+  status TEXT NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled')),
+  issue_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  due_date TIMESTAMP WITH TIME ZONE,
+  paid_at TIMESTAMP WITH TIME ZONE,
+  sent_at TIMESTAMP WITH TIME ZONE,
+  notes TEXT,
+  terms TEXT,
+  payment_instructions TEXT,
+  author_id TEXT NOT NULL
+);
+
+CREATE TABLE invoice_items (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  description TEXT NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL DEFAULT 1,
+  unit_price DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE INDEX idx_quotes_customer ON quotes(customer_id);
+CREATE INDEX idx_quotes_status ON quotes(status);
+CREATE INDEX idx_quotes_created ON quotes(created_at DESC);
+CREATE INDEX idx_quote_items_quote ON quote_items(quote_id);
+
+CREATE INDEX idx_invoices_customer ON invoices(customer_id);
+CREATE INDEX idx_invoices_status ON invoices(status);
+CREATE INDEX idx_invoices_number ON invoices(invoice_number);
+CREATE INDEX idx_invoices_due ON invoices(due_date);
+CREATE INDEX idx_invoice_items_invoice ON invoice_items(invoice_id);
+
+CREATE TRIGGER update_quotes_updated_at 
+  BEFORE UPDATE ON quotes 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();
+
+CREATE TRIGGER update_invoices_updated_at 
+  BEFORE UPDATE ON invoices 
+  FOR EACH ROW 
+  EXECUTE PROCEDURE update_updated_at_column();

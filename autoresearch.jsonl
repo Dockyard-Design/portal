@@ -7,3 +7,4 @@
 {"run":7,"commit":"d119115","metric":8,"metrics":{},"status":"keep","description":"Add kanban metrics to dashboard: customers, boards, and task counts by status","timestamp":1776546583891,"segment":0,"confidence":null,"iterationTokens":831}
 {"run":8,"commit":"532ec09","metric":8,"metrics":{},"status":"keep","description":"Add Contact Submissions card to dashboard alongside Recent Projects","timestamp":1776547006603,"segment":0,"confidence":null,"iterationTokens":4277}
 {"run":9,"commit":"d2ba86f","metric":8,"metrics":{},"status":"keep","description":"Filter Contact Submissions card to only show new submissions","timestamp":1776547090992,"segment":0,"confidence":null,"iterationTokens":2265}
+{"run":10,"commit":"83b0be9","metric":8,"metrics":{},"status":"keep","description":"Add customer detail page with quotes/invoices agency features and customer search","timestamp":1776547780530,"segment":0,"confidence":null,"iterationTokens":2745}

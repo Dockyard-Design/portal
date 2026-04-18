@@ -91,7 +91,7 @@ export async function createCustomer(customer: CreateCustomerInput): Promise<Cus
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   revalidatePath("/dashboard/customers");
   return data as Customer;
 }
@@ -107,7 +107,7 @@ export async function updateCustomer(id: string, updates: UpdateCustomerInput): 
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   revalidatePath("/dashboard/customers");
   return data as Customer;
 }
@@ -121,7 +121,7 @@ export async function deleteCustomer(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   revalidatePath("/dashboard/customers");
 }
 
@@ -195,7 +195,7 @@ export async function createBoard(board: CreateBoardInput): Promise<KanbanBoard>
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   return data as KanbanBoard;
 }
 
@@ -224,7 +224,7 @@ export async function updateBoard(id: string, updates: UpdateBoardInput): Promis
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   return data as KanbanBoard;
 }
 
@@ -237,7 +237,7 @@ export async function deleteBoard(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
 }
 
 // Tasks
@@ -300,7 +300,7 @@ export async function createTask(task: CreateTaskInput): Promise<Task> {
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   return data as Task;
 }
 
@@ -315,7 +315,7 @@ export async function updateTask(id: string, updates: UpdateTaskInput): Promise<
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   return data as Task;
 }
 
@@ -328,7 +328,7 @@ export async function deleteTask(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
 }
 
 export async function moveTask(id: string, newStatus: TaskStatus, newPosition: number): Promise<Task> {
@@ -342,7 +342,7 @@ export async function moveTask(id: string, newStatus: TaskStatus, newPosition: n
     .single();
 
   if (error) throw new Error(sanitizeError(error));
-  revalidatePath("/dashboard/work");
+  revalidatePath("/dashboard/kanban");
   return data as Task;
 }
 

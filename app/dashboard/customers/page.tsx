@@ -77,14 +77,14 @@ export default function CustomersPage() {
     );
   }, [customers, searchQuery]);
 
-  const handleOpenCustomer = (customerId: string, boardId?: string) => {
+  const handleOpenKanban = (customerId: string, boardId?: string) => {
     setSelectedCustomer(customerId);
     if (boardId) {
       setSelectedBoard(boardId);
     } else {
       setSelectedBoard(null);
     }
-    router.push("/dashboard/work");
+    router.push("/dashboard/kanban");
   };
 
   return (
@@ -229,7 +229,7 @@ export default function CustomersPage() {
                         {customer.boards?.map((board: KanbanBoard) => (
                           <DropdownMenuItem 
                             key={board.id}
-                            onClick={() => handleOpenCustomer(customer.id, board.id)}
+                            onClick={() => handleOpenKanban(customer.id, board.id)}
                           >
                             <span className="flex-1 truncate">{board.name}</span>
                             {board.is_default && (
@@ -244,7 +244,7 @@ export default function CustomersPage() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    onClick={() => handleOpenCustomer(customer.id)}
+                    onClick={() => handleOpenKanban(customer.id)}
                   >
                     <LayoutGrid className="size-4 mr-1" />
                     Board
