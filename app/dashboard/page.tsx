@@ -1,15 +1,11 @@
 import { Card, CardContent } from "@/components/ui/card";
 import {
-  Globe,
   ArrowUpRight,
   Plus,
   Key,
   Clock,
   Shield,
-  TrendingUp,
-  MessageSquare,
-  FileText,
-  Activity,
+  LayoutGrid,
 } from "lucide-react";
 import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
@@ -18,112 +14,68 @@ import {
   getDashboardApiMetrics,
   getLastApiRequests,
 } from "@/app/actions/metrics";
-import { getContactSummary } from "@/app/actions/contact";
+import { getContactSummary, getContactSubmissions } from "@/app/actions/contact";
 import { getKanbanMetrics } from "@/app/actions/kanban-metrics";
 import { KanbanMetrics } from "./kanban-metrics";
 import { ApiRequestsTable } from "./api-requests-table";
 
 export default async function DashboardPage() {
-  const [projects, apiKeys, metrics, contactSummary, recentRequests, kanbanMetrics] =
-    await Promise.all([
-      getProjects(),
-      getApiKeys(),
-      getDashboardApiMetrics().catch(() => ({
-        totalRequests: 0,
-        avgResponseTime: 0,
-        successRate: 0,
-        requestsByMethod: {},
-        requestsByPath: [],
-        requestsByDay: [],
-        recentRequests: [],
-        topKeys: [],
-      })),
-      getContactSummary().catch(() => ({
-        new: 0,
-        read: 0,
-        replied: 0,
-        closed: 0,
-      })),
-      getLastApiRequests(50).catch(() => []),
-      getKanbanMetrics().catch(() => ({
-        totalCustomers: 0,
-        totalBoards: 0,
-        tasksByStatus: { backlog: 0, todo: 0, in_progress: 0, complete: 0 },
-        totalTasks: 0,
-      })),
-    ]);
+  const [
+    projects,
+    apiKeys,
+    metrics,
+    contactSummary,
+    recentRequests,
+    kanbanMetrics,
+    contactSubmissions,
+  ] = await Promise.all([
+    getProjects(),
+    getApiKeys(),
+    getDashboardApiMetrics().catch(() => ({
+      totalRequests: 0,
+      avgResponseTime: 0,
+      successRate: 0,
+      requestsByMethod: {},
+      requestsByPath: [],
+      requestsByDay: [],
+      recentRequests: [],
+      topKeys: [],
+    })),
+    getContactSummary().catch(() => ({
+      new: 0,
+      read: 0,
+      replied: 0,
+      closed: 0,
+    })),
+    getLastApiRequests(50).catch(() => []),
+    getKanbanMetrics().catch(() => ({
+      totalCustomers: 0,
+      totalBoards: 0,
+      tasksByStatus: { backlog: 0, todo: 0, in_progress: 0, complete: 0 },
+      totalTasks: 0,
+    })),
+    getContactSubmissions({ archived: false }).catch(() => []),
+  ]);
 
-  const total = projects.length;
-  const published = projects.filter((p) => p.status === "published").length;
-  const draft = projects.filter((p) => p.status === "draft").length;
   const activeKeys = apiKeys.filter((k) => k.is_active).length;
   const totalKeys = apiKeys.length;
-  const totalContact =
-    contactSummary.new +
-    contactSummary.read +
-    contactSummary.replied +
-    contactSummary.closed;
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
-            Dashboard
-          </h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Overview of your content and API usage
-          </p>
-        </div>
-        <Link
-          href="/dashboard/projects"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="size-4" />
-          New Project
-        </Link>
-      </div>
-
-      {/* Stats Grid */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatCard
-          label="Projects"
-          value={total}
-          sub={`${published} published`}
-          icon={FileText}
-          href="/dashboard/projects"
-        />
-        <StatCard
-          label="Contact"
-          value={totalContact}
-          sub={`${contactSummary.new} new`}
-          icon={MessageSquare}
-          href="/dashboard/contact"
-          highlight={contactSummary.new > 0}
-        />
-        <StatCard
-          label="API Keys"
-          value={activeKeys}
-          sub={`${totalKeys} total`}
-          icon={Key}
-          href="/dashboard/api-keys"
-        />
-        <StatCard
-          label="Requests"
-          value={metrics.totalRequests}
-          sub="Last 30 days"
-          icon={TrendingUp}
-          href="/dashboard/api-keys"
-        />
-      </div>
-
       {/* Kanban Metrics */}
+      <div className="flex items-center gap-2">
+        <LayoutGrid className="size-5 text-primary" />
+        <h2 className="text-lg font-semibold">Kanban Boards</h2>
+      </div>
       <KanbanMetrics metrics={kanbanMetrics} />
 
-      {/* Recent Activity - Side by Side */}
+      <div className="flex items-center gap-2">
+        <LayoutGrid className="size-5 text-primary" />
+        <h2 className="text-lg font-semibold">
+          Projects and Contact Submissions
+        </h2>
+      </div>
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent Projects */}
         <Card className="border-border/40 shadow-sm">
           <CardContent className="p-0">
             <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
@@ -164,55 +116,113 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* API Health */}
+        {/* Recent Contact Submissions */}
         <Card className="border-border/40 shadow-sm">
           <CardContent className="p-0">
             <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-              <h2 className="font-semibold text-foreground">API Health</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-foreground">Contact Submissions</h2>
+                {contactSummary.new > 0 && (
+                  <span className="bg-primary text-primary-foreground text-xs font-medium px-2 py-0.5 rounded-full">
+                    {contactSummary.new} new
+                  </span>
+                )}
+              </div>
               <Link
-                href="/dashboard/api-keys"
+                href="/dashboard/contact"
                 className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
               >
-                Manage <ArrowUpRight className="size-3.5" />
+                View all <ArrowUpRight className="size-3.5" />
               </Link>
             </div>
-            <div className="p-5 space-y-4">
-              <HealthRow
-                label="Success Rate"
-                value={`${metrics.successRate}%`}
-                icon={Shield}
-                status={
-                  metrics.successRate >= 95
-                    ? "good"
-                    : metrics.successRate >= 80
-                      ? "warning"
-                      : "error"
-                }
-              />
-              <HealthRow
-                label="Avg Response"
-                value={`${metrics.avgResponseTime}ms`}
-                icon={Clock}
-                status={
-                  metrics.avgResponseTime < 200
-                    ? "good"
-                    : metrics.avgResponseTime < 500
-                      ? "warning"
-                      : "error"
-                }
-              />
-              <HealthRow
-                label="Active Keys"
-                value={`${activeKeys} / ${totalKeys}`}
-                icon={Key}
-                status={activeKeys > 0 ? "good" : "neutral"}
-              />
+            <div className="divide-y divide-border/40">
+              {contactSubmissions.slice(0, 5).map((submission) => (
+                <Link
+                  key={submission.id}
+                  href="/dashboard/contact"
+                  className="flex items-center justify-between px-5 py-3.5 hover:bg-secondary/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`size-2 rounded-full shrink-0 ${
+                        submission.status === 'new' ? 'bg-red-500' :
+                        submission.status === 'read' ? 'bg-amber-500' :
+                        submission.status === 'replied' ? 'bg-blue-500' :
+                        'bg-slate-500'
+                      }`}
+                    />
+                    <div className="flex flex-col min-w-0">
+                      <span className="font-medium text-sm truncate">
+                        {submission.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {submission.email}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {new Date(submission.created_at).toLocaleDateString()}
+                  </span>
+                </Link>
+              ))}
+              {contactSubmissions.length === 0 && (
+                <div className="px-5 py-8 text-center text-muted-foreground text-sm">
+                  No contact submissions yet.
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
+
       {/* API Requests Table - Full Width */}
       <ApiRequestsTable requests={recentRequests} />
+      {/* API Health */}
+      <Card className="border-border/40 shadow-sm">
+        <CardContent className="p-0">
+          <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+            <h2 className="font-semibold text-foreground">API Health</h2>
+            <Link
+              href="/dashboard/api-keys"
+              className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+            >
+              Manage <ArrowUpRight className="size-3.5" />
+            </Link>
+          </div>
+          <div className="p-5 space-y-4">
+            <HealthRow
+              label="Success Rate"
+              value={`${metrics.successRate}%`}
+              icon={Shield}
+              status={
+                metrics.successRate >= 95
+                  ? "good"
+                  : metrics.successRate >= 80
+                    ? "warning"
+                    : "error"
+              }
+            />
+            <HealthRow
+              label="Avg Response"
+              value={`${metrics.avgResponseTime}ms`}
+              icon={Clock}
+              status={
+                metrics.avgResponseTime < 200
+                  ? "good"
+                  : metrics.avgResponseTime < 500
+                    ? "warning"
+                    : "error"
+              }
+            />
+            <HealthRow
+              label="Active Keys"
+              value={`${activeKeys} / ${totalKeys}`}
+              icon={Key}
+              status={activeKeys > 0 ? "good" : "neutral"}
+            />
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

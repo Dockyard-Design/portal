@@ -20,19 +20,6 @@ interface KanbanMetricsProps {
 export function KanbanMetrics({ metrics }: KanbanMetricsProps) {
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <LayoutGrid className="size-5 text-primary" />
-          <h2 className="text-lg font-semibold">Kanban Boards</h2>
-        </div>
-        <Link
-          href="/dashboard/work"
-          className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
-        >
-          View all <ArrowUpRight className="size-3.5" />
-        </Link>
-      </div>
-
       {/* Metrics Grid */}
       <div className="grid gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
         {/* Customers */}

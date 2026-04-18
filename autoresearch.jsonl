@@ -4,3 +4,4 @@
 {"run":4,"commit":"df47844","metric":8,"metrics":{},"status":"keep","description":"Fix serialization error and add lock/unlock/resetPassword server actions","timestamp":1776546153217,"segment":0,"confidence":null,"iterationTokens":772}
 {"run":5,"commit":"545a2ce","metric":8,"metrics":{},"status":"keep","description":"Add lock/unlock and password reset buttons to User Management UI","timestamp":1776546259297,"segment":0,"confidence":null,"iterationTokens":5591}
 {"run":6,"commit":"b0e93db","metric":8,"metrics":{},"status":"keep","description":"Use Zustand for sidebar collapse state (default uncollapsed) and add 3-dot menu for user actions","timestamp":1776546359234,"segment":0,"confidence":null,"iterationTokens":9535}
+{"run":7,"commit":"d119115","metric":8,"metrics":{},"status":"keep","description":"Add kanban metrics to dashboard: customers, boards, and task counts by status","timestamp":1776546583891,"segment":0,"confidence":null,"iterationTokens":831}
