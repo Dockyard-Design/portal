@@ -46,16 +46,26 @@ async function requireAuth() {
 }
 
 export async function getProjects(): Promise<Project[]> {
-  const userId = await requireAuth();
-
   const { data, error } = await supabase
     .from("projects")
     .select("*")
-    .eq("author_id", userId)
     .order("updated_at", { ascending: false });
 
   if (error) throw new Error(sanitizeError(error));
   return data || [];
+}
+
+export async function getProject(id: string): Promise<Project | null> {
+  await requireAuth();
+
+  const { data, error } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("id", id)
+    .single();
+
+  if (error) return null;
+  return data;
 }
 
 export async function createProject(
@@ -81,18 +91,7 @@ export async function updateProject(
   id: string,
   updates: Partial<ProjectUpdate>
 ): Promise<Project> {
-  const userId = await requireAuth();
-
-  // Verify ownership before updating
-  const { data: existing } = await supabase
-    .from("projects")
-    .select("author_id")
-    .eq("id", id)
-    .single();
-
-  if (!existing || existing.author_id !== userId) {
-    throw new Error("Not found or unauthorized");
-  }
+  await requireAuth();
 
   // author_id is excluded from ProjectUpdate so it can't be changed (#19)
   const { data, error } = await supabase
@@ -108,18 +107,7 @@ export async function updateProject(
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  const userId = await requireAuth();
-
-  // Verify ownership before deleting
-  const { data: existing } = await supabase
-    .from("projects")
-    .select("author_id")
-    .eq("id", id)
-    .single();
-
-  if (!existing || existing.author_id !== userId) {
-    throw new Error("Not found or unauthorized");
-  }
+  await requireAuth();
 
   const { error } = await supabase
     .from("projects")

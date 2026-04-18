@@ -5,6 +5,9 @@ import {
   LayoutDashboard,
   FolderKanban,
   Key,
+  MessageSquare,
+  User,
+  LogOut,
 } from "lucide-react";
 import {
   Sidebar,
@@ -17,7 +20,15 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { UserButton, useUser } from "@clerk/nextjs";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -37,17 +48,23 @@ const NAV_ITEMS = [
     href: "/dashboard/api-keys",
     icon: Key,
   },
+  {
+    title: "Contact",
+    href: "/dashboard/contact",
+    icon: MessageSquare,
+  },
 ];
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isLoaded, user } = useUser();
+  const { openUserProfile, signOut } = useClerk();
 
   return (
     <Sidebar className="border-r-border/40">
       <SidebarHeader className="p-6">
         <div className="flex items-center gap-3 group cursor-pointer">
-          <Image src="/logo.svg" alt="Dockyard" width={128} height={32} className="h-8 w-auto brightness-200" />
+          <Image src="/logo.svg" alt="Dockyard" width={128} height={32} className="h-8 w-auto" />
         </div>
       </SidebarHeader>
       <SidebarContent className="px-4">
@@ -80,16 +97,33 @@ export default function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <div className="mt-auto p-6 border-t border-border/40">
-        {/* Render Clerk's UserButton directly — no DOM-reaching hack (#15) */}
-        <div className="flex items-center gap-3 w-full p-2 rounded-xl bg-secondary/30 border border-border/40 hover:bg-secondary/50 transition-colors">
-          <UserButton />
-          {isLoaded && user && (
-            <div className="flex flex-col overflow-hidden">
-              <span className="text-sm font-medium truncate">{user.firstName ?? user.username ?? "Account"}</span>
-              <span className="text-xs text-muted-foreground truncate">Manage profile</span>
-            </div>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger render={
+            <button className="flex items-center gap-3 w-full p-2 rounded-xl bg-secondary/30 border border-border/40 hover:bg-secondary/50 transition-colors text-left cursor-pointer">
+              <Avatar className="size-8">
+                <AvatarImage src={user?.imageUrl} />
+                <AvatarFallback>{user?.firstName?.[0] ?? user?.emailAddresses[0]?.emailAddress?.[0] ?? "U"}</AvatarFallback>
+              </Avatar>
+              {isLoaded && user && (
+                <div className="flex flex-col overflow-hidden">
+                  <span className="text-sm font-medium truncate">{user.firstName ?? user.username ?? "Account"}</span>
+                  <span className="text-xs text-muted-foreground truncate">{user.emailAddresses[0]?.emailAddress ?? ""}</span>
+                </div>
+              )}
+            </button>
+          } />
+          <DropdownMenuContent side="top" align="start" className="w-56">
+            <DropdownMenuItem onClick={() => openUserProfile()} className="gap-2">
+              <User className="size-4" />
+              Account
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => signOut({ redirectUrl: "/" })} className="gap-2 text-destructive">
+              <LogOut className="size-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <SidebarRail />
     </Sidebar>

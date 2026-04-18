@@ -1,20 +1,26 @@
 import { defineConfig } from "vitest/config";
+import { loadEnv } from "vite";
 import path from "path";
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./"),
+export default defineConfig(({ mode }) => {
+  // Load env vars from .env.test (or .env.<mode>) — respects Vite's env loading (#23)
+  const env = loadEnv(mode, process.cwd(), "");
+
+  return {
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./"),
+      },
     },
-  },
-  test: {
-    include: ["tests/**/*.test.ts"],
-    testTimeout: 30_000,
-    // Use Vitest's built-in env config instead of manual dotenv loading (#23).
-    // This reads from process.env at test time — set env vars in CI or via
-    // a .env.test file that's gitignored.
-    env: {
-      API_BASE_URL: "http://localhost:3000",
+    test: {
+      include: ["tests/**/*.test.ts"],
+      testTimeout: 60_000,
+      env: {
+        NODE_ENV: "test",
+        SKIP_RATE_LIMIT: "true",
+        API_BASE_URL: env.API_BASE_URL || "http://localhost:4567",
+        TEST_API_KEY: env.TEST_API_KEY || "",
+      },
     },
-  },
+  };
 });

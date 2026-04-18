@@ -36,16 +36,31 @@ export const projectSchema = z.object({
 export type ProjectFormValues = z.infer<typeof projectSchema>;
 
 interface ProjectFormProps {
-  initialData?: ProjectFormValues;
-  onSubmit: (data: ProjectFormValues) => Promise<void>;
+  initialData?: Partial<ProjectFormValues>;
+  onSubmit?: (data: ProjectFormValues) => Promise<void>;
   isPending: boolean;
   onCancel?: () => void;
 }
 
 export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: ProjectFormProps) {
+  // Normalize initialData to handle null values from database
+  const normalizedData: ProjectFormValues | undefined = initialData ? {
+    title: initialData.title || "",
+    slug: initialData.slug || "",
+    excerpt: initialData.excerpt || "",
+    content: initialData.content || "",
+    status: initialData.status || "draft",
+    is_public: initialData.is_public ?? false,
+    is_indexable: initialData.is_indexable ?? true,
+    seo_title: initialData.seo_title || "",
+    seo_description: initialData.seo_description || "",
+    seo_keywords: initialData.seo_keywords || "",
+    featured_image_url: initialData.featured_image_url || "",
+  } : undefined;
+
   const form = useForm<ProjectFormValues>({
     resolver: zodResolver(projectSchema),
-    defaultValues: initialData || {
+    defaultValues: normalizedData || {
       title: "",
       slug: "",
       excerpt: "",
@@ -76,7 +91,10 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
   const descStatus = getSeoStatus(seoDesc, 120, 160);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8 py-4">
+    <form 
+      onSubmit={onSubmit ? handleSubmit(onSubmit) : undefined} 
+      className="space-y-8 py-4"
+    >
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {/* Left Column — Content */}
         <div className="space-y-5">

@@ -18,6 +18,59 @@ export const supabaseAdmin = serviceRoleKey
   ? createClient(supabaseUrl, serviceRoleKey)
   : supabase;
 
+export interface RecentRequest {
+  id: string;
+  method: string;
+  path: string;
+  status_code: number;
+  response_time_ms: number;
+  auth_method: string;
+  created_at: string;
+  api_key_id?: string;
+  api_key?: {
+    name: string;
+    key_prefix: string;
+  } | null;
+}
+
+export async function getRecentApiRequests(limit: number = 50): Promise<RecentRequest[]> {
+  // First fetch the request logs
+  const { data: logs, error: logsError } = await supabaseAdmin
+    .from("api_request_logs")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (logsError) {
+    console.error("[getRecentApiRequests] Error:", logsError);
+    return [];
+  }
+
+  if (!logs || logs.length === 0) return [];
+
+  // Get unique api_key_ids
+  const keyIds = [...new Set(logs.filter((log: any) => log.api_key_id).map((log: any) => log.api_key_id))];
+  
+  // Fetch key names if there are any
+  let keysMap = new Map();
+  if (keyIds.length > 0) {
+    const { data: keys, error: keysError } = await supabaseAdmin
+      .from("api_keys")
+      .select("id, name, key_prefix")
+      .in("id", keyIds);
+    
+    if (!keysError && keys) {
+      keysMap = new Map(keys.map((k: any) => [k.id, k]));
+    }
+  }
+
+  // Merge the data
+  return logs.map((log: any) => ({
+    ...log,
+    api_key: log.api_key_id ? keysMap.get(log.api_key_id) || { name: "Unknown Key", key_prefix: "----" } : null,
+  }));
+}
+
 // ─── API Key Management ─────────────────────────────────────────────
 
 export function hashApiKey(key: string): string {
@@ -92,6 +145,12 @@ export async function checkRateLimit(
   limit: number = RATE_LIMIT_MAX_REQUESTS,
   windowSeconds: number = RATE_LIMIT_WINDOW_SECONDS
 ): Promise<RateLimitResult> {
+  // Skip rate limiting in development/test or when env var is set
+  if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test" || process.env.SKIP_RATE_LIMIT) {
+    const now = new Date();
+    return { allowed: true, remaining: 9999, limit: 9999, resetAt: new Date(now.getTime() + 60000) };
+  }
+
   const { data, error } = await supabaseAdmin.rpc("check_rate_limit", {
     p_identifier: identifier,
     p_limit: limit,

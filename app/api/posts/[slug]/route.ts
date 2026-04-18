@@ -1,33 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
-import { supabase, supabaseAdmin, verifyApiKey, logRequest, checkRateLimit } from "@/lib/api-keys";
-
-async function authenticate(request: NextRequest): Promise<{ method: "api-key" | "clerk"; keyId?: string; identifier: string } | null> {
-  const authHeader = request.headers.get("authorization");
-  const token = authHeader?.replace("Bearer ", "");
-  if (token) {
-    const { valid, keyId } = await verifyApiKey(token);
-    if (valid) return { method: "api-key", keyId: keyId!, identifier: keyId! };
-    return null;
-  }
-
-  try {
-    const { userId } = await auth();
-    if (userId) return { method: "clerk", identifier: `clerk:${userId}` };
-  } catch {
-    // Not in a Clerk context
-  }
-
-  return null;
-}
-
-function getRateLimitHeaders(result: { remaining: number; limit: number; resetAt: Date }) {
-  return {
-    "X-RateLimit-Limit": String(result.limit),
-    "X-RateLimit-Remaining": String(result.remaining),
-    "X-RateLimit-Reset": String(Math.floor(result.resetAt.getTime() / 1000)),
-  };
-}
+import { supabase, supabaseAdmin, logRequest, checkRateLimit } from "@/lib/api-keys";
+import { authenticate, getRateLimitHeaders } from "@/lib/api-auth";
 
 export async function GET(
   request: NextRequest,

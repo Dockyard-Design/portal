@@ -12,13 +12,17 @@
  * 8. Clerk-authenticated users can see their own posts
  */
 
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 
 const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 // A known valid API key for testing (must be created in the dashboard)
 const VALID_API_KEY = process.env.TEST_API_KEY || "";
 const INVALID_API_KEY = "sk_live_invalidkey00000000000000000000";
+
+beforeEach(async () => {
+  await new Promise((resolve) => setTimeout(resolve, 2000));
+});
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -30,6 +34,59 @@ async function apiFetch(path: string, options: RequestInit = {}) {
 function withApiKey(key: string): Record<string, string> {
   return { Authorization: `Bearer ${key}` };
 }
+
+describe.skipIf(!VALID_API_KEY)("API Pagination", () => {
+  it("returns paginated results with limit parameter", async () => {
+    const res = await apiFetch("/api/posts?limit=2", {
+      headers: withApiKey(VALID_API_KEY),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.data)).toBe(true);
+    // Should return at most 2 items
+    expect(body.data.length).toBeLessThanOrEqual(2);
+  });
+
+  it("returns paginated results with offset parameter", async () => {
+    // Get first page
+    const res1 = await apiFetch("/api/posts?limit=1&offset=0", {
+      headers: withApiKey(VALID_API_KEY),
+    });
+    expect(res1.status).toBe(200);
+    const body1 = await res1.json();
+    
+    // Get second page
+    const res2 = await apiFetch("/api/posts?limit=1&offset=1", {
+      headers: withApiKey(VALID_API_KEY),
+    });
+    expect(res2.status).toBe(200);
+    const body2 = await res2.json();
+
+    // If we have at least 2 posts, they should be different
+    if (body1.data.length > 0 && body2.data.length > 0) {
+      expect(body1.data[0].id).not.toBe(body2.data[0].id);
+    }
+  });
+
+  it("respects maximum limit of 100", async () => {
+    const res = await apiFetch("/api/posts?limit=200", {
+      headers: withApiKey(VALID_API_KEY),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    // Should be capped at 100
+    expect(body.data.length).toBeLessThanOrEqual(100);
+  });
+
+  it("returns empty array when offset exceeds total", async () => {
+    const res = await apiFetch("/api/posts?limit=10&offset=999999", {
+      headers: withApiKey(VALID_API_KEY),
+    });
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(Array.isArray(body.data)).toBe(true);
+  });
+});
 
 // ─── Test Suite ──────────────────────────────────────────────────────
 

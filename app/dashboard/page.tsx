@@ -1,164 +1,278 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Globe, Activity, ArrowUpRight, Plus, LayoutGrid, Key, Clock, Zap, Shield, TrendingUp } from "lucide-react";
+import {
+  Globe,
+  ArrowUpRight,
+  Plus,
+  Key,
+  Clock,
+  Shield,
+  TrendingUp,
+  MessageSquare,
+  FileText,
+  Activity,
+} from "lucide-react";
 import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
 import { getApiKeys } from "@/app/actions/api-keys";
-import { getDashboardApiMetrics } from "@/app/actions/metrics";
-import { ExpandableProjectList } from "@/components/expandable-project-list";
-import { ExpandableRequestList } from "@/components/expandable-request-list";
+import {
+  getDashboardApiMetrics,
+  getLastApiRequests,
+} from "@/app/actions/metrics";
+import { getContactSummary } from "@/app/actions/contact";
+import { ApiRequestsTable } from "./api-requests-table";
 
 export default async function DashboardPage() {
-  const [projects, apiKeys, metrics] = await Promise.all([
-    getProjects(),
-    getApiKeys(),
-    getDashboardApiMetrics().catch(() => ({
-      totalRequests: 0,
-      avgResponseTime: 0,
-      successRate: 0,
-      requestsByMethod: {},
-      requestsByPath: [],
-      requestsByDay: [],
-      recentRequests: [],
-      topKeys: [],
-    })),
-  ]);
+  const [projects, apiKeys, metrics, contactSummary, recentRequests] =
+    await Promise.all([
+      getProjects(),
+      getApiKeys(),
+      getDashboardApiMetrics().catch(() => ({
+        totalRequests: 0,
+        avgResponseTime: 0,
+        successRate: 0,
+        requestsByMethod: {},
+        requestsByPath: [],
+        requestsByDay: [],
+        recentRequests: [],
+        topKeys: [],
+      })),
+      getContactSummary().catch(() => ({
+        new: 0,
+        read: 0,
+        replied: 0,
+        closed: 0,
+      })),
+      getLastApiRequests(50).catch(() => []),
+    ]);
 
   const total = projects.length;
   const published = projects.filter((p) => p.status === "published").length;
-  const publicCount = projects.filter((p) => p.is_public).length;
   const draft = projects.filter((p) => p.status === "draft").length;
   const activeKeys = apiKeys.filter((k) => k.is_active).length;
   const totalKeys = apiKeys.length;
+  const totalContact =
+    contactSummary.new +
+    contactSummary.read +
+    contactSummary.replied +
+    contactSummary.closed;
 
   return (
-    <div className="flex flex-col gap-10 max-w-7xl mx-auto animate-in fade-in duration-500">
+    <div className="flex flex-col gap-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+            Dashboard
+          </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            {total} project{total !== 1 ? "s" : ""} total, {published} published, {draft} in draft.
+            Overview of your content and API usage
           </p>
         </div>
         <Link
           href="/dashboard/projects"
-          className="group flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl font-bold text-sm transition-all hover:scale-105 hover:shadow-[0_0_20px_-5px_var(--color-primary)] active:scale-95"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg font-medium text-sm hover:bg-primary/90 transition-colors"
         >
           <Plus className="size-4" />
           New Project
         </Link>
       </div>
 
-      {/* Project Stats */}
-      <div className="grid gap-5 grid-cols-2 md:grid-cols-4">
-        <MetricCard label="Total" value={total} sub={`${published} published`} icon={LayoutGrid} color="text-blue-400" />
-        <MetricCard label="Public" value={publicCount} sub="Visible to everyone" icon={Globe} color="text-emerald-400" />
-        <MetricCard label="Drafts" value={draft} sub="Not yet published" icon={Activity} color="text-amber-400" />
-        <MetricCard label="API Keys" value={activeKeys} sub={`${totalKeys} total`} icon={Key} color="text-violet-400" />
+      {/* Stats Grid */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <StatCard
+          label="Projects"
+          value={total}
+          sub={`${published} published`}
+          icon={FileText}
+          href="/dashboard/projects"
+        />
+        <StatCard
+          label="Contact"
+          value={totalContact}
+          sub={`${contactSummary.new} new`}
+          icon={MessageSquare}
+          href="/dashboard/contact"
+          highlight={contactSummary.new > 0}
+        />
+        <StatCard
+          label="API Keys"
+          value={activeKeys}
+          sub={`${totalKeys} total`}
+          icon={Key}
+          href="/dashboard/api-keys"
+        />
+        <StatCard
+          label="Requests"
+          value={metrics.totalRequests}
+          sub="Last 30 days"
+          icon={TrendingUp}
+          href="/dashboard/api-keys"
+        />
       </div>
 
-      {/* Recent Projects */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Recent Projects</h2>
-          <Link href="/dashboard/projects" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-            View all <ArrowUpRight className="size-3.5" />
-          </Link>
-        </div>
-
-        {projects.length > 0 ? (
-          <ExpandableProjectList projects={projects} limit={5} />
-        ) : (
-          <div className="p-12 text-center rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground">
-            No projects yet. Create your first one.
-          </div>
-        )}
-      </div>
-
-      {/* API Metrics */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold flex items-center gap-2">
-            <Shield className="size-5 text-primary" />
-            API Usage
-          </h2>
-          <Link href="/dashboard/api-keys" className="text-sm font-medium text-primary hover:underline flex items-center gap-1">
-            Manage Keys <ArrowUpRight className="size-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid gap-5 grid-cols-2 md:grid-cols-4">
-          <MetricCard label="Requests" value={metrics.totalRequests} sub="Last 30 days" icon={Zap} color="text-blue-400" />
-          <MetricCard label="Avg Response" value={`${metrics.avgResponseTime}ms`} sub="Median latency" icon={Clock} color="text-emerald-400" />
-          <MetricCard label="Success Rate" value={`${metrics.successRate}%`} sub="2xx & 3xx responses" icon={TrendingUp} color="text-violet-400" />
-          <MetricCard label="Active Keys" value={activeKeys} sub={`${totalKeys} total`} icon={Key} color="text-amber-400" />
-        </div>
-
-        {/* Recent API Requests */}
-        {metrics.recentRequests.length > 0 && (
-          <div className="rounded-2xl bg-secondary/30 border border-border/40 overflow-hidden">
-            <div className="px-5 py-3 border-b border-border/40">
-              <h3 className="text-sm font-semibold">Recent Requests</h3>
-            </div>
-            <ExpandableRequestList requests={metrics.recentRequests} limit={5} />
-          </div>
-        )}
-
-        {/* Top API Keys by Usage */}
-        {metrics.topKeys.length > 0 && (
-          <div className="rounded-2xl bg-secondary/30 border border-border/40 overflow-hidden">
-            <div className="px-5 py-3 border-b border-border/40">
-              <h3 className="text-sm font-semibold">Key Usage</h3>
+      {/* Recent Activity - Side by Side */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Recent Projects */}
+        <Card className="border-border/40 shadow-sm">
+          <CardContent className="p-0">
+            <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+              <h2 className="font-semibold text-foreground">Recent Projects</h2>
+              <Link
+                href="/dashboard/projects"
+                className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+              >
+                View all <ArrowUpRight className="size-3.5" />
+              </Link>
             </div>
             <div className="divide-y divide-border/40">
-              {metrics.topKeys.map((key) => (
-                <div key={key.id} className="flex items-center justify-between px-5 py-3">
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-muted-foreground">{key.key_prefix}...</span>
-                    <span className="text-sm font-medium">{key.name}</span>
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${
-                      key.is_active
-                        ? "bg-emerald-500/10 text-emerald-400"
-                        : "bg-muted text-muted-foreground"
-                    }`}>
-                      {key.is_active ? "Active" : "Revoked"}
+              {projects.slice(0, 5).map((project) => (
+                <Link
+                  key={project.id}
+                  href={`/dashboard/projects`}
+                  className="flex items-center justify-between px-5 py-3.5 hover:bg-secondary/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`size-2 rounded-full shrink-0 ${project.status === "published" ? "bg-emerald-500" : "bg-amber-500"}`}
+                    />
+                    <span className="font-medium text-sm truncate">
+                      {project.title}
                     </span>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <span className="text-sm font-semibold">{key.request_count.toLocaleString()} reqs</span>
-                    <span className="text-xs text-muted-foreground">
-                      {key.last_used_at ? `Last used ${new Date(key.last_used_at).toLocaleDateString()}` : "Never used"}
-                    </span>
-                  </div>
-                </div>
+                  <span className="text-xs text-muted-foreground shrink-0">
+                    {new Date(project.updated_at).toLocaleDateString()}
+                  </span>
+                </Link>
               ))}
+              {projects.length === 0 && (
+                <div className="px-5 py-8 text-center text-muted-foreground text-sm">
+                  No projects yet. Create your first one.
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          </CardContent>
+        </Card>
 
-        {metrics.totalRequests === 0 && (
-          <div className="p-10 text-center rounded-2xl border-2 border-dashed border-border/40 text-muted-foreground">
-            No API requests yet. Create a key and start making requests.
-          </div>
-        )}
+        {/* API Health */}
+        <Card className="border-border/40 shadow-sm">
+          <CardContent className="p-0">
+            <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
+              <h2 className="font-semibold text-foreground">API Health</h2>
+              <Link
+                href="/dashboard/api-keys"
+                className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+              >
+                Manage <ArrowUpRight className="size-3.5" />
+              </Link>
+            </div>
+            <div className="p-5 space-y-4">
+              <HealthRow
+                label="Success Rate"
+                value={`${metrics.successRate}%`}
+                icon={Shield}
+                status={
+                  metrics.successRate >= 95
+                    ? "good"
+                    : metrics.successRate >= 80
+                      ? "warning"
+                      : "error"
+                }
+              />
+              <HealthRow
+                label="Avg Response"
+                value={`${metrics.avgResponseTime}ms`}
+                icon={Clock}
+                status={
+                  metrics.avgResponseTime < 200
+                    ? "good"
+                    : metrics.avgResponseTime < 500
+                      ? "warning"
+                      : "error"
+                }
+              />
+              <HealthRow
+                label="Active Keys"
+                value={`${activeKeys} / ${totalKeys}`}
+                icon={Key}
+                status={activeKeys > 0 ? "good" : "neutral"}
+              />
+            </div>
+          </CardContent>
+        </Card>
       </div>
+      {/* API Requests Table - Full Width */}
+      <ApiRequestsTable requests={recentRequests} />
     </div>
   );
 }
 
-function MetricCard({ label, value, sub, icon: Icon, color }: { label: string; value: number | string; sub: string; icon: React.ComponentType<{ className?: string }>; color: string }) {
+function StatCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  href,
+  highlight,
+}: {
+  label: string;
+  value: number;
+  sub: string;
+  icon: React.ComponentType<{ className?: string }>;
+  href: string;
+  highlight?: boolean;
+}) {
   return (
-    <Card className="border-none bg-secondary/40 hover:bg-secondary/60 transition-all group cursor-default">
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-3">
-          <div className={`p-2 rounded-lg bg-background/50 ${color}`}>
-            <Icon className="size-5" />
+    <Link href={href}>
+      <Card
+        className={`border-border/40 shadow-sm hover:border-primary/40 transition-colors group ${highlight ? "border-primary/30 bg-primary/5" : ""}`}
+      >
+        <CardContent className="p-5">
+          <div className="flex items-start justify-between">
+            <div
+              className={`p-2 rounded-lg ${highlight ? "bg-primary/10 text-primary" : "bg-secondary text-secondary-foreground"}`}
+            >
+              <Icon className="size-5" />
+            </div>
+            <ArrowUpRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
           </div>
-          <span className="text-xs font-semibold text-muted-foreground">{label}</span>
-        </div>
-        <div className="text-3xl font-bold tracking-tight">{value}</div>
-        <div className="text-sm text-muted-foreground mt-0.5">{sub}</div>
-      </CardContent>
-    </Card>
+          <div className="mt-3">
+            <div className="text-2xl font-semibold tracking-tight">{value}</div>
+            <div className="text-sm text-muted-foreground mt-0.5">{label}</div>
+            <div className="text-xs text-muted-foreground mt-1">{sub}</div>
+          </div>
+        </CardContent>
+      </Card>
+    </Link>
+  );
+}
+
+function HealthRow({
+  label,
+  value,
+  icon: Icon,
+  status,
+}: {
+  label: string;
+  value: string;
+  icon: React.ComponentType<{ className?: string }>;
+  status: "good" | "warning" | "error" | "neutral";
+}) {
+  const statusColors = {
+    good: "text-emerald-500",
+    warning: "text-amber-500",
+    error: "text-red-500",
+    neutral: "text-muted-foreground",
+  };
+
+  return (
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <Icon className="size-4 text-muted-foreground" />
+        <span className="text-sm text-muted-foreground">{label}</span>
+      </div>
+      <span className={`text-sm font-medium ${statusColors[status]}`}>
+        {value}
+      </span>
+    </div>
   );
 }

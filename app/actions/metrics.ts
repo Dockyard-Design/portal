@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { getApiMetrics, type ApiMetrics } from "@/lib/api-keys";
+import { getApiMetrics, type ApiMetrics, getRecentApiRequests, type RecentRequest } from "@/lib/api-keys";
 import { unstable_cache } from "next/cache";
 
 async function requireAuth() {
@@ -27,4 +27,9 @@ const getCachedApiMetrics = unstable_cache(
 export async function getDashboardApiMetrics(): Promise<ApiMetrics> {
   await requireAuth();
   return getCachedApiMetrics();
+}
+
+export async function getLastApiRequests(limit = 50): Promise<RecentRequest[]> {
+  await requireAuth();
+  return getRecentApiRequests(limit);
 }

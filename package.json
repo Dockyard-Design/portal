@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "rm -rf .next && next dev",
+    "dev": "rm -rf .next && next dev --port 4567",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,11 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check:env": "npx tsx scripts/check-env.ts",
-    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm check:env"
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm check:env",
+    "review": "npx tsx scripts/code-review.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.0",
     "@clerk/nextjs": "^7.2.2",
+    "@clerk/themes": "^2.4.57",
     "@hookform/resolvers": "^5.2.2",
     "@radix-ui/react-slot": "^1.2.4",
     "@supabase/supabase-js": "^2.103.3",
@@ -26,8 +28,8 @@
     "nanoid": "^5.1.9",
     "next": "16.2.4",
     "next-themes": "^0.4.6",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
+    "react": "19.2.1",
+    "react-dom": "19.2.1",
     "react-hook-form": "^7.72.1",
     "shadcn": "^4.3.0",
     "sonner": "^2.0.7",
@@ -42,8 +44,11 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.2.4",
+    "ollama-code-review": "link:/home/frederico/Development/ollama-code-review",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5",
+    "vite": "^8.0.8",
     "vitest": "^4.1.4"
   }
 }
