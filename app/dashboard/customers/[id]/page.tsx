@@ -110,7 +110,7 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
               <span className="text-sm">Revenue</span>
             </div>
             <p className="text-2xl font-semibold">
-              ${stats.totalRevenue.toLocaleString()}
+              £{stats.totalRevenue.toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground">
               Total received
@@ -125,7 +125,7 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
               <span className="text-sm">Outstanding</span>
             </div>
             <p className="text-2xl font-semibold">
-              ${stats.outstandingBalance.toLocaleString()}
+              £{stats.outstandingBalance.toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground">
               {stats.invoicesOverdue} overdue

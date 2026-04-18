@@ -59,7 +59,7 @@ export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
             </div>
             <p className="text-2xl font-semibold">{quotes.total}</p>
             <p className="text-xs text-muted-foreground">
-              ${quotes.totalValue.toLocaleString()} value
+              £{quotes.totalValue.toLocaleString()} value
             </p>
           </CardContent>
         </Card>
@@ -72,7 +72,7 @@ export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
             </div>
             <p className="text-2xl font-semibold">{quotes.accepted}</p>
             <p className="text-xs text-muted-foreground">
-              ${quotes.acceptedValue.toLocaleString()}
+              £{quotes.acceptedValue.toLocaleString()}
             </p>
           </CardContent>
         </Card>
@@ -86,7 +86,7 @@ export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
             </div>
             <p className="text-2xl font-semibold">{invoices.total}</p>
             <p className="text-xs text-muted-foreground">
-              ${invoices.totalValue.toLocaleString()} value
+              £{invoices.totalValue.toLocaleString()} value
             </p>
           </CardContent>
         </Card>
@@ -98,7 +98,7 @@ export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
               <span className="text-sm">Outstanding</span>
             </div>
             <p className="text-2xl font-semibold">
-              ${invoices.outstandingValue.toLocaleString()}
+              £{invoices.outstandingValue.toLocaleString()}
             </p>
             <p className="text-xs text-muted-foreground">
               {invoices.overdue} overdue

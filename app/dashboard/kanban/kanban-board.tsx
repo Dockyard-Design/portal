@@ -624,13 +624,28 @@ export function KanbanBoard({
         </div>
       </div>
 
-      {/* Empty State - No Customer */}
-      {!selectedCustomerId && (
+      {/* Empty State - No Customers At All */}
+      {customers.length === 0 && (
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed border-border/50 bg-card/30">
+          <Building className="size-16 text-muted-foreground/30 mb-4" />
+          <h3 className="text-lg font-medium mb-2">No customers yet</h3>
+          <p className="text-muted-foreground max-w-md mb-6">
+            Create your first customer to start using kanban boards.
+          </p>
+          <Button onClick={() => setIsCustomerDialogOpen(true)}>
+            <Plus className="size-4 mr-2" />
+            Create Customer
+          </Button>
+        </div>
+      )}
+
+      {/* Empty State - Customers Exist but No Customer Selected */}
+      {customers.length > 0 && !selectedCustomerId && (
         <div className="flex-1 flex flex-col items-center justify-center text-center p-12 rounded-xl border border-dashed border-border/50 bg-card/30">
           <KanbanSquare className="size-16 text-muted-foreground/30 mb-4" />
-          <h3 className="text-lg font-medium mb-2">No customer selected</h3>
+          <h3 className="text-lg font-medium mb-2">Select a customer</h3>
           <p className="text-muted-foreground max-w-md mb-6">
-            Select a customer from the dropdown to view and manage their Kanban boards.
+            Choose a customer from the dropdown above to view and manage their kanban boards.
           </p>
         </div>
       )}
