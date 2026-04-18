@@ -222,7 +222,7 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
                           <MoreVertical className="size-4" />
                         </Button>
                       } />
-                      <DropdownMenuContent align="end">
+                      <DropdownMenuContent align="end" className="w-48">
                         <DropdownMenuItem onClick={() => setEditUser(user)}>
                           <Edit className="size-4 mr-2" />
                           Edit

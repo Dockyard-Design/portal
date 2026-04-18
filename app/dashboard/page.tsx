@@ -19,10 +19,12 @@ import {
   getLastApiRequests,
 } from "@/app/actions/metrics";
 import { getContactSummary } from "@/app/actions/contact";
+import { getKanbanMetrics } from "@/app/actions/kanban-metrics";
+import { KanbanMetrics } from "./kanban-metrics";
 import { ApiRequestsTable } from "./api-requests-table";
 
 export default async function DashboardPage() {
-  const [projects, apiKeys, metrics, contactSummary, recentRequests] =
+  const [projects, apiKeys, metrics, contactSummary, recentRequests, kanbanMetrics] =
     await Promise.all([
       getProjects(),
       getApiKeys(),
@@ -43,6 +45,12 @@ export default async function DashboardPage() {
         closed: 0,
       })),
       getLastApiRequests(50).catch(() => []),
+      getKanbanMetrics().catch(() => ({
+        totalCustomers: 0,
+        totalBoards: 0,
+        tasksByStatus: { backlog: 0, todo: 0, in_progress: 0, complete: 0 },
+        totalTasks: 0,
+      })),
     ]);
 
   const total = projects.length;
@@ -109,6 +117,9 @@ export default async function DashboardPage() {
           href="/dashboard/api-keys"
         />
       </div>
+
+      {/* Kanban Metrics */}
+      <KanbanMetrics metrics={kanbanMetrics} />
 
       {/* Recent Activity - Side by Side */}
       <div className="grid gap-6 lg:grid-cols-2">
