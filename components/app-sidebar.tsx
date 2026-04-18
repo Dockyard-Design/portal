@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -108,11 +109,36 @@ export default function AppSidebar() {
   const pathname = usePathname();
   const { isLoaded, user } = useUser();
   const { openUserProfile, signOut } = useClerk();
+  
+  // Track open state for each collapsible group
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    // Initialize based on active groups
+    const initial: Record<string, boolean> = {};
+    NAV_GROUPS.forEach(group => {
+      const isActive = group.items.some(item => pathname.startsWith(item.href));
+      initial[group.title] = isActive;
+    });
+    return initial;
+  });
+  
+  // Update open groups when pathname changes
+  useEffect(() => {
+    setOpenGroups(prev => {
+      const updated: Record<string, boolean> = { ...prev };
+      NAV_GROUPS.forEach(group => {
+        const shouldBeOpen = group.items.some(item => pathname.startsWith(item.href));
+        if (shouldBeOpen) {
+          updated[group.title] = true;
+        }
+      });
+      return updated;
+    });
+  }, [pathname]);
 
   return (
     <Sidebar className="border-r-border/40">
       <SidebarHeader className="p-6">
-        <div className="flex items-center gap-3 group cursor-pointer">
+        <div className="flex items-center justify-center gap-3 group cursor-pointer">
           <Image
             src="/logo.svg"
             alt="Dockyard"
@@ -135,7 +161,7 @@ export default function AppSidebar() {
                 className={cn(
                   "transition-all duration-200 rounded-lg h-10 px-3",
                   pathname === NAV_OVERVIEW.href
-                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    ? "bg-primary/10 hover:bg-primary/20"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary",
                 )}
               >
@@ -155,49 +181,64 @@ export default function AppSidebar() {
             </SidebarMenuItem>
 
             {/* Menu Groups with Submenus */}
-            {NAV_GROUPS.map((group) => (
-              <Collapsible
-                key={group.title}
-                defaultOpen
-                className="group/collapsible"
-              >
-                <SidebarMenuItem>
-                  <SidebarMenuButton className="transition-all duration-200 rounded-lg h-10 px-3 text-muted-foreground hover:text-foreground hover:bg-secondary">
-                    <group.icon className="size-4" />
-                    <span className="font-medium flex-1 text-left">
-                      {group.title}
-                    </span>
-                    <ChevronRight className="size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <CollapsibleContent>
-                  <SidebarMenuSub>
-                    {group.items.map((item) => (
-                      <SidebarMenuSubItem key={item.href}>
-                        <SidebarMenuSubButton
-                          isActive={pathname === item.href}
-                          className={cn(
-                            "transition-all duration-200 rounded-md",
-                            pathname === item.href
-                              ? "bg-primary/10 text-primary"
-                              : "text-muted-foreground hover:text-foreground hover:bg-secondary",
-                          )}
-                          render={
-                            <Link
-                              href={item.href}
-                              className="flex items-center gap-2"
-                            >
-                              <item.icon className="size-4" />
-                              <span>{item.title}</span>
-                            </Link>
-                          }
-                        />
-                      </SidebarMenuSubItem>
-                    ))}
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </Collapsible>
-            ))}
+            {NAV_GROUPS.map((group) => {
+              const isGroupActive = group.items.some(item => pathname.startsWith(item.href));
+              
+              return (
+                <Collapsible
+                  key={group.title}
+                  open={openGroups[group.title] ?? false}
+                  onOpenChange={(open) => setOpenGroups(prev => ({ ...prev, [group.title]: open }))}
+                  className="group/collapsible"
+                >
+                  <SidebarMenuItem>
+                    <SidebarMenuButton 
+                      className={cn(
+                        "transition-all duration-200 rounded-lg h-10 px-3",
+                        isGroupActive 
+                          ? "hover:bg-primary/10" 
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      )}
+                    >
+                      <group.icon className={cn("size-4", isGroupActive && "text-primary")} />
+                      <span className="font-medium flex-1 text-left">
+                        {group.title}
+                      </span>
+                      <ChevronRight className={cn("size-4 transition-transform group-data-[state=open]/collapsible:rotate-90")} />
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {group.items.map((item) => {
+                        const isItemActive = pathname === item.href;
+                        return (
+                          <SidebarMenuSubItem key={item.href}>
+                            <SidebarMenuSubButton
+                              isActive={isItemActive}
+                              className={cn(
+                                "transition-all duration-200 rounded-md h-9",
+                                isItemActive
+                                  ? "bg-primary/10"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                              )}
+                              render={
+                                <Link
+                                  href={item.href}
+                                  className="flex items-center gap-2"
+                                >
+                                  <item.icon className={cn("size-4", isItemActive && "text-primary")} />
+                                  <span>{item.title}</span>
+                                </Link>
+                              }
+                            />
+                          </SidebarMenuSubItem>
+                        );
+                      })}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </Collapsible>
+              );
+            })}
           </SidebarMenu>
         </SidebarGroup>
       </SidebarContent>
@@ -212,7 +253,7 @@ export default function AppSidebar() {
                 className={cn(
                   "transition-all duration-200 rounded-lg h-10 px-3",
                   pathname === item.href
-                    ? "bg-primary/10 text-primary hover:bg-primary/20"
+                    ? "bg-primary/10 hover:bg-primary/20"
                     : "text-muted-foreground hover:text-foreground hover:bg-secondary",
                 )}
               >
