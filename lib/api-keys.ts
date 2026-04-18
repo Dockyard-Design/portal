@@ -13,9 +13,19 @@ if (!supabaseUrl || !publishableKey) {
 // Regular client — respects RLS, used for Clerk-authenticated reads
 export const supabase = createClient(supabaseUrl, publishableKey);
 
-// Admin client — bypasses RLS, used for API key ops and logging
+// Admin client — bypasses RLS
 export const supabaseAdmin = serviceRoleKey
-  ? createClient(supabaseUrl, serviceRoleKey)
+  ? createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+      global: {
+        headers: {
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      },
+    })
   : supabase;
 
 export interface RecentRequest {
