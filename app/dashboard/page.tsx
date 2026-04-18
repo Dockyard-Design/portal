@@ -59,6 +59,7 @@ export default async function DashboardPage() {
 
   const activeKeys = apiKeys.filter((k) => k.is_active).length;
   const totalKeys = apiKeys.length;
+  const newSubmissions = contactSubmissions.filter((s) => s.status === "new");
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
@@ -136,21 +137,14 @@ export default async function DashboardPage() {
               </Link>
             </div>
             <div className="divide-y divide-border/40">
-              {contactSubmissions.slice(0, 5).map((submission) => (
+              {newSubmissions.slice(0, 5).map((submission) => (
                 <Link
                   key={submission.id}
                   href="/dashboard/contact"
                   className="flex items-center justify-between px-5 py-3.5 hover:bg-secondary/30 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`size-2 rounded-full shrink-0 ${
-                        submission.status === 'new' ? 'bg-red-500' :
-                        submission.status === 'read' ? 'bg-amber-500' :
-                        submission.status === 'replied' ? 'bg-blue-500' :
-                        'bg-slate-500'
-                      }`}
-                    />
+                    <div className="size-2 rounded-full shrink-0 bg-red-500" />
                     <div className="flex flex-col min-w-0">
                       <span className="font-medium text-sm truncate">
                         {submission.name}
@@ -165,9 +159,9 @@ export default async function DashboardPage() {
                   </span>
                 </Link>
               ))}
-              {contactSubmissions.length === 0 && (
+              {newSubmissions.length === 0 && (
                 <div className="px-5 py-8 text-center text-muted-foreground text-sm">
-                  No contact submissions yet.
+                  No new submissions.
                 </div>
               )}
             </div>
