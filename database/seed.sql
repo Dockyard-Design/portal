@@ -112,3 +112,42 @@ VALUES
 -- Global Solutions - Localization Board
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'seed-author-id', 'Localization', 'Translate app to 5 languages', 'todo', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '30 days'),
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', null, 'Translation review', 'Review translated content', 'backlog', 'medium', 0, 'seed-author-id', NOW() + INTERVAL '45 days');
+
+-- 7. Seed Quotes for Acme Corporation (customer a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10)
+INSERT INTO quotes (id, customer_id, title, description, subtotal, tax_rate, tax_amount, total, status, notes, terms, author_id)
+VALUES
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Website Development Quote', 'Complete website redesign including CMS and e-commerce integration', 15000.00, 10.00, 1500.00, 16500.00, 'accepted', 'Priority project with tight deadline', 'Payment terms: 50% upfront, 50% upon completion', 'seed-author-id'),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'SEO Optimization Package', '6-month SEO campaign including technical audit and content strategy', 5000.00, 10.00, 500.00, 5500.00, 'sent', 'Monthly reporting included', 'Monthly billing in arrears', 'seed-author-id'),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Mobile App Development', 'Native iOS and Android app development', 45000.00, 10.00, 4500.00, 49500.00, 'draft', 'Phased delivery approach', 'Payment schedule: 25% monthly over 4 months', 'seed-author-id');
+
+-- Quote items for accepted quote
+INSERT INTO quote_items (quote_id, description, quantity, unit_price, total, sort_order)
+VALUES
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Design & UX', 1, 5000.00, 5000.00, 0),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Frontend Development', 1, 6000.00, 6000.00, 1),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Backend & CMS', 1, 4000.00, 4000.00, 2);
+
+-- Quote items for sent quote
+INSERT INTO quote_items (quote_id, description, quantity, unit_price, total, sort_order)
+VALUES
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Technical SEO Audit', 1, 1500.00, 1500.00, 0),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Content Strategy (6 months)', 6, 500.00, 3000.00, 1),
+('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Monthly Reporting & Analysis', 6, 83.33, 500.00, 2);
+
+-- 8. Seed Invoices for Acme Corporation
+INSERT INTO invoices (id, customer_id, quote_id, invoice_number, title, description, subtotal, tax_rate, tax_amount, total, amount_paid, balance_due, status, due_date, notes, author_id)
+VALUES
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'INV-2024-0001', 'Website Development - Deposit', '50% deposit for website redesign project', 7500.00, 10.00, 750.00, 8250.00, 8250.00, 0, 'paid', NOW() + INTERVAL '30 days', 'Paid via bank transfer', 'seed-author-id'),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'INV-2024-0002', 'Website Development - Final', 'Final payment for website redesign', 7500.00, 10.00, 750.00, 8250.00, 0, 8250.00, 'sent', NOW() + INTERVAL '15 days', 'Due upon project completion', 'seed-author-id'),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', null, 'INV-2024-0003', 'Consulting Services - January', 'Monthly consulting services', 3000.00, 10.00, 300.00, 3300.00, 3300.00, 0, 'paid', NOW() - INTERVAL '15 days', 'Paid on time', 'seed-author-id'),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', null, 'INV-2024-0004', 'Consulting Services - February', 'Monthly consulting services', 3000.00, 10.00, 300.00, 3300.00, 1650.00, 1650.00, 'partial', NOW() - INTERVAL '30 days', 'Partial payment received', 'seed-author-id'),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', null, 'INV-2024-0005', 'Consulting Services - March', 'Monthly consulting services', 3000.00, 10.00, 300.00, 3300.00, 0, 3300.00, 'overdue', NOW() - INTERVAL '45 days', 'Payment overdue - follow up required', 'seed-author-id');
+
+-- Invoice items
+INSERT INTO invoice_items (invoice_id, description, quantity, unit_price, total, sort_order)
+VALUES
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Website Design & Development (50% deposit)', 1, 7500.00, 7500.00, 0),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a02', 'Website Design & Development (50% final)', 1, 7500.00, 7500.00, 0),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a03', 'Consulting Services', 20, 150.00, 3000.00, 0),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'Consulting Services', 20, 150.00, 3000.00, 0),
+('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'Consulting Services', 20, 150.00, 3000.00, 0);
