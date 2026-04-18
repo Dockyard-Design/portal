@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
-import { supabase } from "@/lib/api-keys";
+import { supabaseAdmin as supabase } from "@/lib/api-keys";
 
 export interface Project {
   id: string;

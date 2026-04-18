@@ -1,6 +1,9 @@
--- RESET SCRIPT
--- Drop all tables and functions to start fresh
--- Order matters for foreign key dependencies
+-- ============================================
+-- DOCKYARD DATABASE SCHEMA
+-- Run this in Supabase SQL Editor
+-- ============================================
+
+-- Drop tables in reverse dependency order
 DROP TABLE IF EXISTS expense_items CASCADE;
 DROP TABLE IF EXISTS expenses CASCADE;
 DROP TABLE IF EXISTS expense_categories CASCADE;
@@ -18,15 +21,12 @@ DROP TABLE IF EXISTS kanban_tasks CASCADE;
 DROP TABLE IF EXISTS kanban_boards CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
 
+-- Drop function
 DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
-DROP FUNCTION IF EXISTS increment_api_key_request_count CASCADE;
-DROP FUNCTION IF EXISTS check_rate_limit CASCADE;
 
 -- ============================================
--- CORE TABLES
+-- PROJECTS TABLE
 -- ============================================
-
--- Table for Projects (Blog Posts)
 CREATE TABLE projects (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -46,7 +46,9 @@ CREATE TABLE projects (
   author_id TEXT NOT NULL
 );
 
--- Table for API Keys
+-- ============================================
+-- API KEYS TABLE
+-- ============================================
 CREATE TABLE api_keys (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -60,7 +62,9 @@ CREATE TABLE api_keys (
   request_count INTEGER DEFAULT 0
 );
 
--- Table for Global Settings
+-- ============================================
+-- SETTINGS TABLE
+-- ============================================
 CREATE TABLE settings (
   key TEXT PRIMARY KEY,
   value TEXT,
@@ -69,10 +73,8 @@ CREATE TABLE settings (
 );
 
 -- ============================================
--- CUSTOMER & KANBAN TABLES
+-- CUSTOMERS TABLE
 -- ============================================
-
--- Customers table for Kanban
 CREATE TABLE customers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -83,7 +85,9 @@ CREATE TABLE customers (
   notes TEXT
 );
 
--- Kanban boards table
+-- ============================================
+-- KANBAN BOARDS TABLE
+-- ============================================
 CREATE TABLE kanban_boards (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -95,7 +99,9 @@ CREATE TABLE kanban_boards (
   author_id TEXT NOT NULL
 );
 
--- Kanban tasks table
+-- ============================================
+-- KANBAN TASKS TABLE
+-- ============================================
 CREATE TABLE kanban_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -112,10 +118,8 @@ CREATE TABLE kanban_tasks (
 );
 
 -- ============================================
--- AGENCY TABLES (Quotes & Invoices)
+-- QUOTES TABLES
 -- ============================================
-
--- Quotes table
 CREATE TABLE quotes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -128,8 +132,7 @@ CREATE TABLE quotes (
   tax_amount DECIMAL(12, 2) DEFAULT 0,
   total DECIMAL(12, 2) NOT NULL DEFAULT 0,
   currency TEXT DEFAULT 'GBP',
-  status TEXT NOT NULL DEFAULT 'draft' 
-    CHECK (status IN ('draft', 'sent', 'accepted', 'rejected', 'expired')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent', 'accepted', 'rejected', 'expired')),
   valid_until TIMESTAMP WITH TIME ZONE,
   accepted_at TIMESTAMP WITH TIME ZONE,
   sent_at TIMESTAMP WITH TIME ZONE,
@@ -138,7 +141,6 @@ CREATE TABLE quotes (
   author_id TEXT NOT NULL
 );
 
--- Quote line items
 CREATE TABLE quote_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   quote_id UUID NOT NULL REFERENCES quotes(id) ON DELETE CASCADE,
@@ -149,7 +151,9 @@ CREATE TABLE quote_items (
   sort_order INTEGER NOT NULL DEFAULT 0
 );
 
--- Invoices table
+-- ============================================
+-- INVOICES TABLES
+-- ============================================
 CREATE TABLE invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -166,8 +170,7 @@ CREATE TABLE invoices (
   amount_paid DECIMAL(12, 2) DEFAULT 0,
   balance_due DECIMAL(12, 2) DEFAULT 0,
   currency TEXT DEFAULT 'GBP',
-  status TEXT NOT NULL DEFAULT 'draft'
-    CHECK (status IN ('draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled')),
   issue_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   due_date TIMESTAMP WITH TIME ZONE,
   paid_at TIMESTAMP WITH TIME ZONE,
@@ -178,7 +181,6 @@ CREATE TABLE invoices (
   author_id TEXT NOT NULL
 );
 
--- Invoice line items
 CREATE TABLE invoice_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
@@ -190,10 +192,8 @@ CREATE TABLE invoice_items (
 );
 
 -- ============================================
--- EXPENSE TRACKER TABLES (Dynamic Categories)
+-- EXPENSES TABLES (Dynamic Categories)
 -- ============================================
-
--- Expense categories table (dynamic - create FIRST)
 CREATE TABLE expense_categories (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -205,7 +205,6 @@ CREATE TABLE expense_categories (
   is_active BOOLEAN DEFAULT TRUE
 );
 
--- Expenses table (references categories)
 CREATE TABLE expenses (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -218,31 +217,29 @@ CREATE TABLE expenses (
   expense_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   receipt_url TEXT,
   is_recurring BOOLEAN DEFAULT FALSE,
-  recurring_frequency TEXT
-    CHECK (recurring_frequency IS NULL OR recurring_frequency IN ('monthly', 'quarterly', 'yearly')),
+  recurring_frequency TEXT CHECK (recurring_frequency IS NULL OR recurring_frequency IN ('monthly', 'quarterly', 'yearly')),
   tax_deductible BOOLEAN DEFAULT FALSE,
   vendor TEXT,
   author_id TEXT NOT NULL
 );
 
 -- ============================================
--- OTHER TABLES
+-- CONTACT SUBMISSIONS TABLE
 -- ============================================
-
--- Contact submissions table
 CREATE TABLE contact_submissions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   email TEXT NOT NULL,
   message TEXT NOT NULL,
-  status TEXT NOT NULL DEFAULT 'new'
-    CONSTRAINT contact_status_check CHECK (status IN ('new', 'read', 'replied', 'closed')),
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new', 'read', 'replied', 'closed')),
   archived BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- API Request Logs
+-- ============================================
+-- API LOGGING TABLES
+-- ============================================
 CREATE TABLE api_request_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -256,7 +253,6 @@ CREATE TABLE api_request_logs (
   user_agent TEXT
 );
 
--- Rate limit counters
 CREATE TABLE api_rate_limits (
   identifier TEXT PRIMARY KEY,
   window_start TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
@@ -264,130 +260,55 @@ CREATE TABLE api_rate_limits (
 );
 
 -- ============================================
--- FUNCTIONS
+-- RLS POLICIES
 -- ============================================
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kanban_boards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kanban_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expense_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_request_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_rate_limits ENABLE ROW LEVEL SECURITY;
 
-CREATE OR REPLACE FUNCTION update_updated_at_column()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-CREATE OR REPLACE FUNCTION increment_api_key_request_count(key_id UUID)
-RETURNS void
-LANGUAGE sql
-SECURITY DEFINER
-AS $$
-  UPDATE api_keys
-  SET request_count = COALESCE(request_count, 0) + 1,
-      last_used_at = NOW()
-  WHERE id = key_id;
-$$;
-
-CREATE OR REPLACE FUNCTION check_rate_limit(
-  p_identifier TEXT,
-  p_limit INTEGER DEFAULT 100,
-  p_window_seconds INTEGER DEFAULT 60
-)
-RETURNS TABLE (allowed BOOLEAN, remaining INTEGER, rate_limit INTEGER, reset_at TIMESTAMPTZ)
-LANGUAGE plpgsql
-SECURITY DEFINER
-AS $$
-DECLARE
-  v_window_start TIMESTAMPTZ;
-  v_reset_at TIMESTAMPTZ;
-  v_current_count INTEGER;
-BEGIN
-  v_window_start := DATE_TRUNC('second', NOW() - (INTERVAL '1 second' * (EXTRACT(EPOCH FROM NOW())::BIGINT % p_window_seconds)));
-  v_reset_at := v_window_start + (INTERVAL '1 second' * p_window_seconds);
-
-  UPDATE api_rate_limits
-  SET request_count = request_count + 1
-  WHERE identifier = p_identifier
-    AND window_start >= v_window_start;
-
-  GET DIAGNOSTICS v_current_count := ROW_COUNT;
-
-  IF v_current_count > 0 THEN
-    SELECT request_count INTO v_current_count
-    FROM api_rate_limits
-    WHERE identifier = p_identifier;
-
-    IF v_current_count > p_limit THEN
-      UPDATE api_rate_limits
-      SET request_count = request_count - 1
-      WHERE identifier = p_identifier;
-
-      RETURN QUERY SELECT FALSE, 0, p_limit, v_reset_at;
-    ELSE
-      RETURN QUERY SELECT TRUE, p_limit - v_current_count, p_limit, v_reset_at;
-    END IF;
-  ELSE
-    INSERT INTO api_rate_limits (identifier, window_start, request_count)
-    VALUES (p_identifier, NOW(), 1)
-    ON CONFLICT (identifier)
-    DO UPDATE SET window_start = NOW(),
-                request_count = 1;
-
-    RETURN QUERY SELECT TRUE, p_limit - 1, p_limit, v_reset_at;
-  END IF;
-END;
-$$;
-
--- ============================================
--- INDEXES
--- ============================================
-
-CREATE INDEX idx_projects_slug ON projects(slug);
-CREATE INDEX idx_projects_status ON projects(status);
-CREATE INDEX idx_api_keys_prefix ON api_keys(key_prefix);
-CREATE INDEX idx_customers_name ON customers(name);
-CREATE INDEX idx_kanban_boards_customer ON kanban_boards(customer_id);
-CREATE INDEX idx_kanban_tasks_board ON kanban_tasks(board_id);
-CREATE INDEX idx_kanban_tasks_assigned ON kanban_tasks(assigned_to);
-CREATE INDEX idx_kanban_tasks_status ON kanban_tasks(status);
-CREATE INDEX idx_kanban_tasks_position ON kanban_tasks(position);
-CREATE INDEX idx_quotes_customer ON quotes(customer_id);
-CREATE INDEX idx_quotes_status ON quotes(status);
-CREATE INDEX idx_quotes_created ON quotes(created_at DESC);
-CREATE INDEX idx_quote_items_quote ON quote_items(quote_id);
-CREATE INDEX idx_invoices_customer ON invoices(customer_id);
-CREATE INDEX idx_invoices_status ON invoices(status);
-CREATE INDEX idx_invoices_number ON invoices(invoice_number);
-CREATE INDEX idx_invoices_due ON invoices(due_date);
-CREATE INDEX idx_invoice_items_invoice ON invoice_items(invoice_id);
-CREATE INDEX idx_expenses_category ON expenses(category_id);
-CREATE INDEX idx_expenses_date ON expenses(expense_date);
-CREATE INDEX idx_expenses_tax_deductible ON expenses(tax_deductible) WHERE tax_deductible = TRUE;
-CREATE INDEX idx_expense_categories_active ON expense_categories(is_active) WHERE is_active = TRUE;
-CREATE INDEX idx_api_request_logs_created_at ON api_request_logs(created_at DESC);
-CREATE INDEX idx_api_request_logs_api_key_id ON api_request_logs(api_key_id);
-CREATE INDEX idx_api_request_logs_path ON api_request_logs(path);
-CREATE INDEX idx_api_request_logs_status_code ON api_request_logs(status_code);
-CREATE INDEX idx_api_rate_limits_identifier ON api_rate_limits(identifier);
-CREATE INDEX idx_contact_submissions_status ON contact_submissions(status);
-CREATE INDEX idx_contact_submissions_archived ON contact_submissions(archived);
-
--- ============================================
--- TRIGGERS
--- ============================================
-
-CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON settings FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_customers_updated_at BEFORE UPDATE ON customers FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_kanban_boards_updated_at BEFORE UPDATE ON kanban_boards FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_kanban_tasks_updated_at BEFORE UPDATE ON kanban_tasks FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_quotes_updated_at BEFORE UPDATE ON quotes FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_invoices_updated_at BEFORE UPDATE ON invoices FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_expenses_updated_at BEFORE UPDATE ON expenses FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER update_expense_categories_updated_at BEFORE UPDATE ON expense_categories FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
-CREATE TRIGGER set_updated_at_contact_submissions BEFORE UPDATE ON contact_submissions FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+-- Create a policy that allows all operations (authenticated via Clerk)
+-- This matches your current setup where Clerk handles authentication
+CREATE POLICY "Allow all" ON projects FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON api_keys FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON settings FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON customers FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON kanban_boards FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON kanban_tasks FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON quotes FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON quote_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON invoices FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON invoice_items FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON expenses FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON expense_categories FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON contact_submissions FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON api_request_logs FOR ALL USING (true) WITH CHECK (true);
+CREATE POLICY "Allow all" ON api_rate_limits FOR ALL USING (true) WITH CHECK (true);
 
 -- ============================================
 -- INITIAL DATA
 -- ============================================
-
 INSERT INTO settings (key, value, description) VALUES
 ('api_rate_limit', '1000', 'Max requests per minute for API keys');
+
+-- Insert default expense categories
+INSERT INTO expense_categories (name, color, icon, description) VALUES
+('Office Rent', 'bg-blue-500', 'Building', 'Monthly office rental payments'),
+('Utilities', 'bg-yellow-500', 'Zap', 'Electricity, water, internet'),
+('Software', 'bg-purple-500', 'Monitor', 'Software subscriptions and licenses'),
+('Hardware', 'bg-gray-500', 'Laptop', 'Computers, equipment, devices'),
+('Marketing', 'bg-pink-500', 'Megaphone', 'Advertising and marketing'),
+('Travel', 'bg-green-500', 'Plane', 'Business travel and accommodation'),
+('Freelance', 'bg-orange-500', 'User', 'Contractor and freelancer payments'),
+('Supplies', 'bg-slate-500', 'Package', 'Office supplies and misc items');

@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "@/lib/api-keys";
+import { supabaseAdmin as supabase } from "@/lib/api-keys";
 
 export interface AgencyMetrics {
   quotes: {

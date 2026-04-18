@@ -1,6 +1,6 @@
 "use server";
 
-import { supabase } from "@/lib/api-keys";
+import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import type { ExpenseMetrics } from "@/types/expense";
 
 export async function getExpenseMetrics(): Promise<ExpenseMetrics> {

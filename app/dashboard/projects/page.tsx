@@ -2,6 +2,7 @@ import { getProjects } from "@/app/actions/projects";
 import { ProjectsTable } from "./projects-table";
 import { clerkClient } from "@clerk/nextjs/server";
 
+export const dynamic = "force-dynamic";
 export default async function ProjectsPage() {
   const projects = await getProjects();
   
