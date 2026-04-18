@@ -45,12 +45,17 @@ function calculateTotals(
 }
 
 // Quotes
-export async function getQuotes(customerId: string): Promise<Quote[]> {
-  const { data, error } = await supabase
+export async function getQuotes(customerId?: string): Promise<Quote[]> {
+  let query = supabase
     .from("quotes")
     .select("*, items:quote_items(*)")
-    .eq("customer_id", customerId)
     .order("created_at", { ascending: false });
+
+  if (customerId) {
+    query = query.eq("customer_id", customerId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(sanitizeError(error));
   return (data as Quote[]) || [];
@@ -186,12 +191,17 @@ export async function updateQuote(
 }
 
 // Invoices
-export async function getInvoices(customerId: string): Promise<Invoice[]> {
-  const { data, error } = await supabase
+export async function getInvoices(customerId?: string): Promise<Invoice[]> {
+  let query = supabase
     .from("invoices")
     .select("*, items:invoice_items(*)")
-    .eq("customer_id", customerId)
     .order("created_at", { ascending: false });
+
+  if (customerId) {
+    query = query.eq("customer_id", customerId);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw new Error(sanitizeError(error));
   return (data as Invoice[]) || [];

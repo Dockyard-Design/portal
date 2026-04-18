@@ -1,9 +1,27 @@
-import { notFound } from "next/navigation";
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Building,
   Mail,
@@ -13,29 +31,56 @@ import {
   FileText,
   Receipt,
   LayoutGrid,
-  DollarSign,
+  PoundSterling,
   CheckCircle,
   Clock,
-  AlertCircle,
+  MoreVertical,
+  Plus,
+  Trash2,
+  Eye,
+  Download,
+  Send,
+  FileSpreadsheet,
 } from "lucide-react";
-import { getCustomer } from "@/app/actions/kanban";
-import { getQuotes, getInvoices, getCustomerStats } from "@/app/actions/agency";
+import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Quote, Invoice, CustomerStats } from "@/types/agency";
 
-interface CustomerPageProps {
-  params: Promise<{ id: string }>;
+interface CustomerDetailProps {
+  customer: Customer;
+  quotes: Quote[];
+  invoices: Invoice[];
+  stats: CustomerStats;
 }
 
-export default async function CustomerDetailPage({ params }: CustomerPageProps) {
-  const { id } = await params;
-  
-  const [customer, quotes, invoices, stats] = await Promise.all([
-    getCustomer(id),
-    getQuotes(id),
-    getInvoices(id),
-    getCustomerStats(id),
-  ]);
+export default function CustomerDetailPage({ 
+  customer, 
+  quotes, 
+  invoices, 
+  stats 
+}: CustomerDetailProps) {
+  const [activeTab, setActiveTab] = useState("overview");
+
+  const getQuoteStatusColor = (status: string) => {
+    switch (status) {
+      case "accepted": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "sent": return "bg-blue-100 text-blue-700 border-blue-200";
+      case "rejected": return "bg-red-100 text-red-700 border-red-200";
+      case "expired": return "bg-slate-100 text-slate-700 border-slate-200";
+      default: return "bg-amber-100 text-amber-700 border-amber-200";
+    }
+  };
+
+  const getInvoiceStatusColor = (status: string) => {
+    switch (status) {
+      case "paid": return "bg-emerald-100 text-emerald-700 border-emerald-200";
+      case "sent": return "bg-blue-100 text-blue-700 border-blue-200";
+      case "partial": return "bg-amber-100 text-amber-700 border-amber-200";
+      case "overdue": return "bg-red-100 text-red-700 border-red-200";
+      case "cancelled": return "bg-slate-100 text-slate-700 border-slate-200";
+      default: return "bg-gray-100 text-gray-700 border-gray-200";
+    }
+  };
 
   if (!customer) {
     notFound();
@@ -67,7 +112,7 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
             </Link>
           </Button>
           <Button asChild>
-            <Link href="/dashboard/work">
+            <Link href={`/dashboard/customers/${customer.id}/edit`}>
               <Edit className="size-4 mr-1" />
               Edit Customer
             </Link>
@@ -84,9 +129,7 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
               <span className="text-sm">Quotes</span>
             </div>
             <p className="text-2xl font-semibold">{stats.totalQuotes}</p>
-            <p className="text-xs text-muted-foreground">
-              {stats.quotesAccepted} accepted
-            </p>
+            <p className="text-xs text-muted-foreground">{stats.quotesAccepted} accepted</p>
           </CardContent>
         </Card>
 
@@ -97,24 +140,17 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
               <span className="text-sm">Invoices</span>
             </div>
             <p className="text-2xl font-semibold">{stats.totalInvoices}</p>
-            <p className="text-xs text-muted-foreground">
-              {stats.invoicesPaid} paid
-            </p>
+            <p className="text-xs text-muted-foreground">{stats.invoicesPaid} paid</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-2 text-emerald-600 mb-2">
-              <DollarSign className="size-4" />
+              <PoundSterling className="size-4" />
               <span className="text-sm">Revenue</span>
             </div>
-            <p className="text-2xl font-semibold">
-              £{stats.totalRevenue.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Total received
-            </p>
+            <p className="text-2xl font-semibold">£{stats.totalRevenue.toLocaleString()}</p>
           </CardContent>
         </Card>
 
@@ -124,32 +160,25 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
               <Clock className="size-4" />
               <span className="text-sm">Outstanding</span>
             </div>
-            <p className="text-2xl font-semibold">
-              £{stats.outstandingBalance.toLocaleString()}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {stats.invoicesOverdue} overdue
-            </p>
+            <p className="text-2xl font-semibold">£{stats.outstandingBalance.toLocaleString()}</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview" className="w-full">
-        <TabsList>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
           <TabsTrigger value="invoices">Invoices ({invoices.length})</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
+        <TabsContent value="overview" className="space-y-4 mt-6">
           <div className="grid md:grid-cols-2 gap-4">
-            {/* Customer Info */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
-                  <Building className="size-4" />
-                  Contact Information
+                  <Building className="size-4" />Contact Information
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -160,204 +189,163 @@ export default async function CustomerDetailPage({ params }: CustomerPageProps) 
                 {customer.email && (
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Email</p>
-                    <p className="font-medium">{customer.email}</p>
+                    <div className="flex items-center gap-2">
+                      <Mail className="size-4 text-muted-foreground" />
+                      <p className="font-medium">{customer.email}</p>
+                    </div>
                   </div>
                 )}
                 {customer.company && (
                   <div className="space-y-1">
                     <p className="text-sm text-muted-foreground">Company</p>
-                    <p className="font-medium">{customer.company}</p>
+                    <div className="flex items-center gap-2">
+                      <Briefcase className="size-4 text-muted-foreground" />
+                      <p className="font-medium">{customer.company}</p>
+                    </div>
                   </div>
                 )}
-                <div className="space-y-1">
-                  <p className="text-sm text-muted-foreground">Created</p>
-                  <p className="font-medium">
-                    {new Date(customer.created_at).toLocaleDateString()}
-                  </p>
-                </div>
               </CardContent>
             </Card>
 
-            {/* Recent Activity */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Recent Activity</CardTitle>
+                <CardTitle className="text-base">Financial Summary</CardTitle>
               </CardHeader>
-              <CardContent>
-                {quotes.length === 0 && invoices.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No activity yet.</p>
-                ) : (
-                  <div className="space-y-3">
-                    {quotes.slice(0, 3).map((quote) => (
-                      <div key={quote.id} className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-medium">{quote.title}</p>
-                          <p className="text-xs text-muted-foreground">Quote</p>
-                        </div>
-                        <Badge variant={getQuoteStatusVariant(quote.status)}>
-                          {quote.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              <CardContent className="space-y-2">
+                <div className="flex justify-between">
+                  <span>Total Quotes</span>
+                  <span className="font-semibold">{stats.totalQuotes}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Total Invoiced</span>
+                  <span className="font-semibold">£{stats.totalRevenue.toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Outstanding</span>
+                  <span className="font-semibold text-amber-600">£{stats.outstandingBalance.toLocaleString()}</span>
+                </div>
               </CardContent>
             </Card>
           </div>
-
-          {customer.notes && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Notes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm whitespace-pre-wrap">{customer.notes}</p>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
-        <TabsContent value="quotes">
-          <QuotesList quotes={quotes} customerId={customer.id} />
+        <TabsContent value="quotes" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Quotes</CardTitle>
+              <Button><Plus className="size-4 mr-1" />Create Quote</Button>
+            </CardHeader>
+            <CardContent>
+              {quotes.length === 0 ? (
+                <p className="text-muted-foreground">No quotes yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Quote</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {quotes.map((quote) => (
+                      <TableRow key={quote.id}>
+                        <TableCell>
+                          <p className="font-medium">{quote.title}</p>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getQuoteStatusColor(quote.status)}>{quote.status}</Badge>
+                        </TableCell>
+                        <TableCell>{format(new Date(quote.created_at), "MMM d, yyyy")}</TableCell>
+                        <TableCell className="text-right font-semibold">£{quote.total.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem><Eye className="size-4 mr-2" />View Details</DropdownMenuItem>
+                              <DropdownMenuItem><Edit className="size-4 mr-2" />Edit</DropdownMenuItem>
+                              <DropdownMenuItem><Download className="size-4 mr-2" />Download PDF</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive"><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
 
-        <TabsContent value="invoices">
-          <InvoicesList invoices={invoices} customerId={customer.id} />
+        <TabsContent value="invoices" className="mt-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Invoices</CardTitle>
+              <Button><Plus className="size-4 mr-1" />Create Invoice</Button>
+            </CardHeader>
+            <CardContent>
+              {invoices.length === 0 ? (
+                <p className="text-muted-foreground">No invoices yet.</p>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map((invoice) => (
+                      <TableRow key={invoice.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium">{invoice.invoice_number}</p>
+                            <p className="text-sm text-muted-foreground">{invoice.title}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={getInvoiceStatusColor(invoice.status)}>{invoice.status}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "-"}
+                        </TableCell>
+                        <TableCell className="text-right font-semibold">£{invoice.total.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger>
+                              <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <MoreVertical className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem><Eye className="size-4 mr-2" />View Details</DropdownMenuItem>
+                              <DropdownMenuItem><Edit className="size-4 mr-2" />Edit</DropdownMenuItem>
+                              <DropdownMenuItem><Download className="size-4 mr-2" />Download PDF</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive"><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
-
-function getQuoteStatusVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
-  switch (status) {
-    case "accepted":
-      return "default";
-    case "sent":
-      return "secondary";
-    case "rejected":
-      return "destructive";
-    default:
-      return "outline";
-  }
-}
-
-// Quotes List Component
-function QuotesList({ quotes, customerId }: { quotes: Quote[]; customerId: string }) {
-  if (quotes.length === 0) {
-    return (
-      <Card className="p-8 text-center">
-        <Receipt className="size-12 text-muted-foreground/30 mx-auto mb-4" />
-        <h3 className="font-medium mb-2">No quotes yet</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Create your first quote for this customer.
-        </p>
-        <Button>Create Quote</Button>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="font-medium">All Quotes</h3>
-        <Button>Create Quote</Button>
-      </div>
-      
-      <div className="grid gap-4">
-        {quotes.map((quote) => (
-          <Card key={quote.id}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium">{quote.title}</p>
-                  <p className="text-sm text-muted-foreground">
-                    Created {new Date(quote.created_at).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">
-                    ${quote.total.toLocaleString()}
-                  </p>
-                  <Badge variant={getQuoteStatusVariant(quote.status)}>
-                    {quote.status}
-                  </Badge>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// Invoices List Component
-function InvoicesList({ invoices, customerId }: { invoices: Invoice[]; customerId: string }) {
-  const getInvoiceStatusVariant = (status: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (status) {
-      case "paid":
-        return "default";
-      case "sent":
-        return "secondary";
-      case "overdue":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
-
-  if (invoices.length === 0) {
-    return (
-      <Card className="p-8 text-center">
-        <FileText className="size-12 text-muted-foreground/30 mx-auto mb-4" />
-        <h3 className="font-medium mb-2">No invoices yet</h3>
-        <p className="text-sm text-muted-foreground mb-4">
-          Create your first invoice for this customer.
-        </p>
-        <Button>Create Invoice</Button>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <h3 className="font-medium">All Invoices</h3>
-        <Button>Create Invoice</Button>
-      </div>
-      
-      <div className="grid gap-4">
-        {invoices.map((invoice) => (
-          <Card key={invoice.id}>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium">{invoice.invoice_number}</p>
-                    <Badge variant={getInvoiceStatusVariant(invoice.status)}>
-                      {invoice.status}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    {invoice.title}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="font-semibold">
-                    ${invoice.total.toLocaleString()}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    Due {invoice.due_date 
-                      ? new Date(invoice.due_date).toLocaleDateString() 
-                      : "N/A"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
     </div>
   );
 }
