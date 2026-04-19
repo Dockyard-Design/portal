@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -15,6 +15,8 @@ import {
   Briefcase,
   Users,
   Receipt,
+  Trash2,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -30,7 +32,11 @@ import {
   SidebarMenuSubItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
-import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "@/components/ui/collapsible";
+import {
+  Collapsible,
+  CollapsibleTrigger,
+  CollapsibleContent,
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -38,12 +44,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/store";
+import { canWipeDatabase, wipeDatabase } from "@/app/actions/dev-wipe";
+import { toast } from "sonner";
 
 // Sidebar Menu Configuration
 // Easy to add/remove/modify menu items here
@@ -111,22 +129,47 @@ const NAV_SETTINGS: SingleMenuItem[] = [
     icon: Users,
   },
   {
-    title: "API Keys",
+    title: "API",
     href: "/dashboard/api-keys",
     icon: Key,
   },
 ];
+
+const ALLOWED_WIPE_EMAIL = "fredericomelogarcia@outlook.com";
 
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isLoaded, user } = useUser();
   const { openUserProfile, signOut } = useClerk();
   const { openGroups, setGroupOpen } = useSidebarStore();
-  
+  const [showWipeDialog, setShowWipeDialog] = useState(false);
+  const [canWipe, setCanWipe] = useState(false);
+
+  // Check if user can wipe database
+  useEffect(() => {
+    if (isLoaded && user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL) {
+      setCanWipe(true);
+    }
+  }, [isLoaded, user]);
+
+  const handleWipe = async () => {
+    const result = await wipeDatabase();
+    if (result.success) {
+      toast.success(result.message);
+      // Redirect to dashboard and refresh
+      window.location.href = "/dashboard";
+    } else {
+      toast.error(result.message);
+      setShowWipeDialog(false);
+    }
+  };
+
   // Auto-expand groups with active items on navigation
   useEffect(() => {
     NAV_GROUPS.forEach((group) => {
-      const isGroupActive = group.items.some((item) => pathname.startsWith(item.href));
+      const isGroupActive = group.items.some((item) =>
+        pathname.startsWith(item.href),
+      );
       if (isGroupActive) {
         setGroupOpen(group.title, true);
       }
@@ -177,8 +220,10 @@ export default function AppSidebar() {
 
             {/* Menu Groups with Submenus */}
             {NAV_GROUPS.map((group) => {
-              const isGroupActive = group.items.some(item => pathname.startsWith(item.href));
-              
+              const isGroupActive = group.items.some((item) =>
+                pathname.startsWith(item.href),
+              );
+
               return (
                 <Collapsible
                   key={group.title}
@@ -190,12 +235,17 @@ export default function AppSidebar() {
                     <CollapsibleTrigger
                       className={cn(
                         "w-full flex items-center gap-3 px-3 h-10 rounded-lg cursor-pointer transition-all duration-200",
-                        isGroupActive 
-                          ? "hover:bg-primary/10" 
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                        isGroupActive
+                          ? "hover:bg-primary/10"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary",
                       )}
                     >
-                      <group.icon className={cn("size-4", isGroupActive && "text-primary")} />
+                      <group.icon
+                        className={cn(
+                          "size-4",
+                          isGroupActive && "text-primary",
+                        )}
+                      />
                       <span className="font-medium flex-1 text-left">
                         {group.title}
                       </span>
@@ -221,7 +271,12 @@ export default function AppSidebar() {
                                   href={item.href}
                                   className="flex items-center gap-2"
                                 >
-                                  <item.icon className={cn("size-4", isItemActive && "!text-primary")} />
+                                  <item.icon
+                                    className={cn(
+                                      "size-4",
+                                      isItemActive && "!text-primary",
+                                    )}
+                                  />
                                   <span>{item.title}</span>
                                 </Link>
                               }
@@ -313,8 +368,44 @@ export default function AppSidebar() {
               <LogOut className="size-4" />
               Logout
             </DropdownMenuItem>
+            {canWipe && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setShowWipeDialog(true)}
+                  className="gap-2 text-destructive"
+                >
+                  <Trash2 className="size-4" />
+                  Wipe Database
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
+
+        <AlertDialog open={showWipeDialog} onOpenChange={setShowWipeDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2">
+                <AlertTriangle className="size-5 text-destructive" />
+                Wipe Database?
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                This will permanently delete ALL data from all application tables.
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleWipe}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              >
+                Wipe Database
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
       <SidebarRail />
     </Sidebar>

@@ -2,13 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 
 export const dynamic = "force-dynamic";
 
-import {
-  ArrowUpRight,
-  Key,
-  Clock,
-  Shield,
-  LayoutGrid,
-} from "lucide-react";
+import { ArrowUpRight, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
 import { getApiKeys } from "@/app/actions/api-keys";
@@ -26,7 +20,6 @@ import { getExpenseMetrics } from "@/app/actions/expense-metrics";
 import { KanbanMetrics } from "./kanban-metrics";
 import { AgencyMetrics } from "./agency-metrics";
 import { ExpenseMetrics } from "./expense-metrics";
-import { ApiRequestsTable } from "./api-requests-table";
 
 export default async function DashboardPage() {
   const [
@@ -104,8 +97,6 @@ export default async function DashboardPage() {
     })),
   ]);
 
-  const activeKeys = apiKeys.filter((k) => k.is_active).length;
-  const totalKeys = apiKeys.length;
   const newSubmissions = contactSubmissions.filter((s) => s.status === "new");
 
   return (
@@ -117,7 +108,7 @@ export default async function DashboardPage() {
       <ExpenseMetrics metrics={expenseMetrics} />
 
       {/* Kanban Metrics */}
-      <div className="flex items-center gap-2 pt-10">
+      <div className="flex items-center gap-2">
         <LayoutGrid className="size-5 text-primary" />
         <h2 className="text-lg font-semibold">Kanban Boards</h2>
       </div>
@@ -223,86 +214,6 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-
-      {/* API Requests Table - Full Width */}
-      <ApiRequestsTable requests={recentRequests} />
-      {/* API Health */}
-      <Card className="border-border/40 shadow-sm">
-        <CardContent className="p-0">
-          <div className="px-5 py-4 border-b border-border/40 flex items-center justify-between">
-            <h2 className="font-semibold text-foreground">API Health</h2>
-            <Link
-              href="/dashboard/api-keys"
-              className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
-            >
-              Manage <ArrowUpRight className="size-3.5" />
-            </Link>
-          </div>
-          <div className="p-5 space-y-4">
-            <HealthRow
-              label="Success Rate"
-              value={`${metrics.successRate}%`}
-              icon={Shield}
-              status={
-                metrics.successRate >= 95
-                  ? "good"
-                  : metrics.successRate >= 80
-                    ? "warning"
-                    : "error"
-              }
-            />
-            <HealthRow
-              label="Avg Response"
-              value={`${metrics.avgResponseTime}ms`}
-              icon={Clock}
-              status={
-                metrics.avgResponseTime < 200
-                  ? "good"
-                  : metrics.avgResponseTime < 500
-                    ? "warning"
-                    : "error"
-              }
-            />
-            <HealthRow
-              label="Active Keys"
-              value={`${activeKeys} / ${totalKeys}`}
-              icon={Key}
-              status={activeKeys > 0 ? "good" : "neutral"}
-            />
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
-function HealthRow({
-  label,
-  value,
-  icon: Icon,
-  status,
-}: {
-  label: string;
-  value: string;
-  icon: React.ComponentType<{ className?: string }>;
-  status: "good" | "warning" | "error" | "neutral";
-}) {
-  const statusColors = {
-    good: "text-emerald-500",
-    warning: "text-amber-500",
-    error: "text-red-500",
-    neutral: "text-muted-foreground",
-  };
-
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <Icon className="size-4 text-muted-foreground" />
-        <span className="text-sm text-muted-foreground">{label}</span>
-      </div>
-      <span className={`text-sm font-medium ${statusColors[status]}`}>
-        {value}
-      </span>
     </div>
   );
 }
