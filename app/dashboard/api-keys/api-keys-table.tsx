@@ -36,10 +36,13 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const router = useRouter();
   const totalPages = Math.ceil(keys.length / ITEMS_PER_PAGE);
-  const paginatedKeys = keys.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
+  const paginatedKeys = keys.slice(
+    page * ITEMS_PER_PAGE,
+    (page + 1) * ITEMS_PER_PAGE,
+  );
 
-  const handlePrevPage = () => setPage(p => Math.max(0, p - 1));
-  const handleNextPage = () => setPage(p => Math.min(totalPages - 1, p + 1));
+  const handlePrevPage = () => setPage((p) => Math.max(0, p - 1));
+  const handleNextPage = () => setPage((p) => Math.min(totalPages - 1, p + 1));
 
   const handleRevoke = async (id: string) => {
     try {
@@ -47,7 +50,9 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
       toast.success("Key revoked");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to revoke key");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to revoke key",
+      );
     }
   };
 
@@ -63,7 +68,9 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
       toast.success("Key deleted");
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to delete key");
+      toast.error(
+        error instanceof Error ? error.message : "Failed to delete key",
+      );
     } finally {
       setDeleteDialogOpen(false);
       setDeleteTarget(null);
@@ -93,27 +100,35 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
         <Table>
           <TableHeader className="bg-secondary/20">
             <TableRow>
-              <TableHead className="w-[250px]">Name</TableHead>
+              <TableHead className="w-62.5">Name</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Prefix</TableHead>
               <TableHead>Usage</TableHead>
-              <TableHead className="w-[150px]">Last Used</TableHead>
+              <TableHead className="w-37.5">Last Used</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {paginatedKeys.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                <TableCell
+                  colSpan={6}
+                  className="h-32 text-center text-muted-foreground"
+                >
                   No API keys yet.
                 </TableCell>
               </TableRow>
             ) : (
               paginatedKeys.map((key) => (
-                <TableRow key={key.id} className={key.is_active ? "" : "opacity-50"}>
+                <TableRow
+                  key={key.id}
+                  className={key.is_active ? "" : "opacity-50"}
+                >
                   <TableCell>
                     <div className="flex flex-col">
-                      <span className={`font-medium ${!key.is_active ? "line-through" : ""}`}>
+                      <span
+                        className={`font-medium ${!key.is_active ? "line-through" : ""}`}
+                      >
                         {key.name}
                       </span>
                       <span className="text-xs text-muted-foreground">
@@ -122,11 +137,12 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge 
-                      variant="outline" 
-                      className={key.is_active 
-                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20" 
-                        : "bg-slate-500/10 text-slate-600 border-slate-500/20"
+                    <Badge
+                      variant="outline"
+                      className={
+                        key.is_active
+                          ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
+                          : "bg-slate-500/10 text-slate-600 border-slate-500/20"
                       }
                     >
                       {key.is_active ? "Active" : "Revoked"}
@@ -137,9 +153,9 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
                       <code className="text-xs font-mono bg-secondary px-1.5 py-0.5 rounded">
                         {key.key_prefix}...
                       </code>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-6 w-6"
                         onClick={() => copyToClipboard(key.key_prefix + "...")}
                       >
@@ -148,29 +164,30 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-sm">{key.request_count.toLocaleString()} reqs</span>
+                    <span className="text-sm">
+                      {key.request_count.toLocaleString()} reqs
+                    </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {key.last_used_at 
-                      ? new Date(key.last_used_at).toLocaleDateString() 
-                      : "Never"
-                    }
+                    {key.last_used_at
+                      ? new Date(key.last_used_at).toLocaleDateString()
+                      : "Never"}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       {key.is_active && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleRevoke(key.id)}
                           className="h-8"
                         >
                           Revoke
                         </Button>
                       )}
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
+                      <Button
+                        variant="ghost"
+                        size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
                         onClick={() => openDeleteDialog(key.id)}
                       >
@@ -190,10 +207,22 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
               Page {page + 1} of {totalPages}
             </span>
             <div className="flex gap-1">
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handlePrevPage} disabled={page === 0}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handlePrevPage}
+                disabled={page === 0}
+              >
                 <ChevronLeft className="size-4" />
               </Button>
-              <Button variant="outline" size="icon" className="h-8 w-8" onClick={handleNextPage} disabled={page >= totalPages - 1}>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleNextPage}
+                disabled={page >= totalPages - 1}
+              >
                 <ChevronRight className="size-4" />
               </Button>
             </div>
@@ -206,12 +235,16 @@ export function ApiKeysTable({ keys }: { keys: ApiKeyRow[] }) {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete API key?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this API key. This action cannot be undone.
+              This will permanently delete this API key. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

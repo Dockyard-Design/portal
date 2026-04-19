@@ -2,7 +2,7 @@
 
 import { supabaseAdmin } from "@/lib/api-keys";
 import { requireAdmin } from "@/lib/authz";
-import { currentUser } from "@clerk/nextjs/server";
+import { currentUser, clerkClient } from "@clerk/nextjs/server";
 
 const ALLOWED_EMAIL = "fredericomelogarcia@outlook.com";
 
@@ -24,7 +24,7 @@ const TABLES_TO_WIPE = [
   "customers",
 ];
 
-export async function wipeDatabase(): Promise<{ success: boolean; message: string }> {
+export async function wipeDatabase(password: string): Promise<{ success: boolean; message: string }> {
   // Verify admin access
   await requireAdmin();
 
@@ -32,10 +32,24 @@ export async function wipeDatabase(): Promise<{ success: boolean; message: strin
   const user = await currentUser();
   const userEmail = user?.primaryEmailAddress?.emailAddress;
 
-  if (userEmail !== ALLOWED_EMAIL) {
+  if (userEmail !== ALLOWED_EMAIL || !user) {
     return {
       success: false,
       message: "Unauthorized: This action is restricted.",
+    };
+  }
+
+  // Verify password using Clerk backend
+  try {
+    const client = await clerkClient();
+    await client.users.verifyPassword({
+      userId: user.id,
+      password,
+    });
+  } catch {
+    return {
+      success: false,
+      message: "Incorrect password.",
     };
   }
 

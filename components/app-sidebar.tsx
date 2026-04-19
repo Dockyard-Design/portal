@@ -55,12 +55,13 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/store";
-import { canWipeDatabase, wipeDatabase } from "@/app/actions/dev-wipe";
+import { wipeDatabase } from "@/app/actions/dev-wipe";
 import { toast } from "sonner";
 
 // Sidebar Menu Configuration
@@ -143,25 +144,23 @@ export default function AppSidebar() {
   const { openUserProfile, signOut } = useClerk();
   const { openGroups, setGroupOpen } = useSidebarStore();
   const [showWipeDialog, setShowWipeDialog] = useState(false);
-  const [canWipe, setCanWipe] = useState(false);
+  const [wipePassword, setWipePassword] = useState("");
 
-  // Check if user can wipe database
-  useEffect(() => {
-    if (isLoaded && user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL) {
-      setCanWipe(true);
-    }
-  }, [isLoaded, user]);
+  // Check if user can wipe database - computed directly from user data
+  const canWipe =
+    isLoaded && user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL;
 
   const handleWipe = async () => {
-    const result = await wipeDatabase();
+    const result = await wipeDatabase(wipePassword);
     if (result.success) {
       toast.success(result.message);
       // Redirect to dashboard and refresh
       window.location.href = "/dashboard";
     } else {
       toast.error(result.message);
-      setShowWipeDialog(false);
     }
+    setWipePassword("");
+    setShowWipeDialog(false);
   };
 
   // Auto-expand groups with active items on navigation
@@ -274,7 +273,7 @@ export default function AppSidebar() {
                                   <item.icon
                                     className={cn(
                                       "size-4",
-                                      isItemActive && "!text-primary",
+                                      isItemActive && "text-primary!",
                                     )}
                                   />
                                   <span>{item.title}</span>
@@ -383,7 +382,10 @@ export default function AppSidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <AlertDialog open={showWipeDialog} onOpenChange={setShowWipeDialog}>
+        <AlertDialog open={showWipeDialog} onOpenChange={(open) => {
+          setShowWipeDialog(open);
+          if (!open) setWipePassword("");
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
@@ -391,15 +393,28 @@ export default function AppSidebar() {
                 Wipe Database?
               </AlertDialogTitle>
               <AlertDialogDescription>
-                This will permanently delete ALL data from all application tables.
-                This action cannot be undone.
+                This will permanently delete ALL data from all application
+                tables. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
+            <div className="py-4">
+              <label className="text-sm font-medium mb-2 block">
+                Enter your password to confirm:
+              </label>
+              <Input
+                type="password"
+                value={wipePassword}
+                onChange={(e) => setWipePassword(e.target.value)}
+                placeholder="Your password..."
+                className="w-full"
+              />
+            </div>
             <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setWipePassword("")}>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleWipe}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={!wipePassword}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
               >
                 Wipe Database
               </AlertDialogAction>
