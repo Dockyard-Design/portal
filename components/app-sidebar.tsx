@@ -80,7 +80,7 @@ import { useKanbanStore, useSidebarStore } from "@/lib/store";
 import { wipeDatabase } from "@/app/actions/dev-wipe";
 import { getBoards, getCustomers } from "@/app/actions/kanban";
 import { toast } from "sonner";
-import type { Customer, KanbanBoard } from "@/types/kanban";
+import type { Customer } from "@/types/kanban";
 
 // Sidebar Menu Configuration
 // Easy to add/remove/modify menu items here
@@ -152,7 +152,6 @@ const ALLOWED_WIPE_EMAIL = "fredericomelogarcia@outlook.com";
 
 function getCustomerNavGroup(
   selectedCustomerId: string | null,
-  boards: KanbanBoard[],
 ): MenuGroup {
   const items: SubMenuItem[] = [
     {
@@ -169,14 +168,6 @@ function getCustomerNavGroup(
 
   if (selectedCustomerId) {
     items.push(
-      ...[...boards]
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((board) => ({
-          title: board.name,
-          href: "/dashboard/kanban",
-          icon: KanbanSquare,
-          boardId: board.id,
-        })),
       {
         title: "Customer Details",
         href: `/dashboard/customers/${selectedCustomerId}`,
@@ -207,8 +198,6 @@ export default function AppSidebar() {
   const [showWipeDialog, setShowWipeDialog] = useState(false);
   const [wipePassword, setWipePassword] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [boards, setBoards] = useState<KanbanBoard[]>([]);
-  const [boardsCustomerId, setBoardsCustomerId] = useState<string | null>(null);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
 
   // Check if user can wipe database - computed directly from user data
@@ -230,7 +219,7 @@ export default function AppSidebar() {
 
   // Auto-expand groups with active items on navigation
   useEffect(() => {
-    [getCustomerNavGroup(selectedCustomerId, boards), ...NAV_GROUPS].forEach((group) => {
+    [getCustomerNavGroup(selectedCustomerId), ...NAV_GROUPS].forEach((group) => {
       const isGroupActive = group.items.some((item) =>
         pathname.startsWith(item.href),
       );
@@ -238,7 +227,7 @@ export default function AppSidebar() {
         setGroupOpen(group.title, true);
       }
     });
-  }, [pathname, setGroupOpen, selectedCustomerId, boards]);
+  }, [pathname, setGroupOpen, selectedCustomerId]);
 
   const loadCustomers = useCallback(() => {
     let cancelled = false;
@@ -278,8 +267,6 @@ export default function AppSidebar() {
     getBoards(selectedCustomerId)
       .then((data) => {
         if (cancelled) return;
-        setBoards([...data].sort((a, b) => a.name.localeCompare(b.name)));
-        setBoardsCustomerId(selectedCustomerId);
         if (data.length > 0 && !data.some((board) => board.id === selectedBoardId)) {
           setSelectedBoard(data.find((board) => board.is_default)?.id ?? data[0].id);
         }
@@ -295,10 +282,7 @@ export default function AppSidebar() {
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
   const navGroups = [
-    getCustomerNavGroup(
-      selectedCustomerId,
-      selectedCustomerId === boardsCustomerId ? boards : [],
-    ),
+    getCustomerNavGroup(selectedCustomerId),
     ...NAV_GROUPS,
   ];
 
