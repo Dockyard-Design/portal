@@ -550,7 +550,7 @@ export function KanbanBoard({
   return (
     <div className="flex flex-col h-full">
       {/* Header with Customer and Board Selectors */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col gap-4 mb-6 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-center gap-2">
           {selectedCustomer && (
             <div className="flex items-center gap-3">
@@ -570,15 +570,15 @@ export function KanbanBoard({
           )}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-end">
           {/* Board Selector */}
           {selectedCustomerId && boards.length > 0 && (
-            <div className="relative">
+            <div className="relative w-full lg:w-auto">
               <Button
                 variant="outline"
                 role="combobox"
                 aria-expanded={isBoardSelectOpen}
-                className="w-48 justify-between"
+                className="w-full justify-between lg:w-80 xl:w-96"
                 onClick={() => setIsBoardSelectOpen(true)}
               >
                 {selectedBoard ? (
@@ -596,7 +596,7 @@ export function KanbanBoard({
               </Button>
 
               {isBoardSelectOpen && (
-                <div className="absolute top-full right-0 mt-1 z-50 w-64">
+                <div className="absolute top-full right-0 mt-1 z-50 w-full min-w-80 xl:min-w-96">
                   <Command className="rounded-lg border shadow-md bg-popover">
                     <CommandInput
                       placeholder="Search boards..."
@@ -614,8 +614,8 @@ export function KanbanBoard({
                           >
                             <div className="flex items-center gap-2 flex-1">
                               <LayoutGrid className="size-4 text-muted-foreground" />
-                              <div className="flex flex-col flex-1">
-                                <span>{board.name}</span>
+                              <div className="flex min-w-0 flex-1 flex-col">
+                                <span className="truncate">{board.name}</span>
                                 {board.description && (
                                   <span className="text-xs text-muted-foreground line-clamp-1">
                                     {board.description}
@@ -655,12 +655,12 @@ export function KanbanBoard({
           )}
 
           {/* Customer Combobox */}
-          <div className="relative">
+          <div className="relative w-full lg:w-auto">
             <Button
               variant="outline"
               role="combobox"
               aria-expanded={isCustomerSelectOpen}
-              className="w-72 justify-between"
+              className="w-full justify-between lg:w-96 xl:w-[30rem]"
               onClick={() => setIsCustomerSelectOpen(true)}
             >
               {selectedCustomer ? (
@@ -677,7 +677,7 @@ export function KanbanBoard({
             </Button>
 
             {isCustomerSelectOpen && (
-              <div className="absolute top-full left-0 right-0 mt-1 z-50">
+              <div className="absolute top-full left-0 right-0 mt-1 z-50 w-full lg:min-w-96 xl:min-w-[30rem]">
                 <Command className="rounded-lg border shadow-md bg-popover">
                   <CommandInput
                     placeholder="Search customers..."
@@ -693,11 +693,11 @@ export function KanbanBoard({
                           onSelect={() => handleCustomerChange(customer.id)}
                           className="cursor-pointer"
                         >
-                          <div className="flex items-center gap-2 flex-1">
-                            <Building className="size-4 text-muted-foreground" />
-                            <span className="flex-1">{customer.name}</span>
+                          <div className="flex min-w-0 flex-1 items-center gap-2">
+                            <Building className="size-4 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1 truncate">{customer.name}</span>
                             {customer.company && (
-                              <span className="text-muted-foreground text-sm">
+                              <span className="shrink-0 text-muted-foreground text-sm">
                                 {customer.company}
                               </span>
                             )}
