@@ -47,6 +47,7 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
+  GripVertical,
   Search,
   Check,
   UserCircle,
@@ -194,6 +195,11 @@ interface BoardFormState {
   is_default: boolean;
 }
 
+interface DragOverTarget {
+  status: TaskStatus;
+  taskId: string | null;
+}
+
 interface KanbanBoardProps {
   customers: Customer[];
   boards: Board[];
@@ -225,6 +231,10 @@ export function KanbanBoard({
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [editingBoard, setEditingBoard] = useState<Board | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [draggingTask, setDraggingTask] = useState<Task | null>(null);
+  const [dragOverTarget, setDragOverTarget] = useState<DragOverTarget | null>(
+    null,
+  );
 
   const [taskForm, setTaskForm] = useState<TaskFormState>({
     title: "",
@@ -334,9 +344,10 @@ export function KanbanBoard({
   async function handleMoveTask(
     task: Task,
     newStatus: TaskStatus,
+    newPosition = task.position,
   ): Promise<void> {
     try {
-      await moveTask(task.id, newStatus, task.position);
+      await moveTask(task.id, newStatus, newPosition);
       refreshData();
     } catch (error: unknown) {
       const message =
@@ -435,6 +446,97 @@ export function KanbanBoard({
     resetTaskForm();
     setTaskForm((prev) => ({ ...prev, status: columnId }));
     setIsTaskDialogOpen(true);
+  }
+
+  function getDropPosition(
+    task: Task,
+    status: TaskStatus,
+    beforeTaskId: string | null,
+  ): number {
+    const destinationTasks = (tasksByStatus[status] || []).filter(
+      (candidate) => candidate.id !== task.id,
+    );
+
+    if (!beforeTaskId) {
+      const lastTask = destinationTasks.at(-1);
+      return lastTask ? lastTask.position + 1 : 0;
+    }
+
+    const targetIndex = destinationTasks.findIndex(
+      (candidate) => candidate.id === beforeTaskId,
+    );
+
+    if (targetIndex <= 0) {
+      return destinationTasks[0] ? destinationTasks[0].position - 1 : 0;
+    }
+
+    const previousTask = destinationTasks[targetIndex - 1];
+    const targetTask = destinationTasks[targetIndex];
+    return (previousTask.position + targetTask.position) / 2;
+  }
+
+  function handleTaskDragStart(
+    event: React.DragEvent<HTMLDivElement>,
+    task: Task,
+  ): void {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", task.id);
+    setDraggingTask(task);
+    setDragOverTarget({ status: task.status, taskId: task.id });
+  }
+
+  function handleTaskDragOver(
+    event: React.DragEvent<HTMLDivElement>,
+    status: TaskStatus,
+    taskId: string,
+  ): void {
+    if (!draggingTask) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverTarget({ status, taskId });
+  }
+
+  function handleColumnDragOver(
+    event: React.DragEvent<HTMLDivElement>,
+    status: TaskStatus,
+  ): void {
+    if (!draggingTask) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    setDragOverTarget({ status, taskId: null });
+  }
+
+  async function handleTaskDrop(
+    event: React.DragEvent<HTMLDivElement>,
+    status: TaskStatus,
+    beforeTaskId: string | null,
+  ): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!draggingTask) return;
+    if (beforeTaskId === draggingTask.id) {
+      setDragOverTarget(null);
+      setDraggingTask(null);
+      return;
+    }
+
+    const nextPosition = getDropPosition(draggingTask, status, beforeTaskId);
+    const isSameSlot =
+      draggingTask.status === status && draggingTask.position === nextPosition;
+
+    setDragOverTarget(null);
+    setDraggingTask(null);
+
+    if (isSameSlot) return;
+
+    await handleMoveTask(draggingTask, status, nextPosition);
+  }
+
+  function handleTaskDragEnd(): void {
+    setDraggingTask(null);
+    setDragOverTarget(null);
   }
 
   return (
@@ -726,19 +828,55 @@ export function KanbanBoard({
                 </div>
 
                 {/* Tasks */}
-                <div className="flex-1 space-y-2 min-h-0 overflow-y-auto">
+                <div
+                  className={cn(
+                    "flex-1 min-h-24 overflow-y-auto rounded-lg border border-transparent p-1 transition-colors",
+                    dragOverTarget?.status === column.id &&
+                      dragOverTarget.taskId === null &&
+                      "border-dashed border-primary/40 bg-primary/5",
+                  )}
+                  onDragOver={(event) =>
+                    handleColumnDragOver(event, column.id)
+                  }
+                  onDrop={(event) => handleTaskDrop(event, column.id, null)}
+                >
+                  <div className="flex flex-col gap-2">
                   {tasksByStatus[column.id]?.map((task) => {
                     const taskAssignee = teamMembers.find(
                       (u) => u.id === task.assigned_to,
                     );
+                    const isDragging = draggingTask?.id === task.id;
+                    const isDropTarget =
+                      dragOverTarget?.status === column.id &&
+                      dragOverTarget.taskId === task.id &&
+                      draggingTask?.id !== task.id;
+
                     return (
                       <div
                         key={task.id}
-                        className="group p-4 rounded-lg bg-card border border-border hover:border-primary/30 transition-colors cursor-pointer"
+                        draggable
+                        className={cn(
+                          "group relative rounded-lg border bg-card p-4 transition-colors",
+                          "cursor-pointer hover:border-primary/30",
+                          isDragging && "opacity-50 ring-1 ring-primary/40",
+                          isDropTarget &&
+                            "border-primary/50 bg-primary/5 before:absolute before:inset-x-3 before:-top-1 before:h-0.5 before:rounded-full before:bg-primary",
+                        )}
+                        onDragStart={(event) =>
+                          handleTaskDragStart(event, task)
+                        }
+                        onDragOver={(event) =>
+                          handleTaskDragOver(event, column.id, task.id)
+                        }
+                        onDrop={(event) =>
+                          handleTaskDrop(event, column.id, task.id)
+                        }
+                        onDragEnd={handleTaskDragEnd}
                         onClick={() => handleEditTask(task)}
                       >
                         {/* Header: Title + Menu */}
                         <div className="flex items-start justify-between gap-2 mb-3">
+                          <GripVertical className="size-4 shrink-0 cursor-grab text-muted-foreground opacity-40 transition-opacity group-hover:opacity-100" />
                           <h3 className="font-medium text-sm line-clamp-2 flex-1">
                             {task.title}
                           </h3>
@@ -859,6 +997,7 @@ export function KanbanBoard({
                     <Plus className="size-4 mr-1" />
                     Add task
                   </Button>
+                  </div>
                 </div>
               </div>
             ))}
