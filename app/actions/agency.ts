@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import { requireAdmin } from "@/lib/authz";
+import { sendDocumentEmail, sendFormSubmissionEmail } from "@/lib/email";
 import type {
   Quote,
   Invoice,
@@ -112,6 +113,20 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
     .insert(itemsToInsert);
 
   if (itemsError) throw new Error(sanitizeError(itemsError));
+
+  await sendFormSubmissionEmail({
+    formName: "Quote",
+    submittedAt: new Date().toISOString(),
+    details: {
+      action: "created",
+      title: quote.title,
+      customer_id: input.customer_id,
+      total,
+      status: quote.status,
+    },
+  }).catch((emailError) => {
+    console.error("[createQuote] Email notification failed:", emailError);
+  });
 
   revalidatePath(`/dashboard/customers/${input.customer_id}`);
   return quote as Quote;
@@ -269,6 +284,21 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
 
   if (itemsError) throw new Error(sanitizeError(itemsError));
 
+  await sendFormSubmissionEmail({
+    formName: "Invoice",
+    submittedAt: new Date().toISOString(),
+    details: {
+      action: "created",
+      title: invoice.title,
+      invoice_number: invoice.invoice_number,
+      customer_id: input.customer_id,
+      total,
+      status: invoice.status,
+    },
+  }).catch((emailError) => {
+    console.error("[createInvoice] Email notification failed:", emailError);
+  });
+
   revalidatePath(`/dashboard/customers/${input.customer_id}`);
   return invoice as Invoice;
 }
@@ -421,5 +451,67 @@ export async function deleteInvoice(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw new Error(sanitizeError(error));
+  revalidatePath("/dashboard/invoices");
+}
+
+export async function sendQuoteToCustomer(id: string): Promise<void> {
+  await requireAdmin();
+
+  const quote = await getQuote(id);
+  if (!quote) throw new Error("Quote not found");
+
+  const { data: customer, error } = await supabase
+    .from("customers")
+    .select("name, email")
+    .eq("id", quote.customer_id)
+    .single();
+
+  if (error || !customer?.email) {
+    throw new Error("Customer email is required before sending a quote");
+  }
+
+  const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4567";
+  await sendDocumentEmail({
+    documentType: "quote",
+    recipientEmail: customer.email,
+    recipientName: customer.name,
+    title: quote.title,
+    total: quote.total,
+    currency: quote.currency,
+    pdfUrl: `${baseUrl}/api/pdf/quote/${quote.id}`,
+  });
+
+  await updateQuote(id, { status: "sent" });
+  revalidatePath("/dashboard/quotes");
+}
+
+export async function sendInvoiceToCustomer(id: string): Promise<void> {
+  await requireAdmin();
+
+  const invoice = await getInvoice(id);
+  if (!invoice) throw new Error("Invoice not found");
+
+  const { data: customer, error } = await supabase
+    .from("customers")
+    .select("name, email")
+    .eq("id", invoice.customer_id)
+    .single();
+
+  if (error || !customer?.email) {
+    throw new Error("Customer email is required before sending an invoice");
+  }
+
+  const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4567";
+  await sendDocumentEmail({
+    documentType: "invoice",
+    recipientEmail: customer.email,
+    recipientName: customer.name,
+    title: invoice.title,
+    total: invoice.total,
+    currency: invoice.currency,
+    pdfUrl: `${baseUrl}/api/pdf/invoice/${invoice.id}`,
+  });
+
+  await updateInvoice(id, { status: "sent" });
   revalidatePath("/dashboard/invoices");
 }

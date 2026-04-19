@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -34,12 +35,15 @@ import {
   MoreVertical,
   Eye,
   Download,
+  Send,
   Trash2,
   Edit,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Invoice } from "@/types/agency";
+import { sendInvoiceToCustomer } from "@/app/actions/agency";
+import { toast } from "sonner";
 
 interface InvoicesClientProps {
   invoices: Invoice[];
@@ -49,6 +53,8 @@ interface InvoicesClientProps {
 export default function InvoicesClient({ invoices, customers }: InvoicesClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const router = useRouter();
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch = 
@@ -72,6 +78,19 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
 
   const getCustomerName = (customerId: string) => {
     return customers.find(c => c.id === customerId)?.name || "Unknown";
+  };
+
+  const handleSendInvoice = async (invoiceId: string) => {
+    setSendingId(invoiceId);
+    try {
+      await sendInvoiceToCustomer(invoiceId);
+      toast.success("Invoice sent to customer");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send invoice");
+    } finally {
+      setSendingId(null);
+    }
   };
 
   return (
@@ -198,6 +217,13 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
                           <DropdownMenuItem>
                             <Download className="size-4 mr-2" />
                             Download PDF
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => void handleSendInvoice(invoice.id)}
+                            disabled={sendingId === invoice.id}
+                          >
+                            <Send className="size-4 mr-2" />
+                            {sendingId === invoice.id ? "Sending..." : "Send Email"}
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem className="text-destructive">

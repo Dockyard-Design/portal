@@ -4,6 +4,8 @@ DROP TABLE IF EXISTS quote_items CASCADE;
 DROP TABLE IF EXISTS quotes CASCADE;
 DROP TABLE IF EXISTS invoice_items CASCADE;
 DROP TABLE IF EXISTS invoices CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS message_threads CASCADE;
 DROP TABLE IF EXISTS contact_submissions CASCADE;
 DROP TABLE IF EXISTS api_rate_limits CASCADE;
 DROP TABLE IF EXISTS api_request_logs CASCADE;
@@ -43,6 +45,14 @@ CREATE TABLE projects (
 
   -- Metadata
   featured_image_url TEXT,
+  brief_text TEXT NOT NULL DEFAULT '' CHECK (char_length(brief_text) <= 500),
+  brief_gallery JSONB NOT NULL DEFAULT '[]'::jsonb,
+  prototyping_text TEXT NOT NULL DEFAULT '' CHECK (char_length(prototyping_text) <= 500),
+  prototyping_gallery JSONB NOT NULL DEFAULT '[]'::jsonb,
+  building_text TEXT NOT NULL DEFAULT '' CHECK (char_length(building_text) <= 500),
+  building_gallery JSONB NOT NULL DEFAULT '[]'::jsonb,
+  feedback_text TEXT NOT NULL DEFAULT '' CHECK (char_length(feedback_text) <= 500),
+  feedback_gallery JSONB NOT NULL DEFAULT '[]'::jsonb,
   author_id TEXT NOT NULL -- Clerk User ID
 );
 
@@ -402,6 +412,42 @@ CREATE TRIGGER update_expense_categories_updated_at
   FOR EACH ROW 
   EXECUTE PROCEDURE update_updated_at_column();
 
+-- Messaging centre
+CREATE TABLE message_threads (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  subject TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'open'
+    CHECK (status IN ('open', 'closed', 'archived')),
+  created_by TEXT NOT NULL,
+  last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  unread_admin BOOLEAN NOT NULL DEFAULT TRUE,
+  unread_customer BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE TABLE messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  thread_id UUID NOT NULL REFERENCES message_threads(id) ON DELETE CASCADE,
+  sender_id TEXT NOT NULL,
+  sender_role TEXT NOT NULL CHECK (sender_role IN ('admin', 'customer', 'system')),
+  body TEXT NOT NULL,
+  read_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE INDEX idx_message_threads_customer ON message_threads(customer_id);
+CREATE INDEX idx_message_threads_status ON message_threads(status);
+CREATE INDEX idx_message_threads_last_message ON message_threads(last_message_at DESC);
+CREATE INDEX idx_messages_thread ON messages(thread_id);
+CREATE INDEX idx_messages_created ON messages(created_at);
+
+CREATE TRIGGER update_message_threads_updated_at
+  BEFORE UPDATE ON message_threads
+  FOR EACH ROW
+  EXECUTE PROCEDURE update_updated_at_column();
+
 -- Restrictive RLS baseline for Supabase-exposed public tables.
 -- Server routes/actions use the service role client and bypass these policies.
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
@@ -419,6 +465,16 @@ ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expense_categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE message_threads ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Public can read published projects"
+  ON projects FOR SELECT
+  USING (status = 'published' AND is_public = TRUE);
+
+CREATE POLICY "Public can create contact submissions"
+  ON contact_submissions FOR INSERT
+  WITH CHECK (true);
 
 REVOKE ALL ON FUNCTION increment_api_key_request_count(UUID) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION check_rate_limit(TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;

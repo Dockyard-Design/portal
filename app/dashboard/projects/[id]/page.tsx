@@ -1,18 +1,5 @@
-import { notFound } from "next/navigation";
-import { getProject } from "@/app/actions/projects";
-import { EditProjectClient } from "./edit-client";
+import { redirect } from "next/navigation";
 
-interface EditProjectPageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default async function EditProjectPage({ params }: EditProjectPageProps) {
-  const { id } = await params;
-  const project = await getProject(id);
-
-  if (!project) {
-    notFound();
-  }
-
-  return <EditProjectClient project={project} />;
+export default function EditProjectPage() {
+  redirect("/dashboard/projects");
 }

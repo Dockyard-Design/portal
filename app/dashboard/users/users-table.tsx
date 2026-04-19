@@ -16,6 +16,7 @@ import { ChevronLeft, ChevronRight, Trash2, Edit, Lock, Unlock, Key, MoreVertica
 import { toast } from "sonner";
 import { deleteUser, lockUser, unlockUser, resetUserPassword } from "@/app/actions/users";
 import type { SimpleUser } from "@/app/actions/users";
+import type { Customer } from "@/types/kanban";
 import { CreateUserDialog } from "./create-dialog";
 import { EditUserDialog } from "./edit-dialog";
 import {
@@ -49,7 +50,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 const ITEMS_PER_PAGE = 10;
 
-export function UsersTable({ users }: { users: SimpleUser[] }) {
+export function UsersTable({ users, customers }: { users: SimpleUser[]; customers: Customer[] }) {
   const [page, setPage] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -142,6 +143,11 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
     return `${first}${last}`.toUpperCase() || "U";
   };
 
+  const getCustomerName = (customerId: string | null) => {
+    if (!customerId) return "All companies";
+    return customers.find((customer) => customer.id === customerId)?.name ?? "Unknown company";
+  };
+
   return (
     <div className="flex flex-col gap-6 max-w-7xl mx-auto">
       {/* Header */}
@@ -152,7 +158,7 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
             Manage portal users and their access
           </p>
         </div>
-        <CreateUserDialog />
+        <CreateUserDialog customers={customers} />
       </div>
 
       {/* Table */}
@@ -162,6 +168,8 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
             <TableRow>
               <TableHead className="w-[280px]">User</TableHead>
               <TableHead>Email</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead>Company</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[150px]">Last Sign In</TableHead>
               <TableHead className="w-[150px]">Joined</TableHead>
@@ -171,7 +179,7 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
           <TableBody>
             {paginatedUsers.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={8} className="h-32 text-center text-muted-foreground">
                   No users found.
                 </TableCell>
               </TableRow>
@@ -194,6 +202,14 @@ export function UsersTable({ users }: { users: SimpleUser[] }) {
                   </TableCell>
                   <TableCell className="font-mono text-sm">
                     {getUserEmail(user)}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={user.role === "admin" ? "bg-sky-500/10 text-sky-700 border-sky-500/20" : "bg-violet-500/10 text-violet-700 border-violet-500/20"}>
+                      {user.role === "admin" ? "Admin" : "Customer"}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {getCustomerName(user.customerId)}
                   </TableCell>
                   <TableCell>
                     <Badge 

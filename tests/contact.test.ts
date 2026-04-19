@@ -20,13 +20,13 @@ function withApiKey(key: string): Record<string, string> {
 
 describe("Contact Form API (/api/contact)", () => {
   describe("Authentication & Method Enforcement", () => {
-    it("rejects GET requests with 405 Method Not Allowed", async () => {
+    it("rejects GET requests without Clerk admin auth", async () => {
       const res = await apiFetch("/api/contact", {
         method: "GET",
       });
-      expect(res.status).toBe(405);
+      expect(res.status).toBe(401);
       const body = await res.json();
-      expect(body.error).toMatch(/not allowed/i);
+      expect(body.error).toMatch(/clerk admin/i);
     });
 
     it("rejects POST requests with no auth (401)", async () => {

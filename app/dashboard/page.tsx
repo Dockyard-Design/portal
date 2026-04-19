@@ -5,11 +5,6 @@ export const dynamic = "force-dynamic";
 import { ArrowUpRight, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
-import { getApiKeys } from "@/app/actions/api-keys";
-import {
-  getDashboardApiMetrics,
-  getLastApiRequests,
-} from "@/app/actions/metrics";
 import {
   getContactSummary,
   getContactSubmissions,
@@ -17,41 +12,39 @@ import {
 import { getKanbanMetrics } from "@/app/actions/kanban-metrics";
 import { getAgencyMetrics } from "@/app/actions/agency-metrics";
 import { getExpenseMetrics } from "@/app/actions/expense-metrics";
+import { getCustomers } from "@/app/actions/kanban";
+import { getCurrentUserAccess } from "@/lib/authz";
+import { getMyCustomerDashboard } from "@/app/actions/customer-dashboard";
 import { KanbanMetrics } from "./kanban-metrics";
 import { AgencyMetrics } from "./agency-metrics";
 import { ExpenseMetrics } from "./expense-metrics";
+import { CustomerDashboard } from "./customer-dashboard";
+import { CustomerFocusPanel } from "./customer-focus-panel";
 
 export default async function DashboardPage() {
+  const access = await getCurrentUserAccess();
+
+  if (access.role === "customer") {
+    const data = await getMyCustomerDashboard();
+    return <CustomerDashboard data={data} />;
+  }
+
   const [
     projects,
-    apiKeys,
-    metrics,
     contactSummary,
-    recentRequests,
     kanbanMetrics,
     contactSubmissions,
     agencyMetrics,
     expenseMetrics,
+    customers,
   ] = await Promise.all([
     getProjects(),
-    getApiKeys(),
-    getDashboardApiMetrics().catch(() => ({
-      totalRequests: 0,
-      avgResponseTime: 0,
-      successRate: 0,
-      requestsByMethod: {},
-      requestsByPath: [],
-      requestsByDay: [],
-      recentRequests: [],
-      topKeys: [],
-    })),
     getContactSummary().catch(() => ({
       new: 0,
       read: 0,
       replied: 0,
       closed: 0,
     })),
-    getLastApiRequests(50).catch(() => []),
     getKanbanMetrics().catch(() => ({
       totalCustomers: 0,
       totalBoards: 0,
@@ -95,12 +88,15 @@ export default async function DashboardPage() {
       taxDeductibleAmount: 0,
       recurringAmount: 0,
     })),
+    getCustomers().catch(() => []),
   ]);
 
   const newSubmissions = contactSubmissions.filter((s) => s.status === "new");
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto">
+      <CustomerFocusPanel customers={customers} />
+
       {/* Agency Metrics */}
       <AgencyMetrics metrics={agencyMetrics} />
 

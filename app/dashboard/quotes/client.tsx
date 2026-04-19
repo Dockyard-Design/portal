@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +46,8 @@ import {
 import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Quote } from "@/types/agency";
+import { sendQuoteToCustomer } from "@/app/actions/agency";
+import { toast } from "sonner";
 
 interface QuotesClientProps {
   quotes: Quote[];
@@ -54,6 +57,8 @@ interface QuotesClientProps {
 export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sendingId, setSendingId] = useState<string | null>(null);
+  const router = useRouter();
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch = 
@@ -70,6 +75,19 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
       case "rejected": return "bg-red-100 text-red-700 border-red-200";
       case "expired": return "bg-slate-100 text-slate-700 border-slate-200";
       default: return "bg-amber-100 text-amber-700 border-amber-200";
+    }
+  };
+
+  const handleSendQuote = async (quoteId: string) => {
+    setSendingId(quoteId);
+    try {
+      await sendQuoteToCustomer(quoteId);
+      toast.success("Quote sent to customer");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send quote");
+    } finally {
+      setSendingId(null);
     }
   };
 
@@ -203,9 +221,12 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
                               <Download className="size-4 mr-2" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => void handleSendQuote(quote.id)}
+                              disabled={sendingId === quote.id}
+                            >
                               <Send className="size-4 mr-2" />
-                              Send Email
+                              {sendingId === quote.id ? "Sending..." : "Send Email"}
                             </DropdownMenuItem>
                             {quote.status === "sent" && (
                               <>

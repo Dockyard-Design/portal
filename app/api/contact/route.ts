@@ -7,6 +7,8 @@ import {
   logRequest,
   type RateLimitResult,
 } from "@/lib/api-keys";
+import { sendFormSubmissionEmail } from "@/lib/email";
+import { requireAdmin } from "@/lib/authz";
 
 const submissionSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -16,7 +18,8 @@ const submissionSchema = z.object({
 
 type ContactResponseBody =
   | { error: string; details?: ReturnType<z.ZodError["format"]> }
-  | { message: string };
+  | { message: string }
+  | { data: unknown[] };
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -86,11 +89,39 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  await sendFormSubmissionEmail({
+    formName: "Contact",
+    submittedAt: new Date().toISOString(),
+    details: {
+      name: validation.data.name,
+      email: validation.data.email,
+      message: validation.data.message,
+    },
+  }).catch((emailError) => {
+    console.error("[api/contact] Email notification failed:", emailError);
+  });
+
   return handleResponse(201, { message: "Submission received successfully" }, request, startTime, keyId, rateLimit);
 }
 
 export async function GET(request: NextRequest) {
-  return handleResponse(405, { error: "Method Not Allowed" }, request, Date.now());
+  const startTime = Date.now();
+  try {
+    await requireAdmin();
+  } catch {
+    return handleResponse(401, { error: "Unauthorized: Clerk admin access required" }, request, startTime);
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from("contact_submissions")
+    .select("*")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return handleResponse(500, { error: "Failed to fetch contact submissions" }, request, startTime);
+  }
+
+  return handleResponse(200, { data: data || [] }, request, startTime);
 }
 
 /**

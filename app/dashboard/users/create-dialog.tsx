@@ -15,15 +15,26 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { createUser } from "@/app/actions/users";
+import type { Customer } from "@/types/kanban";
+import type { UserRole } from "@/types/auth";
 
-export function CreateUserDialog() {
+export function CreateUserDialog({ customers }: { customers: Customer[] }) {
   const [open, setOpen] = useState(false);
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState<UserRole>("admin");
+  const [customerId, setCustomerId] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -38,6 +49,10 @@ export function CreateUserDialog() {
       toast.error("Password must be at least 8 characters");
       return;
     }
+    if (role === "customer" && !customerId) {
+      toast.error("Select a company for customer users");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -46,12 +61,16 @@ export function CreateUserDialog() {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
         password,
+        role,
+        customerId: role === "customer" ? customerId : undefined,
       });
       toast.success("User created successfully");
       setEmail("");
       setFirstName("");
       setLastName("");
       setPassword("");
+      setRole("admin");
+      setCustomerId("");
       setOpen(false);
       router.refresh();
     } catch (error) {
@@ -110,6 +129,35 @@ export function CreateUserDialog() {
               </div>
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="role">Role *</Label>
+              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+                <SelectTrigger id="role">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {role === "customer" && (
+              <div className="grid gap-2">
+                <Label htmlFor="customer">Company *</Label>
+                <Select value={customerId} onValueChange={(value) => setCustomerId(value ?? "")}>
+                  <SelectTrigger id="customer">
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="grid gap-2">
               <Label htmlFor="password">Password *</Label>
               <Input
                 id="password"
@@ -129,7 +177,10 @@ export function CreateUserDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !email.trim() || password.length < 8}>
+            <Button
+              type="submit"
+              disabled={isLoading || !email.trim() || password.length < 8 || (role === "customer" && !customerId)}
+            >
               {isLoading ? "Creating..." : "Create User"}
             </Button>
           </DialogFooter>

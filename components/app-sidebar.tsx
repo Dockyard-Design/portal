@@ -17,6 +17,7 @@ import {
   Receipt,
   Trash2,
   AlertTriangle,
+  X,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -56,13 +57,22 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useSidebarStore } from "@/lib/store";
+import { useKanbanStore, useSidebarStore } from "@/lib/store";
 import { wipeDatabase } from "@/app/actions/dev-wipe";
+import { getBoards, getCustomers } from "@/app/actions/kanban";
 import { toast } from "sonner";
+import type { Customer, KanbanBoard } from "@/types/kanban";
 
 // Sidebar Menu Configuration
 // Easy to add/remove/modify menu items here
@@ -71,6 +81,7 @@ interface SubMenuItem {
   title: string;
   href: string;
   icon: LucideIcon;
+  boardId?: string;
 }
 
 interface MenuGroup {
@@ -93,18 +104,6 @@ const NAV_OVERVIEW: SingleMenuItem = {
 
 const NAV_GROUPS: MenuGroup[] = [
   {
-    title: "Customers",
-    icon: Briefcase,
-    items: [
-      { title: "Kanban Board", href: "/dashboard/kanban", icon: KanbanSquare },
-      {
-        title: "Customer Management",
-        href: "/dashboard/customers",
-        icon: Building,
-      },
-    ],
-  },
-  {
     title: "Dockyard",
     icon: Briefcase,
     items: [
@@ -112,6 +111,11 @@ const NAV_GROUPS: MenuGroup[] = [
       {
         title: "Contact Submissions",
         href: "/dashboard/contact",
+        icon: MessageSquare,
+      },
+      {
+        title: "Messaging Centre",
+        href: "/dashboard/messages",
         icon: MessageSquare,
       },
       {
@@ -138,13 +142,60 @@ const NAV_SETTINGS: SingleMenuItem[] = [
 
 const ALLOWED_WIPE_EMAIL = "fredericomelogarcia@outlook.com";
 
+function getCustomerNavGroup(
+  selectedCustomerId: string | null,
+  boards: KanbanBoard[],
+): MenuGroup {
+  const items: SubMenuItem[] = selectedCustomerId
+    ? [
+        ...[...boards].sort((a, b) => a.name.localeCompare(b.name)).map((board) => ({
+          title: board.name,
+          href: "/dashboard/kanban",
+          icon: KanbanSquare,
+          boardId: board.id,
+        })),
+        {
+          title: "Messages",
+          href: "/dashboard/messages",
+          icon: MessageSquare,
+        },
+        {
+          title: "Customer Details",
+          href: `/dashboard/customers/${selectedCustomerId}`,
+          icon: Building,
+        },
+      ]
+    : [
+        {
+          title: "Select a customer",
+          href: "/dashboard/customers",
+          icon: Building,
+        },
+      ];
+
+  return {
+    title: "Customers",
+    icon: Briefcase,
+    items,
+  };
+}
+
 export default function AppSidebar() {
   const pathname = usePathname();
   const { isLoaded, user } = useUser();
   const { openUserProfile, signOut } = useClerk();
   const { openGroups, setGroupOpen } = useSidebarStore();
+  const {
+    selectedCustomerId,
+    selectedBoardId,
+    setSelectedCustomer,
+    setSelectedBoard,
+    clearSelection,
+  } = useKanbanStore();
   const [showWipeDialog, setShowWipeDialog] = useState(false);
   const [wipePassword, setWipePassword] = useState("");
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [boards, setBoards] = useState<KanbanBoard[]>([]);
 
   // Check if user can wipe database - computed directly from user data
   const canWipe =
@@ -165,7 +216,7 @@ export default function AppSidebar() {
 
   // Auto-expand groups with active items on navigation
   useEffect(() => {
-    NAV_GROUPS.forEach((group) => {
+    [getCustomerNavGroup(selectedCustomerId, boards), ...NAV_GROUPS].forEach((group) => {
       const isGroupActive = group.items.some((item) =>
         pathname.startsWith(item.href),
       );
@@ -173,7 +224,51 @@ export default function AppSidebar() {
         setGroupOpen(group.title, true);
       }
     });
-  }, [pathname, setGroupOpen]);
+  }, [pathname, setGroupOpen, selectedCustomerId, boards]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCustomers()
+      .then((data) => {
+        if (!cancelled) setCustomers([...data].sort((a, b) => a.name.localeCompare(b.name)));
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Failed to load customers");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!selectedCustomerId) {
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    getBoards(selectedCustomerId)
+      .then((data) => {
+        if (cancelled) return;
+        setBoards([...data].sort((a, b) => a.name.localeCompare(b.name)));
+        if (data.length > 0 && !data.some((board) => board.id === selectedBoardId)) {
+          setSelectedBoard(data.find((board) => board.is_default)?.id ?? data[0].id);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) toast.error("Failed to load customer boards");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCustomerId, selectedBoardId, setSelectedBoard]);
+
+  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
+  const navGroups = [getCustomerNavGroup(selectedCustomerId, boards), ...NAV_GROUPS];
 
   return (
     <Sidebar className="border-r-border/40">
@@ -186,6 +281,40 @@ export default function AppSidebar() {
             height={32}
             className="h-8 w-auto"
           />
+        </div>
+        <div className="mt-5 space-y-2">
+          <div className="flex items-center gap-2">
+            <Select
+              value={selectedCustomer && selectedCustomerId ? selectedCustomerId : ""}
+              onValueChange={(value) => setSelectedCustomer(value || null)}
+            >
+              <SelectTrigger className="h-9 bg-background text-sm">
+                <SelectValue placeholder="Select customer" />
+              </SelectTrigger>
+              <SelectContent>
+                {customers.map((customer) => (
+                  <SelectItem key={customer.id} value={customer.id}>
+                    {customer.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedCustomerId && (
+              <button
+                type="button"
+                onClick={clearSelection}
+                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
+                aria-label="Clear customer selection"
+              >
+                <X className="size-4" />
+              </button>
+            )}
+          </div>
+          {selectedCustomer && (
+            <p className="truncate text-xs text-muted-foreground">
+              Focused on {selectedCustomer.name}
+            </p>
+          )}
         </div>
       </SidebarHeader>
       <SidebarContent className="px-4">
@@ -218,7 +347,7 @@ export default function AppSidebar() {
             </SidebarMenuItem>
 
             {/* Menu Groups with Submenus */}
-            {NAV_GROUPS.map((group) => {
+            {navGroups.map((group) => {
               const isGroupActive = group.items.some((item) =>
                 pathname.startsWith(item.href),
               );
@@ -269,6 +398,9 @@ export default function AppSidebar() {
                                 <Link
                                   href={item.href}
                                   className="flex items-center gap-2"
+                                  onClick={() => {
+                                    if (item.boardId) setSelectedBoard(item.boardId);
+                                  }}
                                 >
                                   <item.icon
                                     className={cn(

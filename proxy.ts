@@ -17,7 +17,13 @@ const isPublicRoute = (request: NextRequest) => {
 
 const isPublicApiRoute = (request: NextRequest) => {
   const { pathname } = request.nextUrl;
-  return pathname === "/api/contact" || pathname === "/api/posts" || pathname.startsWith("/api/posts/");
+  return (
+    pathname === "/api/contact" ||
+    pathname === "/api/posts" ||
+    pathname.startsWith("/api/posts/") ||
+    pathname === "/api/projects" ||
+    pathname.startsWith("/api/projects/")
+  );
 };
 
 const isSignUpRoute = (request: NextRequest) => {

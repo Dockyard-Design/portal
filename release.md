@@ -1,10 +1,10 @@
 # Release Readiness Tracker
 
-Last updated: 2026-04-19 15:56 Europe/London
+Last updated: 2026-04-19 20:20 Europe/London
 
 ## Verdict
 
-Not release-ready yet. The first remediation pass fixed the code-owned authorization, API boundary, schema mismatch, env-check, and header issues. Release is still blocked by production database migration/advisor verification and deeper authorization test coverage.
+Not release-ready yet. This implementation pass added the ordered migration, public Projects API, contact/project policies, role-aware dashboards, messaging, Resend and Blob integration, and regression coverage. Release is still blocked by Supabase advisor or equivalent verification against the real project.
 
 ## Verification Baseline
 
@@ -25,7 +25,7 @@ Not release-ready yet. The first remediation pass fixed the code-owned authoriza
 ### Security: Supabase RLS
 
 - [x] Enable RLS on every table in the public schema.
-- [ ] Add policies that match the app access model. Current baseline is restrictive/no public table policies because the app uses server-side service-role access.
+- [x] Add policies that match the app access model. Public policies are limited to published project reads and contact inserts; dashboard operations remain Clerk-gated server-side operations.
 - [x] Avoid relying on the service-role client as the only security boundary for dashboard operations by adding Clerk admin authorization in server actions.
 - [x] Explicitly restrict `SECURITY DEFINER` function execution from `PUBLIC`, `anon`, and `authenticated`.
 - [ ] Verify with Supabase advisors or equivalent SQL checks against the real project.
@@ -96,8 +96,8 @@ Implementation note: start the local server for integration tests with `ALLOW_TE
 
 ### Database: Migration Readiness
 
-- [ ] Replace destructive reset SQL with ordered migrations before production deployment.
-- [ ] Keep `database/database.sql` usable for local reset only, or rename/document it clearly.
+- [x] Replace destructive reset SQL with ordered migrations before production deployment.
+- [x] Keep `database/database.sql` usable for local reset only, or rename/document it clearly.
 - [x] Add missing `generate_invoice_number` function or remove its use.
 - [x] Fix the rate-limit RPC return shape mismatch.
 - [x] Fix kanban task `position` type or reindexing strategy.
@@ -106,10 +106,10 @@ Implementation note: start the local server for integration tests with `ALLOW_TE
 
 - [x] Add tests for server-action authorization.
 - [x] Add tests for API allowlist/proxy behavior.
-- [ ] Add tests for invoice creation and invoice numbering.
-- [ ] Add tests for kanban drag/drop persistence.
+- [x] Add tests for invoice creation and invoice numbering.
+- [x] Add tests for kanban drag/drop persistence.
 - [x] Add tests or SQL assertions for RLS expectations.
-- [ ] Add regression coverage for contact submission admin actions.
+- [x] Add regression coverage for contact submission admin actions.
 
 ## Remediation Log
 
@@ -124,6 +124,14 @@ Implementation note: start the local server for integration tests with `ALLOW_TE
 - Updated rate-limit result handling to support table-returning RPC responses.
 - Added production headers and disabled `X-Powered-By` in `next.config.ts`.
 - Added static release-hardening tests for admin action guardrails, API proxy allowlisting, fake-key opt-in, and SQL RLS/function expectations.
+- Added ordered migration coverage for extended projects and messaging tables.
+- Added public Projects API with section/gallery fields while keeping writes behind Clerk-authenticated app actions.
+- Added Clerk role metadata for Admin and Customer users, including company assignment by customer name in the UI.
+- Added customer-focused dashboard metrics and a Messaging Centre with auto-replies, unread state, timestamps, and thread status management.
+- Added Resend email helpers for contact submissions, project/quote/invoice form notifications, and customer quote/invoice sends.
+- Added Vercel Blob image upload support for project featured images and section galleries.
+- Rewrote README.md and updated .env.example for the new integration variables.
+- Verified `pnpm typecheck`, `pnpm lint`, `pnpm build`, `pnpm check:env`, and `pnpm test` against local server port 4568 after migration application.
 
 ## Positive Baseline
 
@@ -134,4 +142,4 @@ Implementation note: start the local server for integration tests with `ALLOW_TE
 
 ## Release Gate
 
-Do not release until every blocker above is either completed and verified or explicitly accepted as a documented production risk.
+Do not release until Supabase advisor or equivalent SQL verification has been completed against the real project, or explicitly accepted as a documented production risk.

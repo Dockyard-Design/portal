@@ -1,6 +1,7 @@
 import { auth, clerkClient } from "@clerk/nextjs/server";
+import type { CustomerUserMetadata } from "@/types/auth";
 
-type RoleMetadata = {
+type RoleMetadata = CustomerUserMetadata & {
   admin?: unknown;
   role?: unknown;
   roles?: unknown;
@@ -62,4 +63,46 @@ export async function requireAdmin(): Promise<string> {
   }
 
   throw new Error("Forbidden");
+}
+
+export async function getCurrentUserAccess(): Promise<{
+  userId: string;
+  role: "admin" | "customer";
+  customerId: string | null;
+}> {
+  const userId = await requireUser();
+  const adminUserIds = getAdminUserIds();
+
+  if (adminUserIds.has(userId)) {
+    return { userId, role: "admin", customerId: null };
+  }
+
+  const clerk = await clerkClient();
+  const user = await clerk.users.getUser(userId);
+  const metadata = {
+    ...(user.privateMetadata as CustomerUserMetadata),
+    ...(user.publicMetadata as CustomerUserMetadata),
+  };
+
+  if (hasAdminMetadata(metadata)) {
+    return { userId, role: "admin", customerId: null };
+  }
+
+  if (metadata.role === "customer" && typeof metadata.customerId === "string") {
+    return { userId, role: "customer", customerId: metadata.customerId };
+  }
+
+  if (process.env.NODE_ENV !== "production" && adminUserIds.size === 0) {
+    return { userId, role: "admin", customerId: null };
+  }
+
+  throw new Error("Forbidden");
+}
+
+export async function requireCustomerAccess(): Promise<{ userId: string; customerId: string }> {
+  const access = await getCurrentUserAccess();
+  if (access.role !== "customer" || !access.customerId) {
+    throw new Error("Forbidden");
+  }
+  return { userId: access.userId, customerId: access.customerId };
 }
