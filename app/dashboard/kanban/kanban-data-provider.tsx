@@ -60,7 +60,7 @@ export function KanbanDataProvider({
       } else if (boardsData.length === 0) {
         setSelectedBoard(null);
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to load boards");
     }
   }, [selectedBoardId, setSelectedBoard]);
@@ -76,7 +76,7 @@ export function KanbanDataProvider({
       setIsLoading(true);
       const tasks = await getTasksByStatus(boardId);
       setTasksByStatus(tasks);
-    } catch (error) {
+    } catch {
       toast.error("Failed to load tasks");
     } finally {
       setIsLoading(false);

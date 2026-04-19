@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,7 +42,6 @@ import {
   X,
   ArrowLeft,
 } from "lucide-react";
-import { toast } from "sonner";
 import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Quote } from "@/types/agency";
@@ -54,7 +52,6 @@ interface QuotesClientProps {
 }
 
 export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
-  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
 

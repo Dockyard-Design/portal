@@ -18,7 +18,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { ChevronLeft, ChevronRight, Activity, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Activity } from "lucide-react";
 import type { RecentRequest } from "@/lib/api-keys";
 
 const ITEMS_PER_PAGE = 10;

@@ -5,9 +5,7 @@ import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import type {
   Quote,
-  QuoteItem,
   Invoice,
-  InvoiceItem,
   CreateQuoteInput,
   UpdateQuoteInput,
   CreateInvoiceInput,

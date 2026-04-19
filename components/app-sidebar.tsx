@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -21,7 +21,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarGroup,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -132,7 +131,7 @@ export default function AppSidebar() {
         setGroupOpen(group.title, true);
       }
     });
-  }, [pathname]);
+  }, [pathname, setGroupOpen]);
 
   return (
     <Sidebar className="border-r-border/40">

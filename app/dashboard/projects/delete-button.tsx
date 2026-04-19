@@ -49,7 +49,7 @@ export function DeleteProjectButton({ id, title }: DeleteProjectButtonProps) {
         <AlertDialogHeader>
           <AlertDialogTitle>Delete project?</AlertDialogTitle>
           <AlertDialogDescription>
-            This will permanently delete "{title}". This can't be undone.
+            This will permanently delete &quot;{title}&quot;. This can&apos;t be undone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

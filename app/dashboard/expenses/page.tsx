@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { format, startOfMonth, endOfMonth, subMonths, addMonths, isWithinInterval, parseISO } from "date-fns";
 import { Calendar as CalendarIcon, Receipt, Plus, Search, MoreVertical, Edit, Trash2, Eye, Download, ChevronLeft, ChevronRight, Building, Tag } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
-import type { Expense, ExpenseCategory } from "@/types/expense";
+import type { Expense, ExpenseCategory, RecurringFrequency } from "@/types/expense";
 
 const ITEMS_PER_PAGE = 25;
+const RECURRING_FREQUENCIES: RecurringFrequency[] = ["monthly", "quarterly", "yearly"];
 
 // Month Navigator using ShadCN
 function MonthNavigator({ 
@@ -154,18 +155,15 @@ function DatePicker({
     <div className="grid gap-2">
       {label && <Label>{label}</Label>}
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <Button
-            variant="outline"
-            className={cn(
-              "w-full justify-start text-left font-normal",
-              !date && "text-muted-foreground"
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date ? format(date, "PPP") : <span>Pick a date</span>}
-          </Button>
-        </PopoverTrigger>
+        <PopoverTrigger
+          className={cn(
+            "inline-flex w-full items-center justify-start rounded-md border border-input bg-background px-4 py-2 text-left text-sm font-normal transition-colors hover:bg-accent hover:text-accent-foreground",
+            !date && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {date ? format(date, "PPP") : <span>Pick a date</span>}
+          </PopoverTrigger>
         <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             mode="single"
@@ -211,14 +209,10 @@ export default function ExpensesPage() {
     vendor: "",
     tax_deductible: false,
     is_recurring: false,
-    recurring_frequency: "monthly" as "monthly" | "quarterly" | "yearly",
+    recurring_frequency: "monthly" as RecurringFrequency,
   });
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const { getExpenses, getExpenseCategories } = await import("@/app/actions/expenses");
@@ -230,8 +224,10 @@ export default function ExpensesPage() {
       
       setExpenses(expensesData);
       setCategories(categoriesData);
-      if (categoriesData.length > 0 && !formData.category_id) {
-        setFormData(prev => ({ ...prev, category_id: categoriesData[0].id }));
+      if (categoriesData.length > 0) {
+        setFormData((prev) =>
+          prev.category_id ? prev : { ...prev, category_id: categoriesData[0].id }
+        );
       }
     } catch (error) {
       console.error("Error loading expenses:", error);
@@ -239,7 +235,11 @@ export default function ExpensesPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredExpenses = expenses.filter((expense) => {
     const matchesSearch = searchQuery
@@ -312,7 +312,7 @@ export default function ExpensesPage() {
       await deleteExpense(selectedExpense.id);
       await loadData();
       toast.success("Expense deleted");
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete expense");
     } finally {
       setDeleteModalOpen(false);
@@ -352,7 +352,7 @@ export default function ExpensesPage() {
       toast.success("Expense created");
       setAddModalOpen(false);
       await loadData();
-    } catch (error) {
+    } catch {
       toast.error("Failed to create expense");
     } finally {
       setSaving(false);
@@ -380,7 +380,7 @@ export default function ExpensesPage() {
       toast.success("Expense updated");
       setEditModalOpen(false);
       await loadData();
-    } catch (error) {
+    } catch {
       toast.error("Failed to update expense");
     } finally {
       setSaving(false);
@@ -764,14 +764,14 @@ export default function ExpensesPage() {
                     </PopoverTrigger>
                     <PopoverContent className="w-[160px] p-0">
                       <div className="py-1">
-                        {["monthly", "quarterly", "yearly"].map((freq) => (
+                        {RECURRING_FREQUENCIES.map((freq) => (
                           <button
                             key={freq}
                             className={cn(
                               "w-full px-3 py-2 text-left text-sm hover:bg-muted",
                               formData.recurring_frequency === freq && "bg-muted"
                             )}
-                            onClick={() => setFormData({ ...formData, recurring_frequency: freq as any })}
+                            onClick={() => setFormData({ ...formData, recurring_frequency: freq })}
                           >
                             {freq.charAt(0).toUpperCase() + freq.slice(1)}
                           </button>
@@ -852,10 +852,10 @@ export default function ExpensesPage() {
 
               <div className="grid gap-2">
                 <Label>Vendor</Label>
-                <Input
-                  value={formData.vendor}
-                  onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}}
-                />
+                  <Input
+                    value={formData.vendor}
+                    onChange={(e) => setFormData({ ...formData, vendor: e.target.value })}
+                  />
               </div>
 
               <div className="flex items-center space-x-2">
@@ -884,14 +884,14 @@ export default function ExpensesPage() {
                     </PopoverTrigger>
                     <PopoverContent className="w-[160px] p-0">
                       <div className="py-1">
-                        {["monthly", "quarterly", "yearly"].map((freq) => (
+                        {RECURRING_FREQUENCIES.map((freq) => (
                           <button
                             key={freq}
                             className={cn(
                               "w-full px-3 py-2 text-left text-sm hover:bg-muted",
                               formData.recurring_frequency === freq && "bg-muted"
                             )}
-                            onClick={() => setFormData({ ...formData, recurring_frequency: freq as any })}
+                            onClick={() => setFormData({ ...formData, recurring_frequency: freq })}
                           >
                             {freq.charAt(0).toUpperCase() + freq.slice(1)}
                           </button>
@@ -918,7 +918,7 @@ export default function ExpensesPage() {
             <DialogTitle>Delete Expense</DialogTitle>
           </DialogHeader>
           <p className="text-muted-foreground">
-            Are you sure you want to delete "{selectedExpense?.title}"? This action cannot be undone.
+            Are you sure you want to delete &quot;{selectedExpense?.title}&quot;? This action cannot be undone.
           </p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setDeleteModalOpen(false)}>Cancel</Button>

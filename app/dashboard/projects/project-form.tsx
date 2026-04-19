@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Input } from "@/components/ui/input";
@@ -75,10 +75,12 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
     },
   });
 
-  const { register, handleSubmit, setValue, watch, formState: { errors } } = form;
+  const { register, handleSubmit, setValue, control, formState: { errors } } = form;
 
-  const seoTitle = watch("seo_title");
-  const seoDesc = watch("seo_description");
+  const seoTitle = useWatch({ control, name: "seo_title" });
+  const seoDesc = useWatch({ control, name: "seo_description" });
+  const isPublic = useWatch({ control, name: "is_public" });
+  const isIndexable = useWatch({ control, name: "is_indexable" });
 
   const getSeoStatus = (val: string, min: number, max: number) => {
     if (!val) return { color: "text-muted-foreground", icon: <Info className="size-3.5" />, text: "Empty" };
@@ -170,7 +172,7 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
                 <p className="text-xs text-muted-foreground mt-0.5">Visible to everyone</p>
               </div>
               <Switch
-                checked={watch("is_public")}
+                checked={isPublic}
                 onCheckedChange={(v) => setValue("is_public", v)}
               />
             </div>
@@ -181,7 +183,7 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
                 <p className="text-xs text-muted-foreground mt-0.5">Allow search engines</p>
               </div>
               <Switch
-                checked={watch("is_indexable")}
+                checked={isIndexable}
                 onCheckedChange={(v) => setValue("is_indexable", v)}
               />
             </div>

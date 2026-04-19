@@ -1,0 +1,621 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { format, parseISO } from "date-fns";
+import { useFieldArray, useForm } from "react-hook-form";
+import { z } from "zod";
+import { CalendarIcon, CheckCircle, Download, Plus, Send, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import type { Quote } from "@/types/agency";
+import type { Customer } from "@/types/kanban";
+
+const quoteItemSchema = z.object({
+  description: z.string().trim().min(1, "Item description is required"),
+  quantity: z.coerce.number().positive("Quantity must be greater than 0"),
+  unit_price: z.coerce.number().nonnegative("Unit price cannot be negative"),
+});
+
+const quoteSchema = z.object({
+  customerId: z.string().min(1, "Please select a customer"),
+  title: z.string().trim().min(1, "Quote title is required"),
+  description: z.string().trim().optional(),
+  taxRate: z.coerce
+    .number()
+    .min(0, "Tax rate cannot be negative")
+    .max(100, "Tax rate cannot exceed 100"),
+  validUntil: z.date().optional(),
+  notes: z.string().trim().optional(),
+  terms: z.string().trim().optional(),
+  items: z.array(quoteItemSchema).min(1, "Add at least one line item"),
+});
+
+type QuoteFormValues = z.infer<typeof quoteSchema>;
+type QuoteFormInput = z.input<typeof quoteSchema>;
+type QuoteFormOutput = z.output<typeof quoteSchema>;
+
+interface QuoteModalProps {
+  quote: Quote | null;
+  customers: Customer[];
+  preselectedCustomerId?: string | null;
+  mode: "create" | "edit" | "view";
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
+}
+
+function getDefaultValues(
+  quote: Quote | null,
+  preselectedCustomerId?: string | null
+): QuoteFormValues {
+  if (quote) {
+    return {
+      customerId: quote.customer_id,
+      title: quote.title,
+      description: quote.description ?? "",
+      taxRate: quote.tax_rate,
+      validUntil: quote.valid_until ? parseISO(quote.valid_until) : undefined,
+      notes: quote.notes ?? "",
+      terms: quote.terms ?? "",
+      items:
+        quote.items?.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })) ?? [{ description: "", quantity: 1, unit_price: 0 }],
+    };
+  }
+
+  return {
+    customerId: preselectedCustomerId ?? "",
+    title: "",
+    description: "",
+    taxRate: 20,
+    validUntil: undefined,
+    notes: "",
+    terms: "Payment due within 30 days of acceptance.",
+    items: [{ description: "", quantity: 1, unit_price: 0 }],
+  };
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="text-xs text-destructive">{message}</p>;
+}
+
+function DatePickerField({
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  invalid,
+}: {
+  value?: Date;
+  onChange: (value?: Date) => void;
+  placeholder: string;
+  disabled?: boolean;
+  invalid?: boolean;
+}) {
+  return (
+    <Popover>
+      <PopoverTrigger
+        disabled={disabled}
+        aria-invalid={invalid}
+        className={cn(
+          "inline-flex h-9 w-full items-center justify-start rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground",
+          "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none",
+          !value && "text-muted-foreground",
+          invalid && "border-destructive focus-visible:ring-destructive/20"
+        )}
+      >
+        <CalendarIcon className="mr-2 size-4" />
+        {value ? format(value, "PPP") : placeholder}
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar mode="single" selected={value} onSelect={onChange} initialFocus />
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function getQuoteStatusColor(status: string) {
+  switch (status) {
+    case "accepted":
+      return "bg-emerald-100 text-emerald-700 border-emerald-200";
+    case "sent":
+      return "bg-blue-100 text-blue-700 border-blue-200";
+    case "rejected":
+      return "bg-red-100 text-red-700 border-red-200";
+    case "expired":
+      return "bg-slate-100 text-slate-700 border-slate-200";
+    default:
+      return "bg-amber-100 text-amber-700 border-amber-200";
+  }
+}
+
+export function QuoteModal({
+  quote,
+  customers,
+  preselectedCustomerId,
+  mode,
+  open,
+  onOpenChange,
+  onSuccess,
+}: QuoteModalProps) {
+  const [saving, setSaving] = useState(false);
+  const isViewOnly = mode === "view";
+
+  const form = useForm<QuoteFormInput, unknown, QuoteFormOutput>({
+    resolver: zodResolver(quoteSchema),
+    mode: "onChange",
+    defaultValues: getDefaultValues(quote, preselectedCustomerId),
+  });
+
+  const {
+    control,
+    register,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors, isValid },
+  } = form;
+
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: "items",
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    reset(getDefaultValues(quote, preselectedCustomerId));
+  }, [open, quote, preselectedCustomerId, reset]);
+
+  const selectedCustomerId = watch("customerId");
+  const selectedCustomer = useMemo(
+    () => customers.find((customer) => customer.id === selectedCustomerId) ?? null,
+    [customers, selectedCustomerId]
+  );
+
+  const items = watch("items");
+  const taxRate = Number(watch("taxRate")) || 0;
+
+  const subtotal = useMemo(
+    () =>
+      items.reduce((sum, item) => {
+        const quantity = Number(item.quantity) || 0;
+        const unitPrice = Number(item.unit_price) || 0;
+        return sum + quantity * unitPrice;
+      }, 0),
+    [items]
+  );
+  const taxAmount = subtotal * (taxRate / 100);
+  const total = subtotal + taxAmount;
+
+  const handleGeneratePdf = () => {
+    if (!quote) return;
+    window.open(`/api/pdf/quote/${quote.id}`, "_blank", "noopener,noreferrer");
+  };
+
+  const onSubmit = async (values: QuoteFormOutput) => {
+    setSaving(true);
+
+    try {
+      const payload = {
+        customer_id: values.customerId,
+        title: values.title.trim(),
+        description: values.description?.trim() || undefined,
+        tax_rate: values.taxRate,
+        valid_until: values.validUntil ? format(values.validUntil, "yyyy-MM-dd") : undefined,
+        notes: values.notes?.trim() || undefined,
+        terms: values.terms?.trim() || undefined,
+        items: values.items.map((item) => ({
+          description: item.description.trim(),
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        })),
+      };
+
+      if (mode === "create") {
+        const { createQuote } = await import("@/app/actions/agency");
+        await createQuote(payload);
+        toast.success("Quote created successfully");
+      } else if (mode === "edit" && quote) {
+        const { updateQuote } = await import("@/app/actions/agency");
+        await updateQuote(quote.id, payload);
+        toast.success("Quote updated successfully");
+      }
+
+      onOpenChange(false);
+      onSuccess?.();
+    } catch (error) {
+      console.error("Error saving quote:", error);
+      toast.error("Failed to save quote");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSendQuote = async () => {
+    if (!quote) return;
+    try {
+      const { updateQuote } = await import("@/app/actions/agency");
+      await updateQuote(quote.id, {
+        status: "sent",
+        sent_at: new Date().toISOString(),
+      });
+      toast.success("Quote sent");
+      onSuccess?.();
+    } catch {
+      toast.error("Failed to send quote");
+    }
+  };
+
+  const handleAcceptQuote = async () => {
+    if (!quote) return;
+    try {
+      const { updateQuote } = await import("@/app/actions/agency");
+      await updateQuote(quote.id, {
+        status: "accepted",
+        accepted_at: new Date().toISOString(),
+      });
+      toast.success("Quote marked as accepted");
+      onSuccess?.();
+    } catch {
+      toast.error("Failed to accept quote");
+    }
+  };
+
+  const handleRejectQuote = async () => {
+    if (!quote) return;
+    try {
+      const { updateQuote } = await import("@/app/actions/agency");
+      await updateQuote(quote.id, {
+        status: "rejected",
+      });
+      toast.success("Quote marked as rejected");
+      onSuccess?.();
+    } catch {
+      toast.error("Failed to reject quote");
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl w-[95vw] max-h-[94vh] overflow-y-auto border-border/60 bg-background p-0">
+        <DialogHeader className="border-b border-border/60 px-6 py-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <DialogTitle className="text-2xl tracking-tight">
+                {mode === "create" && "Create Quote"}
+                {mode === "edit" && "Edit Quote"}
+                {mode === "view" && (quote?.title || "Quote Details")}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground">
+                One place to shape the scope, validate the form live, and keep the money visible.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {quote && <Badge className={getQuoteStatusColor(quote.status)}>{quote.status}</Badge>}
+              {quote && (
+                <Button variant="outline" size="sm" onClick={handleGeneratePdf}>
+                  <Download className="mr-2 size-4" />
+                  PDF
+                </Button>
+              )}
+              {mode === "view" && quote?.status === "draft" && (
+                <Button size="sm" onClick={handleSendQuote}>
+                  <Send className="mr-2 size-4" />
+                  Mark Sent
+                </Button>
+              )}
+              {mode === "view" && quote?.status === "sent" && (
+                <>
+                  <Button size="sm" onClick={handleAcceptQuote}>
+                    <CheckCircle className="mr-2 size-4" />
+                    Accept
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleRejectQuote}>
+                    <X className="mr-2 size-4" />
+                    Reject
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="flex flex-col gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Client & Scope</CardTitle>
+                <CardDescription>Set the recipient, headline, and validity window.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5 md:grid-cols-2">
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="quote-customer">Customer</Label>
+                  <Select
+                    disabled={isViewOnly}
+                    value={selectedCustomerId}
+                    onValueChange={(value) =>
+                      setValue("customerId", value ?? "", {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                  >
+                    <SelectTrigger id="quote-customer" aria-invalid={Boolean(errors.customerId)}>
+                      <SelectValue placeholder="Select a customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.name}
+                          {customer.company ? ` (${customer.company})` : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldError message={errors.customerId?.message} />
+                </div>
+
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="quote-title">Quote title</Label>
+                  <Input
+                    id="quote-title"
+                    aria-invalid={Boolean(errors.title)}
+                    disabled={isViewOnly}
+                    placeholder="Website redesign and launch support"
+                    {...register("title")}
+                  />
+                  <FieldError message={errors.title?.message} />
+                </div>
+
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="quote-description">Description</Label>
+                  <Textarea
+                    id="quote-description"
+                    disabled={isViewOnly}
+                    rows={4}
+                    placeholder="Summarize the work, deliverables, and assumptions."
+                    {...register("description")}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="quote-tax-rate">Tax rate (%)</Label>
+                  <Input
+                    id="quote-tax-rate"
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.01"
+                    aria-invalid={Boolean(errors.taxRate)}
+                    disabled={isViewOnly}
+                    {...register("taxRate")}
+                  />
+                  <FieldError message={errors.taxRate?.message} />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label>Valid until</Label>
+                  <DatePickerField
+                    value={watch("validUntil")}
+                    invalid={Boolean(errors.validUntil)}
+                    disabled={isViewOnly}
+                    placeholder="Pick a validity date"
+                    onChange={(value) =>
+                      setValue("validUntil", value, {
+                        shouldValidate: true,
+                        shouldDirty: true,
+                      })
+                    }
+                  />
+                  <FieldError message={errors.validUntil?.message} />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-base">Line Items</CardTitle>
+                  <CardDescription>Each item updates totals immediately as you type.</CardDescription>
+                </div>
+                {!isViewOnly && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => append({ description: "", quantity: 1, unit_price: 0 })}
+                  >
+                    <Plus className="mr-2 size-4" />
+                    Add Item
+                  </Button>
+                )}
+              </CardHeader>
+              <CardContent className="flex flex-col gap-4">
+                {fields.map((field, index) => {
+                  const itemError = errors.items?.[index];
+                  const quantity = Number(items[index]?.quantity) || 0;
+                  const unitPrice = Number(items[index]?.unit_price) || 0;
+
+                  return (
+                    <div key={field.id} className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_110px_140px_140px_auto] lg:items-start">
+                        <div className="grid gap-2">
+                          <Label htmlFor={`quote-item-description-${index}`}>Description</Label>
+                          <Textarea
+                            id={`quote-item-description-${index}`}
+                            aria-invalid={Boolean(itemError?.description)}
+                            disabled={isViewOnly}
+                            rows={3}
+                            placeholder="Discovery workshop and interface exploration"
+                            {...register(`items.${index}.description`)}
+                          />
+                          <FieldError message={itemError?.description?.message} />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label htmlFor={`quote-item-quantity-${index}`}>Qty</Label>
+                          <Input
+                            id={`quote-item-quantity-${index}`}
+                            type="number"
+                            min="0"
+                            step="1"
+                            aria-invalid={Boolean(itemError?.quantity)}
+                            disabled={isViewOnly}
+                            {...register(`items.${index}.quantity`)}
+                          />
+                          <FieldError message={itemError?.quantity?.message} />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label htmlFor={`quote-item-price-${index}`}>Unit price</Label>
+                          <Input
+                            id={`quote-item-price-${index}`}
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            aria-invalid={Boolean(itemError?.unit_price)}
+                            disabled={isViewOnly}
+                            {...register(`items.${index}.unit_price`)}
+                          />
+                          <FieldError message={itemError?.unit_price?.message} />
+                        </div>
+
+                        <div className="grid gap-2">
+                          <Label>Line total</Label>
+                          <div className="flex h-9 items-center rounded-md border border-dashed border-border bg-background px-3 text-sm font-medium">
+                            £{(quantity * unitPrice).toLocaleString()}
+                          </div>
+                        </div>
+
+                        {!isViewOnly && fields.length > 1 && (
+                          <div className="flex items-end">
+                            <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}>
+                              <Trash2 className="size-4 text-destructive" />
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+                <FieldError message={errors.items?.message} />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Terms & Notes</CardTitle>
+                <CardDescription>Capture commercial terms and client-facing notes.</CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-5">
+                <div className="grid gap-2">
+                  <Label htmlFor="quote-terms">Terms</Label>
+                  <Textarea
+                    id="quote-terms"
+                    disabled={isViewOnly}
+                    rows={4}
+                    placeholder="Payment due within 30 days of acceptance."
+                    {...register("terms")}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="quote-notes">Notes</Label>
+                  <Textarea
+                    id="quote-notes"
+                    disabled={isViewOnly}
+                    rows={4}
+                    placeholder="Anything the client should know before approval."
+                    {...register("notes")}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <aside className="flex flex-col gap-6">
+            <Card className="sticky top-0">
+              <CardHeader>
+                <CardTitle className="text-base">Live Summary</CardTitle>
+                <CardDescription>Financial context stays visible while you edit.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-5">
+                <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                  <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Customer</p>
+                  <p className="mt-2 text-base font-semibold">
+                    {selectedCustomer?.name || "No customer selected"}
+                  </p>
+                  {selectedCustomer?.company && (
+                    <p className="text-sm text-muted-foreground">{selectedCustomer.company}</p>
+                  )}
+                  {selectedCustomer?.email && (
+                    <p className="mt-2 text-sm text-muted-foreground">{selectedCustomer.email}</p>
+                  )}
+                </div>
+
+                <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>£{subtotal.toLocaleString()}</span>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span>£{taxAmount.toLocaleString()}</span>
+                  </div>
+                  <div className="mt-4 border-t border-border/70 pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Grand total</span>
+                      <span className="text-xl font-semibold">£{total.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {quote && (
+                  <div className="rounded-xl border border-border/70 bg-muted/20 p-4">
+                    <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Quote Timeline</p>
+                    <p className="mt-2 font-medium">
+                      Created {format(new Date(quote.created_at), "MMM d, yyyy")}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {quote.valid_until
+                        ? `Valid until ${format(parseISO(quote.valid_until), "MMM d, yyyy")}`
+                        : "No validity date set"}
+                    </p>
+                  </div>
+                )}
+
+                {!isViewOnly && (
+                  <Button type="submit" disabled={saving || !isValid}>
+                    {saving ? "Saving..." : mode === "create" ? "Create Quote" : "Save Changes"}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          </aside>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}

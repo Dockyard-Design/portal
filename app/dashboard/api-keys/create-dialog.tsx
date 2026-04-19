@@ -69,7 +69,7 @@ export function CreateApiKeyDialog() {
               <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-sm">
                 <p className="font-semibold text-emerald-400 mb-2">Key created successfully</p>
                 <p className="text-muted-foreground mb-3">
-                  Copy this key now — you won't be able to see it again.
+                  Copy this key now. You won&apos;t be able to see it again.
                 </p>
                 <div className="flex items-center gap-2">
                   <code className="flex-1 p-3 rounded-lg bg-background border border-border/40 text-xs font-mono break-all">

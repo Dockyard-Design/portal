@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
-import { supabaseAdmin, generateApiKey, hashApiKey, type ApiKeyRow } from "@/lib/api-keys";
+import { supabaseAdmin, generateApiKey, type ApiKeyRow } from "@/lib/api-keys";
 
 async function requireAuth() {
   const { userId } = await auth();

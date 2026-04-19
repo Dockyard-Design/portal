@@ -1,12 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { supabaseAdmin, verifyApiKey, checkRateLimit, logRequest } from "@/lib/api-keys";
+import {
+  supabaseAdmin,
+  verifyApiKey,
+  checkRateLimit,
+  logRequest,
+  type RateLimitResult,
+} from "@/lib/api-keys";
 
 const submissionSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email address"),
   message: z.string().min(1, "Message is required"),
 });
+
+type ContactResponseBody =
+  | { error: string; details?: ReturnType<z.ZodError["format"]> }
+  | { message: string };
 
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
@@ -19,25 +29,41 @@ export async function POST(request: NextRequest) {
     return handleResponse(401, { error: "Unauthorized: Invalid or missing API key" }, request, startTime);
   }
 
-  const keyId = authResult.keyId!;
+  const keyId = authResult.keyId;
+  if (!keyId) {
+    return handleResponse(401, { error: "Unauthorized: Invalid or missing API key" }, request, startTime);
+  }
 
   // 2. Rate Limiting
   const rateLimit = await checkRateLimit(keyId);
   if (!rateLimit.allowed) {
-    return handleResponse(429, { error: "Too many requests. Please try again later." }, request, startTime, rateLimit);
+    return handleResponse(
+      429,
+      { error: "Too many requests. Please try again later." },
+      request,
+      startTime,
+      keyId,
+      rateLimit
+    );
   }
 
   // 3. Validation
-  let body;
+  let body: unknown;
   try {
     body = await request.json();
-  } catch (e) {
-    return handleResponse(400, { error: "Invalid JSON body" }, request, startTime);
+  } catch {
+    return handleResponse(400, { error: "Invalid JSON body" }, request, startTime, keyId);
   }
 
   const validation = submissionSchema.safeParse(body);
   if (!validation.success) {
-    return handleResponse(400, { error: "Validation failed", details: validation.error.format() }, request, startTime);
+    return handleResponse(
+      400,
+      { error: "Validation failed", details: validation.error.format() },
+      request,
+      startTime,
+      keyId
+    );
   }
 
   // 4. Database Insertion
@@ -51,10 +77,16 @@ export async function POST(request: NextRequest) {
 
   if (dbError) {
     console.error("[api/contact] DB Error:", dbError);
-    return handleResponse(500, { error: "Internal server error while saving submission" }, request, startTime);
+    return handleResponse(
+      500,
+      { error: "Internal server error while saving submission" },
+      request,
+      startTime,
+      keyId
+    );
   }
 
-  return handleResponse(201, { message: "Submission received successfully" }, request, startTime);
+  return handleResponse(201, { message: "Submission received successfully" }, request, startTime, keyId, rateLimit);
 }
 
 export async function GET(request: NextRequest) {
@@ -66,16 +98,17 @@ export async function GET(request: NextRequest) {
  */
 async function handleResponse(
   status: number,
-  body: any,
+  body: ContactResponseBody,
   request: NextRequest,
   startTime: number,
-  rateLimit?: any
+  apiKeyId: string | null = null,
+  rateLimit?: RateLimitResult
 ) {
   const responseTime = Date.now() - startTime;
 
   // Log the request asynchronously
   logRequest({
-    api_key_id: request.headers.get("authorization")?.replace("Bearer ", "") ? (await verifyApiKey(request.headers.get("authorization")?.replace("Bearer ", "") || "")).keyId || null : null,
+    api_key_id: apiKeyId,
     auth_method: "api-key",
     method: request.method,
     path: request.nextUrl.pathname,

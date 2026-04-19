@@ -21,12 +21,10 @@ import {
   Mail, 
   Briefcase, 
   LayoutGrid, 
-  ExternalLink, 
   ChevronDown,
   Search,
   ArrowRight,
   FileText,
-  DollarSign
 } from "lucide-react";
 import Link from "next/link";
 import type { Customer, KanbanBoard } from "@/types/kanban";

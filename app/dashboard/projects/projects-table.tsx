@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -42,7 +41,6 @@ const ITEMS_PER_PAGE = 10;
 
 export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
   const [page, setPage] = useState(0);
-  const router = useRouter();
   const totalPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
   const paginatedProjects = projects.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
 

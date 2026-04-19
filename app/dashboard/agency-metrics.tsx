@@ -1,20 +1,6 @@
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-} from "recharts";
 import {
   FileText,
   Receipt,
@@ -29,18 +15,7 @@ interface AgencyMetricsProps {
 }
 
 export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
-  const { quotes, invoices, monthlyData } = metrics;
-
-  const chartConfig = {
-    quotes: {
-      label: "Quotes",
-      color: "hsl(var(--primary) / 0.3)",
-    },
-    invoices: {
-      label: "Invoices",
-      color: "hsl(var(--primary))",
-    },
-  };
+  const { quotes, invoices } = metrics;
 
   return (
     <div className="flex flex-col gap-6">
@@ -118,10 +93,30 @@ export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <StatusRow label="Draft" value={quotes.draft} total={quotes.total} color="bg-slate-500" />
-            <StatusRow label="Sent" value={quotes.sent} total={quotes.total} color="bg-blue-500" />
-            <StatusRow label="Accepted" value={quotes.accepted} total={quotes.total} color="bg-emerald-500" />
-            <StatusRow label="Rejected" value={quotes.rejected} total={quotes.total} color="bg-red-500" />
+            <StatusRow
+              label="Draft"
+              value={quotes.draft}
+              total={quotes.total}
+              color="bg-slate-500"
+            />
+            <StatusRow
+              label="Sent"
+              value={quotes.sent}
+              total={quotes.total}
+              color="bg-blue-500"
+            />
+            <StatusRow
+              label="Accepted"
+              value={quotes.accepted}
+              total={quotes.total}
+              color="bg-emerald-500"
+            />
+            <StatusRow
+              label="Rejected"
+              value={quotes.rejected}
+              total={quotes.total}
+              color="bg-red-500"
+            />
           </CardContent>
         </Card>
 
@@ -134,35 +129,33 @@ export function AgencyMetrics({ metrics }: AgencyMetricsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <StatusRow label="Draft" value={invoices.draft} total={invoices.total} color="bg-slate-500" />
-            <StatusRow label="Sent" value={invoices.sent} total={invoices.total} color="bg-blue-500" />
-            <StatusRow label="Paid" value={invoices.paid} total={invoices.total} color="bg-emerald-500" />
-            <StatusRow label="Overdue" value={invoices.overdue} total={invoices.total} color="bg-red-500" />
+            <StatusRow
+              label="Draft"
+              value={invoices.draft}
+              total={invoices.total}
+              color="bg-slate-500"
+            />
+            <StatusRow
+              label="Sent"
+              value={invoices.sent}
+              total={invoices.total}
+              color="bg-blue-500"
+            />
+            <StatusRow
+              label="Paid"
+              value={invoices.paid}
+              total={invoices.total}
+              color="bg-emerald-500"
+            />
+            <StatusRow
+              label="Overdue"
+              value={invoices.overdue}
+              total={invoices.total}
+              color="bg-red-500"
+            />
           </CardContent>
         </Card>
       </div>
-
-      {/* Monthly Trends Chart */}
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <TrendingUp className="size-4" />
-            Monthly Trends
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ChartContainer config={chartConfig} className="h-64">
-            <BarChart data={monthlyData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="month" />
-              <YAxis />
-              <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="quoteValue" name="quotes" fill="var(--color-quotes)" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="invoiceValue" name="invoices" fill="var(--color-invoices)" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ChartContainer>
-        </CardContent>
-      </Card>
     </div>
   );
 }

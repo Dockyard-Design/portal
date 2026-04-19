@@ -34,11 +34,28 @@ export interface RecentRequest {
   response_time_ms: number;
   auth_method: string;
   created_at: string;
-  api_key_id?: string;
+  api_key_id?: string | null;
   api_key?: {
     name: string;
     key_prefix: string;
   } | null;
+}
+
+interface ApiRequestLogRow {
+  id: string;
+  method: string;
+  path: string;
+  status_code: number;
+  response_time_ms: number;
+  auth_method: string;
+  created_at: string;
+  api_key_id: string | null;
+}
+
+interface ApiKeyLookupRow {
+  id: string;
+  name: string;
+  key_prefix: string;
 }
 
 export async function getRecentApiRequests(limit: number = 50): Promise<RecentRequest[]> {
@@ -57,10 +74,11 @@ export async function getRecentApiRequests(limit: number = 50): Promise<RecentRe
   if (!logs || logs.length === 0) return [];
 
   // Get unique api_key_ids
-  const keyIds = [...new Set(logs.filter((log: any) => log.api_key_id).map((log: any) => log.api_key_id))];
+  const typedLogs = logs as ApiRequestLogRow[];
+  const keyIds = [...new Set(typedLogs.flatMap((log) => (log.api_key_id ? [log.api_key_id] : [])))];
   
-  // Fetch key names if there are any
-  let keysMap = new Map();
+  // Fetch key names when at least one key id is present
+  let keysMap = new Map<string, ApiKeyLookupRow>();
   if (keyIds.length > 0) {
     const { data: keys, error: keysError } = await supabaseAdmin
       .from("api_keys")
@@ -68,12 +86,13 @@ export async function getRecentApiRequests(limit: number = 50): Promise<RecentRe
       .in("id", keyIds);
     
     if (!keysError && keys) {
-      keysMap = new Map(keys.map((k: any) => [k.id, k]));
+      const typedKeys = keys as ApiKeyLookupRow[];
+      keysMap = new Map(typedKeys.map((key) => [key.id, key]));
     }
   }
 
   // Merge the data
-  return logs.map((log: any) => ({
+  return typedLogs.map((log) => ({
     ...log,
     api_key: log.api_key_id ? keysMap.get(log.api_key_id) || { name: "Unknown Key", key_prefix: "----" } : null,
   }));
@@ -109,7 +128,7 @@ export async function verifyApiKey(bearerToken: string): Promise<{ valid: boolea
 
   // Atomically increment request_count and update last_used_at via RPC.
   // This avoids the read-then-write race condition and the operator-precedence
-  // bug in `(data as any).request_count ?? 0 + 1` (#2, #3).
+  // bug in the previous request_count increment expression (#2, #3).
   supabaseAdmin
     .rpc("increment_api_key_request_count", { key_id: data.id })
     .then(({ error: rpcError }) => {

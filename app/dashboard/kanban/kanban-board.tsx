@@ -47,7 +47,6 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  User,
   Search,
   Check,
   UserCircle,
@@ -85,7 +84,7 @@ import type {
   ClerkUser,
 } from "@/types/kanban";
 import type { LucideIcon } from "lucide-react";
-import { useState, useCallback } from "react";
+import { useState } from "react";
 
 interface ColumnConfig {
   id: TaskStatus;

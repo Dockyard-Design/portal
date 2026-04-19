@@ -4,12 +4,10 @@ export const dynamic = "force-dynamic";
 
 import {
   ArrowUpRight,
-  Plus,
   Key,
   Clock,
   Shield,
   LayoutGrid,
-  Receipt,
 } from "lucide-react";
 import Link from "next/link";
 import { getProjects } from "@/app/actions/projects";
@@ -275,46 +273,6 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
     </div>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  sub,
-  icon: Icon,
-  href,
-  highlight,
-}: {
-  label: string;
-  value: number;
-  sub: string;
-  icon: React.ComponentType<{ className?: string }>;
-  href: string;
-  highlight?: boolean;
-}) {
-  return (
-    <Link href={href}>
-      <Card
-        className={`border-border/40 shadow-sm hover:border-primary/40 transition-colors group ${highlight ? "border-primary/30 bg-primary/5" : ""}`}
-      >
-        <CardContent className="p-5">
-          <div className="flex items-start justify-between">
-            <div
-              className={`p-2 rounded-lg ${highlight ? "bg-primary/10 text-primary" : "bg-secondary text-secondary-foreground"}`}
-            >
-              <Icon className="size-5" />
-            </div>
-            <ArrowUpRight className="size-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-          </div>
-          <div className="mt-3">
-            <div className="text-2xl font-semibold tracking-tight">{value}</div>
-            <div className="text-sm text-muted-foreground mt-0.5">{label}</div>
-            <div className="text-xs text-muted-foreground mt-1">{sub}</div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
   );
 }
 

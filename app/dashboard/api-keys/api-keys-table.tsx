@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Key, Copy, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Copy, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { revokeApiKey, deleteApiKey } from "@/app/actions/api-keys";
 import type { ApiKeyRow } from "@/lib/api-keys";

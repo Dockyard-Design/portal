@@ -42,7 +42,7 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
           <Home className="size-4" />
           <span className="sr-only">Dashboard</span>
         </Link>
-        {items.map((item, index) => (
+        {items.map((item) => (
           <div key={item.href} className="flex items-center">
             <ChevronRight className="size-4 mx-1" />
             {item.isCurrent ? (

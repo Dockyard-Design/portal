@@ -1,7 +1,6 @@
 "use server";
 
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
-import type { TaskStatus } from "@/types/kanban";
 
 export interface KanbanMetrics {
   totalCustomers: number;

@@ -12,7 +12,7 @@
  * 8. Clerk-authenticated users can see their own posts
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 
 const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 

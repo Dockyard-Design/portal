@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Trash2, Edit, Lock, Unlock, Key, MoreVertical } from "lucide-react";
+import { ChevronLeft, ChevronRight, Trash2, Edit, Lock, Unlock, Key, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { deleteUser, lockUser, unlockUser, resetUserPassword } from "@/app/actions/users";
 import type { SimpleUser } from "@/app/actions/users";

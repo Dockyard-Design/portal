@@ -55,7 +55,6 @@ import {
   MessageCircle, 
   ChevronLeft, 
   ChevronRight,
-  Check,
   X
 } from "lucide-react";
 
@@ -75,7 +74,6 @@ interface StatusTableProps {
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: () => void;
   onUpdateStatus: (id: string, status: ContactStatus) => void;
-  onToggleArchive: (id: string, currentArchived: boolean) => void;
   onOpenDeleteDialog: (id: string) => void;
   onView: (submission: ContactSubmission) => void;
 }
@@ -236,7 +234,6 @@ function StatusTable({
   onToggleSelect,
   onToggleSelectAll,
   onUpdateStatus, 
-  onToggleArchive, 
   onOpenDeleteDialog, 
   onView 
 }: StatusTableProps) {
@@ -247,8 +244,6 @@ function StatusTable({
   const Icon = config.icon;
 
   const allSelected = paginatedSubmissions.length > 0 && paginatedSubmissions.every(s => selectedIds.has(s.id));
-  const someSelected = paginatedSubmissions.some(s => selectedIds.has(s.id)) && !allSelected;
-
   const handlePrevPage = () => setPage(p => Math.max(0, p - 1));
   const handleNextPage = () => setPage(p => Math.min(totalPages - 1, p + 1));
 
@@ -472,7 +467,7 @@ export default function ContactPage() {
       setSelectedRead(new Set());
       setSelectedReplied(new Set());
       setSelectedArchived(new Set());
-    } catch (error) {
+    } catch {
       toast.error("Failed to load contact submissions");
     } finally {
       setIsLoading(false);
@@ -497,7 +492,7 @@ export default function ContactPage() {
       const msg = status === "closed" ? "Closed and archived" : `Status updated to ${status}`;
       toast.success(isArchived ? `${msg} and unarchived` : msg);
       await fetchSubmissions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to update status");
     }
   }, []);
@@ -517,7 +512,7 @@ export default function ContactPage() {
         toast.success("Unarchived and restored to Read");
       }
       await fetchSubmissions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to update archive status");
     }
   }, []);
@@ -540,7 +535,7 @@ export default function ContactPage() {
         toast.success("Submission deleted");
       }
       await fetchSubmissions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to delete submission");
     } finally {
       setDeleteDialogOpen(false);
@@ -570,7 +565,7 @@ export default function ContactPage() {
       const msg = status === "closed" ? "Closed and archived" : `Marked as ${status}`;
       toast.success(`${msg}: ${totalSelectedCount} submissions`);
       await fetchSubmissions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to update some submissions");
     }
   }, [allSelected, totalSelectedCount]);
@@ -592,7 +587,7 @@ export default function ContactPage() {
       
       toast.success(`Archived and closed: ${totalSelectedCount} submissions`);
       await fetchSubmissions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to archive some submissions");
     }
   }, [allSelected, totalSelectedCount]);
@@ -612,7 +607,7 @@ export default function ContactPage() {
       
       toast.success(`Unarchived and restored to Read: ${totalSelectedCount} submissions`);
       await fetchSubmissions();
-    } catch (error) {
+    } catch {
       toast.error("Failed to unarchive some submissions");
     }
   }, [allSelected, totalSelectedCount]);
@@ -622,12 +617,7 @@ export default function ContactPage() {
     setIsModalOpen(true);
   }, []);
 
-  const closeModal = useCallback(() => {
-    setIsModalOpen(false);
-    setSelectedSubmission(null);
-  }, []);
-
-  const createToggleSelect = (setSelected: React.Dispatch<React.SetStateAction<Set<string>>>, submissions: ContactSubmission[]) => {
+  const createToggleSelect = (setSelected: React.Dispatch<React.SetStateAction<Set<string>>>) => {
     return (id: string) => {
       setSelected(prev => {
         const newSet = new Set(prev);
@@ -710,10 +700,9 @@ export default function ContactPage() {
               status="new"
               submissions={submissionsByStatus.new}
               selectedIds={selectedNew}
-              onToggleSelect={createToggleSelect(setSelectedNew, submissionsByStatus.new)}
+              onToggleSelect={createToggleSelect(setSelectedNew)}
               onToggleSelectAll={createToggleSelectAll(setSelectedNew, submissionsByStatus.new)}
               onUpdateStatus={handleUpdateStatus}
-              onToggleArchive={handleToggleArchive}
               onOpenDeleteDialog={openDeleteDialog}
               onView={openModal}
             />
@@ -721,10 +710,9 @@ export default function ContactPage() {
               status="read"
               submissions={submissionsByStatus.read}
               selectedIds={selectedRead}
-              onToggleSelect={createToggleSelect(setSelectedRead, submissionsByStatus.read)}
+              onToggleSelect={createToggleSelect(setSelectedRead)}
               onToggleSelectAll={createToggleSelectAll(setSelectedRead, submissionsByStatus.read)}
               onUpdateStatus={handleUpdateStatus}
-              onToggleArchive={handleToggleArchive}
               onOpenDeleteDialog={openDeleteDialog}
               onView={openModal}
             />
@@ -732,10 +720,9 @@ export default function ContactPage() {
               status="replied"
               submissions={submissionsByStatus.replied}
               selectedIds={selectedReplied}
-              onToggleSelect={createToggleSelect(setSelectedReplied, submissionsByStatus.replied)}
+              onToggleSelect={createToggleSelect(setSelectedReplied)}
               onToggleSelectAll={createToggleSelectAll(setSelectedReplied, submissionsByStatus.replied)}
               onUpdateStatus={handleUpdateStatus}
-              onToggleArchive={handleToggleArchive}
               onOpenDeleteDialog={openDeleteDialog}
               onView={openModal}
             />
@@ -744,7 +731,7 @@ export default function ContactPage() {
           <ArchivedTable
             submissions={archivedSubmissions}
             selectedIds={selectedArchived}
-            onToggleSelect={createToggleSelect(setSelectedArchived, archivedSubmissions)}
+            onToggleSelect={createToggleSelect(setSelectedArchived)}
             onToggleSelectAll={createToggleSelectAll(setSelectedArchived, archivedSubmissions)}
             openModal={openModal}
             onToggleArchive={handleToggleArchive}

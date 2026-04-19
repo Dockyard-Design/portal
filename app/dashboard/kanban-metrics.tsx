@@ -3,7 +3,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import {
   Briefcase,
-  LayoutGrid,
   ClipboardList,
   Clock,
   Play,

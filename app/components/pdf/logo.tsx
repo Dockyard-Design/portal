@@ -28,6 +28,7 @@ const FallbackLogo = () => (
 
 export const Logo = ({ logoBase64 }: LogoProps) => {
   if (logoBase64) {
+    // eslint-disable-next-line jsx-a11y/alt-text -- react-pdf Image is not a browser img element.
     return <Image src={logoBase64} style={{ width: 200, height: 40 }} />;
   }
   return <FallbackLogo />;
