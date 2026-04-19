@@ -6,7 +6,18 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -72,6 +83,14 @@ export default function CustomerDetailClient({
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceModalMode, setInvoiceModalMode] = useState<"create" | "edit" | "view">("create");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false);
+  const [isSavingCustomer, setIsSavingCustomer] = useState(false);
+  const [customerForm, setCustomerForm] = useState({
+    name: customer.name,
+    email: customer.email ?? "",
+    company: customer.company ?? "",
+    notes: customer.notes ?? "",
+  });
 
   const refreshData = () => {
     startTransition(() => {
@@ -141,6 +160,39 @@ export default function CustomerDetailClient({
     window.open(`/api/pdf/${type}/${id}`, "_blank", "noopener,noreferrer");
   };
 
+  const openEditCustomer = () => {
+    setCustomerForm({
+      name: customer.name,
+      email: customer.email ?? "",
+      company: customer.company ?? "",
+      notes: customer.notes ?? "",
+    });
+    setIsEditCustomerOpen(true);
+  };
+
+  const handleUpdateCustomer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!customerForm.name.trim()) return;
+
+    setIsSavingCustomer(true);
+    try {
+      const { updateCustomer } = await import("@/app/actions/kanban");
+      await updateCustomer(customer.id, {
+        name: customerForm.name.trim(),
+        email: customerForm.email.trim() || null,
+        company: customerForm.company.trim() || null,
+        notes: customerForm.notes.trim() || null,
+      });
+      toast.success("Customer updated");
+      setIsEditCustomerOpen(false);
+      refreshData();
+    } catch {
+      toast.error("Failed to update customer");
+    } finally {
+      setIsSavingCustomer(false);
+    }
+  };
+
   const openCreateQuote = () => {
     setSelectedQuote(null);
     setQuoteModalMode("create");
@@ -201,11 +253,9 @@ export default function CustomerDetailClient({
               Kanban
             </Link>
           </Button>
-          <Button variant="outline" asChild>
-            <Link href={`/dashboard/customers/${customer.id}/edit`}>
-              <Edit className="size-4 mr-2" />
-              Edit Customer
-            </Link>
+          <Button variant="outline" onClick={openEditCustomer}>
+            <Edit className="size-4 mr-2" />
+            Edit Customer
           </Button>
         </div>
       </div>
@@ -493,6 +543,75 @@ export default function CustomerDetailClient({
         onOpenChange={setInvoiceModalOpen}
         onSuccess={refreshData}
       />
+
+      <Dialog open={isEditCustomerOpen} onOpenChange={setIsEditCustomerOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Customer</DialogTitle>
+            <DialogDescription>
+              Update the customer details used across boards, quotes, and invoices.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleUpdateCustomer} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-customer-name">Name</Label>
+              <Input
+                id="edit-customer-name"
+                value={customerForm.name}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, name: event.target.value }))
+                }
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-customer-email">Email</Label>
+              <Input
+                id="edit-customer-email"
+                type="email"
+                value={customerForm.email}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, email: event.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-customer-company">Company</Label>
+              <Input
+                id="edit-customer-company"
+                value={customerForm.company}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, company: event.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-customer-notes">Notes</Label>
+              <Textarea
+                id="edit-customer-notes"
+                value={customerForm.notes}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, notes: event.target.value }))
+                }
+                rows={3}
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditCustomerOpen(false)}
+                disabled={isSavingCustomer}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSavingCustomer || !customerForm.name.trim()}>
+                {isSavingCustomer ? "Saving..." : "Save Customer"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

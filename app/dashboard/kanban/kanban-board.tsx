@@ -123,6 +123,14 @@ const PRIORITIES: Record<TaskPriority, PriorityConfig> = {
   low: { color: "bg-blue-400", label: "Low" },
 };
 
+function getStatusLabel(status: TaskStatus): string {
+  return COLUMNS.find((column) => column.id === status)?.title ?? status;
+}
+
+function getPriorityLabel(priority: TaskPriority): string {
+  return PRIORITIES[priority]?.label ?? priority;
+}
+
 function getPriorityBadge(priority: TaskPriority): React.ReactNode {
   const config = PRIORITIES[priority] || PRIORITIES.medium;
   return <div className={cn("size-2 rounded-full", config.color)} />;
@@ -967,8 +975,8 @@ export function KanbanBoard({
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
                             {getPriorityBadge(task.priority)}
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {task.priority}
+                            <span className="text-xs text-muted-foreground">
+                              {getPriorityLabel(task.priority)}
                             </span>
                           </div>
 
@@ -1112,8 +1120,8 @@ export function KanbanBoard({
                     setTaskForm({ ...taskForm, priority: v as TaskPriority })
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-full">
+                    <SelectValue>{getPriorityLabel(taskForm.priority)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
@@ -1132,8 +1140,8 @@ export function KanbanBoard({
                     setTaskForm({ ...taskForm, status: v as TaskStatus })
                   }
                 >
-                  <SelectTrigger>
-                    <SelectValue />
+                  <SelectTrigger className="w-full">
+                    <SelectValue>{getStatusLabel(taskForm.status)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="backlog">Backlog</SelectItem>

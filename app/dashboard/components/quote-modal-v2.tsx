@@ -161,6 +161,7 @@ export function QuoteModal({
 }: QuoteModalProps) {
   const [saving, setSaving] = useState(false);
   const isViewOnly = mode === "view";
+  const isCustomerLocked = Boolean(preselectedCustomerId);
 
   const form = useForm<QuoteFormInput, unknown, QuoteFormOutput>({
     resolver: zodResolver(quoteSchema),
@@ -351,32 +352,46 @@ export function QuoteModal({
                 <CardDescription>Set the recipient, headline, and validity window.</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5 md:grid-cols-2">
-                <div className="grid gap-2 md:col-span-2">
-                  <Label htmlFor="quote-customer">Customer</Label>
-                  <Select
-                    disabled={isViewOnly}
-                    value={selectedCustomerId}
-                    onValueChange={(value) =>
-                      setValue("customerId", value ?? "", {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
-                  >
-                    <SelectTrigger id="quote-customer" aria-invalid={Boolean(errors.customerId)}>
-                      <SelectValue placeholder="Select a customer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name}
-                          {customer.company ? ` (${customer.company})` : ""}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FieldError message={errors.customerId?.message} />
-                </div>
+                {isCustomerLocked ? (
+                  <div className="grid gap-2 md:col-span-2">
+                    <Label>Customer</Label>
+                    <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm">
+                      <span className="font-medium">
+                        {selectedCustomer?.name || "Selected customer"}
+                      </span>
+                      {selectedCustomer?.company && (
+                        <span className="text-muted-foreground"> ({selectedCustomer.company})</span>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid gap-2 md:col-span-2">
+                    <Label htmlFor="quote-customer">Customer</Label>
+                    <Select
+                      disabled={isViewOnly}
+                      value={selectedCustomerId}
+                      onValueChange={(value) =>
+                        setValue("customerId", value ?? "", {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        })
+                      }
+                    >
+                      <SelectTrigger id="quote-customer" className="w-full" aria-invalid={Boolean(errors.customerId)}>
+                        <SelectValue placeholder="Select a customer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {customers.map((customer) => (
+                          <SelectItem key={customer.id} value={customer.id}>
+                            {customer.name}
+                            {customer.company ? ` (${customer.company})` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FieldError message={errors.customerId?.message} />
+                  </div>
+                )}
 
                 <div className="grid gap-2 md:col-span-2">
                   <Label htmlFor="quote-title">Quote title</Label>

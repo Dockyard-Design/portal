@@ -1,11 +1,21 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useKanbanStore } from "@/lib/store";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +37,7 @@ import {
   FileText,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
 import type { Customer, KanbanBoard } from "@/types/kanban";
 
 interface CustomerWithBoards extends Customer {
@@ -40,12 +51,21 @@ export default function CustomersPage() {
   const [customers, setCustomers] = useState<CustomerWithBoards[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
+  const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
+  const [customerForm, setCustomerForm] = useState({
+    name: "",
+    email: "",
+    company: "",
+    notes: "",
+  });
 
-  useEffect(() => {
-    async function loadData() {
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
       const { getCustomers, getBoards } = await import("@/app/actions/kanban");
       const customersData = await getCustomers();
-      
+
       const customersWithBoards = await Promise.all(
         customersData.map(async (customer: Customer) => {
           const boards = await getBoards(customer.id);
@@ -56,13 +76,16 @@ export default function CustomersPage() {
           };
         })
       );
-      
+
       setCustomers(customersWithBoards);
+    } finally {
       setLoading(false);
     }
-    
-    loadData();
   }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const filteredCustomers = useMemo(() => {
     if (!searchQuery.trim()) return customers;
@@ -85,6 +108,30 @@ export default function CustomersPage() {
     router.push("/dashboard/kanban");
   };
 
+  const handleCreateCustomer = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!customerForm.name.trim()) return;
+
+    setIsCreatingCustomer(true);
+    try {
+      const { createCustomer } = await import("@/app/actions/kanban");
+      const customer = await createCustomer({
+        name: customerForm.name.trim(),
+        email: customerForm.email.trim() || undefined,
+        company: customerForm.company.trim() || undefined,
+        notes: customerForm.notes.trim() || undefined,
+      });
+
+      setCustomerForm({ name: "", email: "", company: "", notes: "" });
+      setIsCustomerDialogOpen(false);
+      router.push(`/dashboard/customers/${customer.id}`);
+    } catch {
+      toast.error("Failed to create customer");
+    } finally {
+      setIsCreatingCustomer(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
@@ -99,11 +146,9 @@ export default function CustomersPage() {
           </div>
         </div>
 
-        <Button asChild>
-          <Link href="/dashboard/work">
+        <Button onClick={() => setIsCustomerDialogOpen(true)}>
             <Plus className="size-4 mr-1" />
             New Customer
-          </Link>
         </Button>
       </div>
 
@@ -149,8 +194,9 @@ export default function CustomersPage() {
               : "Create your first customer from the kanban page."}
           </p>
           {!searchQuery && (
-            <Button asChild>
-              <Link href="/dashboard/kanban">Go to Kanban</Link>
+            <Button onClick={() => setIsCustomerDialogOpen(true)}>
+              <Plus className="size-4 mr-1" />
+              New Customer
             </Button>
           )}
         </div>
@@ -253,6 +299,79 @@ export default function CustomersPage() {
           ))}
         </div>
       )}
+
+      <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>New Customer</DialogTitle>
+            <DialogDescription>
+              Add the customer details, then continue to their customer workspace.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateCustomer} className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="customer-name">Name</Label>
+              <Input
+                id="customer-name"
+                value={customerForm.name}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, name: event.target.value }))
+                }
+                placeholder="Customer name"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="customer-email">Email</Label>
+              <Input
+                id="customer-email"
+                type="email"
+                value={customerForm.email}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, email: event.target.value }))
+                }
+                placeholder="client@example.com"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="customer-company">Company</Label>
+              <Input
+                id="customer-company"
+                value={customerForm.company}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, company: event.target.value }))
+                }
+                placeholder="Company name"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="customer-notes">Notes</Label>
+              <Textarea
+                id="customer-notes"
+                value={customerForm.notes}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, notes: event.target.value }))
+                }
+                rows={3}
+                placeholder="Context, requirements, or relationship notes"
+              />
+            </div>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCustomerDialogOpen(false)}
+                disabled={isCreatingCustomer}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isCreatingCustomer || !customerForm.name.trim()}>
+                {isCreatingCustomer ? "Creating..." : "Create Customer"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

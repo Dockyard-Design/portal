@@ -59,7 +59,7 @@ export function CreateApiKeyDialog() {
           <Plus className="mr-2 h-4 w-4" />
           New Key
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto p-0 gap-0 border-border/40 bg-background">
+      <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto p-0 gap-0 border-border/40 bg-background">
         <DialogHeader className="p-6 border-b border-border/40">
           <DialogTitle className="text-xl font-bold tracking-tight">Create API Key</DialogTitle>
         </DialogHeader>
@@ -71,7 +71,7 @@ export function CreateApiKeyDialog() {
                 <p className="text-muted-foreground mb-3">
                   Copy this key now. You won&apos;t be able to see it again.
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <code className="flex-1 p-3 rounded-lg bg-background border border-border/40 text-xs font-mono break-all">
                     {createdKey}
                   </code>

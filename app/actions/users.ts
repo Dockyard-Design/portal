@@ -10,6 +10,39 @@ async function requireAuth() {
   return userId;
 }
 
+interface ClerkErrorLike {
+  errors?: Array<{
+    code?: string;
+    message?: string;
+    longMessage?: string;
+  }>;
+  message?: string;
+}
+
+function getUserActionErrorMessage(error: unknown): string {
+  const clerkError = error as ClerkErrorLike;
+  const firstError = clerkError.errors?.[0];
+
+  switch (firstError?.code) {
+    case "form_password_pwned":
+      return "That password has appeared in a data breach. Choose a different, stronger password.";
+    case "form_password_length_too_short":
+      return "Password is too short. Use at least 8 characters.";
+    case "form_identifier_exists":
+    case "form_email_address_exists":
+      return "A user with that email address already exists.";
+    case "form_param_format_invalid":
+      return firstError.longMessage || firstError.message || "One of the user fields is invalid.";
+    default:
+      return (
+        firstError?.longMessage ||
+        firstError?.message ||
+        clerkError.message ||
+        "Failed to update user management."
+      );
+  }
+}
+
 export interface SimpleUser {
   id: string;
   firstName: string | null;
@@ -64,16 +97,22 @@ export async function createUser(params: {
 }): Promise<SimpleUser> {
   await requireAuth();
 
-  const client = await clerkClient();
-  const user = await client.users.createUser({
-    emailAddress: [params.emailAddress],
-    firstName: params.firstName,
-    lastName: params.lastName,
-    password: params.password,
-  });
+  try {
+    const client = await clerkClient();
+    const user = await client.users.createUser({
+      emailAddress: [params.emailAddress],
+      firstName: params.firstName,
+      lastName: params.lastName,
+      ...(params.password
+        ? { password: params.password }
+        : { skipPasswordRequirement: true }),
+    });
 
-  revalidatePath("/dashboard/users");
-  return serializeUser(user);
+    revalidatePath("/dashboard/users");
+    return serializeUser(user);
+  } catch (error) {
+    throw new Error(getUserActionErrorMessage(error));
+  }
 }
 
 export async function updateUser(
@@ -86,44 +125,60 @@ export async function updateUser(
 ): Promise<SimpleUser> {
   await requireAuth();
 
-  const client = await clerkClient();
-  const user = await client.users.updateUser(userId, {
-    firstName: params.firstName,
-    lastName: params.lastName,
-    primaryEmailAddressID: params.primaryEmailAddressID,
-  });
+  try {
+    const client = await clerkClient();
+    const user = await client.users.updateUser(userId, {
+      firstName: params.firstName,
+      lastName: params.lastName,
+      primaryEmailAddressID: params.primaryEmailAddressID,
+    });
 
-  revalidatePath("/dashboard/users");
-  return serializeUser(user);
+    revalidatePath("/dashboard/users");
+    return serializeUser(user);
+  } catch (error) {
+    throw new Error(getUserActionErrorMessage(error));
+  }
 }
 
 export async function deleteUser(userId: string): Promise<void> {
   await requireAuth();
 
-  const client = await clerkClient();
-  await client.users.deleteUser(userId);
+  try {
+    const client = await clerkClient();
+    await client.users.deleteUser(userId);
 
-  revalidatePath("/dashboard/users");
+    revalidatePath("/dashboard/users");
+  } catch (error) {
+    throw new Error(getUserActionErrorMessage(error));
+  }
 }
 
 export async function lockUser(userId: string): Promise<SimpleUser> {
   await requireAuth();
 
-  const client = await clerkClient();
-  const user = await client.users.lockUser(userId);
+  try {
+    const client = await clerkClient();
+    const user = await client.users.lockUser(userId);
 
-  revalidatePath("/dashboard/users");
-  return serializeUser(user);
+    revalidatePath("/dashboard/users");
+    return serializeUser(user);
+  } catch (error) {
+    throw new Error(getUserActionErrorMessage(error));
+  }
 }
 
 export async function unlockUser(userId: string): Promise<SimpleUser> {
   await requireAuth();
 
-  const client = await clerkClient();
-  const user = await client.users.unlockUser(userId);
+  try {
+    const client = await clerkClient();
+    const user = await client.users.unlockUser(userId);
 
-  revalidatePath("/dashboard/users");
-  return serializeUser(user);
+    revalidatePath("/dashboard/users");
+    return serializeUser(user);
+  } catch (error) {
+    throw new Error(getUserActionErrorMessage(error));
+  }
 }
 
 export async function resetUserPassword(
@@ -132,12 +187,16 @@ export async function resetUserPassword(
 ): Promise<SimpleUser> {
   await requireAuth();
 
-  const client = await clerkClient();
-  const user = await client.users.updateUser(userId, {
-    password: newPassword,
-    signOutOfOtherSessions: true, // Sign out user from all devices
-  });
+  try {
+    const client = await clerkClient();
+    const user = await client.users.updateUser(userId, {
+      password: newPassword,
+      signOutOfOtherSessions: true, // Sign out user from all devices
+    });
 
-  revalidatePath("/dashboard/users");
-  return serializeUser(user);
+    revalidatePath("/dashboard/users");
+    return serializeUser(user);
+  } catch (error) {
+    throw new Error(getUserActionErrorMessage(error));
+  }
 }

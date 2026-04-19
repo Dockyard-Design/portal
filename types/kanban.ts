@@ -62,9 +62,9 @@ export interface CreateCustomerInput {
 
 export interface UpdateCustomerInput {
   name?: string;
-  email?: string;
-  company?: string;
-  notes?: string;
+  email?: string | null;
+  company?: string | null;
+  notes?: string | null;
 }
 
 export interface CreateBoardInput {

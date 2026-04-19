@@ -30,18 +30,22 @@ export function CreateUserDialog() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email) {
+    if (!email.trim()) {
       toast.error("Email is required");
+      return;
+    }
+    if (password.length < 8) {
+      toast.error("Password must be at least 8 characters");
       return;
     }
 
     setIsLoading(true);
     try {
       await createUser({
-        emailAddress: email,
+        emailAddress: email.trim(),
         firstName: firstName || undefined,
         lastName: lastName || undefined,
-        password: password || undefined,
+        password,
       });
       toast.success("User created successfully");
       setEmail("");
@@ -69,7 +73,7 @@ export function CreateUserDialog() {
         <DialogHeader>
           <DialogTitle>Create New User</DialogTitle>
           <DialogDescription>
-            Add a new user to the portal. An email address is required.
+            Add a new user to the portal. They can sign in with this email and password.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit}>
@@ -106,16 +110,18 @@ export function CreateUserDialog() {
               </div>
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password">Password (optional)</Label>
+              <Label htmlFor="password">Password *</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Leave blank for auto-generated"
+                placeholder="Minimum 8 characters"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                minLength={8}
+                required
               />
               <p className="text-xs text-muted-foreground">
-                If left blank, user will need to set password via email verification.
+                The user will use this password for their first sign-in.
               </p>
             </div>
           </div>
@@ -123,7 +129,7 @@ export function CreateUserDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading || !email}>
+            <Button type="submit" disabled={isLoading || !email.trim() || password.length < 8}>
               {isLoading ? "Creating..." : "Create User"}
             </Button>
           </DialogFooter>
