@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 import type {
   Quote,
   Invoice,
@@ -25,12 +25,6 @@ function sanitizeError(error: { code?: string; message: string }): string {
   return error.message || "Something went wrong. Please try again.";
 }
 
-async function requireAuth(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
-
 // Calculate totals from items
 function calculateTotals(
   items: Array<{ quantity: number; unit_price: number }>,
@@ -44,6 +38,8 @@ function calculateTotals(
 
 // Quotes
 export async function getQuotes(customerId?: string): Promise<Quote[]> {
+  await requireAdmin();
+
   let query = supabase
     .from("quotes")
     .select("*, items:quote_items(*)")
@@ -60,6 +56,8 @@ export async function getQuotes(customerId?: string): Promise<Quote[]> {
 }
 
 export async function getQuote(id: string): Promise<Quote | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("quotes")
     .select("*, items:quote_items(*)")
@@ -71,7 +69,7 @@ export async function getQuote(id: string): Promise<Quote | null> {
 }
 
 export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   const { subtotal, tax_amount, total } = calculateTotals(
     input.items,
@@ -123,7 +121,7 @@ export async function updateQuote(
   id: string,
   input: UpdateQuoteInput
 ): Promise<Quote> {
-  await requireAuth();
+  await requireAdmin();
 
   const updateData: Record<string, unknown> = {};
   
@@ -190,6 +188,8 @@ export async function updateQuote(
 
 // Invoices
 export async function getInvoices(customerId?: string): Promise<Invoice[]> {
+  await requireAdmin();
+
   let query = supabase
     .from("invoices")
     .select("*, items:invoice_items(*)")
@@ -206,6 +206,8 @@ export async function getInvoices(customerId?: string): Promise<Invoice[]> {
 }
 
 export async function getInvoice(id: string): Promise<Invoice | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("invoices")
     .select("*, items:invoice_items(*)")
@@ -217,7 +219,7 @@ export async function getInvoice(id: string): Promise<Invoice | null> {
 }
 
 export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   const { subtotal, tax_amount, total } = calculateTotals(
     input.items,
@@ -275,7 +277,7 @@ export async function updateInvoice(
   id: string,
   input: UpdateInvoiceInput
 ): Promise<Invoice> {
-  await requireAuth();
+  await requireAdmin();
 
   const updateData: Record<string, unknown> = {};
   
@@ -360,6 +362,8 @@ export async function updateInvoice(
 
 // Customer Stats
 export async function getCustomerStats(customerId: string): Promise<CustomerStats> {
+  await requireAdmin();
+
   const { data: quotes, error: quotesError } = await supabase
     .from("quotes")
     .select("status, total")
@@ -396,7 +400,7 @@ export async function getCustomerStats(customerId: string): Promise<CustomerStat
 
 // Delete Quote
 export async function deleteQuote(id: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   const { error } = await supabase
     .from("quotes")
@@ -409,7 +413,7 @@ export async function deleteQuote(id: string): Promise<void> {
 
 // Delete Invoice
 export async function deleteInvoice(id: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   const { error } = await supabase
     .from("invoices")

@@ -6,6 +6,8 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 const secretKey = process.env.SUPABASE_SECRET_KEY;
 const DEFAULT_TEST_API_KEY = "sk_live_test_fake_key_000000000000000000";
+const allowTestApiKey =
+  process.env.NODE_ENV === "test" || process.env.ALLOW_TEST_API_KEY === "true";
 
 if (!supabaseUrl || !publishableKey) {
   throw new Error("Missing Supabase environment variables");
@@ -115,10 +117,12 @@ export function generateApiKey(): { raw: string; prefix: string; hash: string } 
 export async function verifyApiKey(bearerToken: string): Promise<{ valid: boolean; keyId?: string }> {
   if (!bearerToken) return { valid: false };
 
-  const configuredTestKey = process.env.TEST_API_KEY || DEFAULT_TEST_API_KEY;
+  const configuredTestKey = process.env.TEST_API_KEY;
   if (
-    (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") &&
-    (bearerToken === configuredTestKey || bearerToken === DEFAULT_TEST_API_KEY)
+    allowTestApiKey &&
+    configuredTestKey &&
+    bearerToken === configuredTestKey &&
+    configuredTestKey !== DEFAULT_TEST_API_KEY
   ) {
     return { valid: true, keyId: "test-api-key" };
   }
@@ -193,7 +197,9 @@ export async function checkRateLimit(
     p_window_seconds: windowSeconds,
   });
 
-  if (error || !data) {
+  const row = Array.isArray(data) ? data[0] : data;
+
+  if (error || !row) {
     // If the RPC fails (e.g. migration not yet applied), log and allow the request
     // rather than blocking all traffic. This is a graceful degradation.
     console.error("[checkRateLimit] RPC failed, allowing request:", error?.message);
@@ -203,10 +209,10 @@ export async function checkRateLimit(
   }
 
   return {
-    allowed: data.allowed,
-    remaining: data.remaining,
-    limit: data.limit,
-    resetAt: new Date(data.reset_at),
+    allowed: row.allowed,
+    remaining: row.remaining,
+    limit: row.rate_limit,
+    resetAt: new Date(row.reset_at),
   };
 }
 

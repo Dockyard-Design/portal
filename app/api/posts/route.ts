@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase, supabaseAdmin, logRequest, checkRateLimit } from "@/lib/api-keys";
+import { supabaseAdmin, logRequest, checkRateLimit } from "@/lib/api-keys";
 import { authenticate, getRateLimitHeaders } from "@/lib/api-auth";
 
 export async function GET(request: NextRequest) {
@@ -49,13 +49,12 @@ export async function GET(request: NextRequest) {
   }
 
   const isClerk = authResult.method === "clerk";
-  const client = isClerk ? supabase : supabaseAdmin;
 
   const { searchParams } = request.nextUrl;
   const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
   const offset = parseInt(searchParams.get("offset") || "0");
 
-  let query = client
+  let query = supabaseAdmin
     .from("projects")
     .select("id, title, slug, excerpt, status, is_public, seo_title, seo_description, seo_keywords, featured_image_url, created_at, updated_at")
     .order("updated_at", { ascending: false })

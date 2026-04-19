@@ -1,14 +1,8 @@
 "use server";
 
-import { auth } from "@clerk/nextjs/server";
 import { getApiMetrics, type ApiMetrics, getRecentApiRequests, type RecentRequest } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 import { unstable_cache } from "next/cache";
-
-async function requireAuth() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
 
 /**
  * Cached metrics query — revalidates every 60 seconds via tag.
@@ -25,11 +19,11 @@ const getCachedApiMetrics = unstable_cache(
 );
 
 export async function getDashboardApiMetrics(): Promise<ApiMetrics> {
-  await requireAuth();
+  await requireAdmin();
   return getCachedApiMetrics();
 }
 
 export async function getLastApiRequests(limit = 50): Promise<RecentRequest[]> {
-  await requireAuth();
+  await requireAdmin();
   return getRecentApiRequests(limit);
 }

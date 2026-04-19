@@ -15,10 +15,12 @@ DROP TABLE IF EXISTS kanban_boards CASCADE;
 DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS expenses CASCADE;
 DROP TABLE IF EXISTS expense_categories CASCADE;
+DROP SEQUENCE IF EXISTS invoice_number_seq;
 
 DROP FUNCTION IF EXISTS update_updated_at_column CASCADE;
 DROP FUNCTION IF EXISTS increment_api_key_request_count CASCADE;
 DROP FUNCTION IF EXISTS check_rate_limit CASCADE;
+DROP FUNCTION IF EXISTS generate_invoice_number CASCADE;
 
 -- Table for Projects (Blog Posts)
 CREATE TABLE projects (
@@ -212,7 +214,7 @@ CREATE TABLE kanban_tasks (
   status TEXT NOT NULL DEFAULT 'backlog' CHECK (status IN ('backlog', 'todo', 'in_progress', 'complete')),
   priority TEXT NOT NULL DEFAULT 'medium' CHECK (priority IN ('low', 'medium', 'high', 'urgent')),
   due_date TIMESTAMP WITH TIME ZONE,
-  position INTEGER NOT NULL DEFAULT 0,
+  position NUMERIC(12, 4) NOT NULL DEFAULT 0,
   author_id TEXT NOT NULL
 );
 
@@ -310,6 +312,17 @@ CREATE TABLE invoices (
   author_id TEXT NOT NULL
 );
 
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START WITH 1;
+
+CREATE OR REPLACE FUNCTION generate_invoice_number()
+RETURNS TEXT
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT 'INV-' || LPAD(nextval('invoice_number_seq')::TEXT, 6, '0');
+$$;
+
 CREATE TABLE invoice_items (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
@@ -388,3 +401,25 @@ CREATE TRIGGER update_expense_categories_updated_at
   BEFORE UPDATE ON expense_categories 
   FOR EACH ROW 
   EXECUTE PROCEDURE update_updated_at_column();
+
+-- Restrictive RLS baseline for Supabase-exposed public tables.
+-- Server routes/actions use the service role client and bypass these policies.
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_request_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE api_rate_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kanban_boards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE kanban_tasks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE contact_submissions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quotes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quote_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoices ENABLE ROW LEVEL SECURITY;
+ALTER TABLE invoice_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expense_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON FUNCTION increment_api_key_request_count(UUID) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION check_rate_limit(TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION generate_invoice_number() FROM PUBLIC, anon, authenticated;

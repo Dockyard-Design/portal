@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextRequest, NextResponse } from "next/server";
+import { requireAdmin } from "@/lib/authz";
 
 export async function GET(
   request: NextRequest,
@@ -7,10 +7,7 @@ export async function GET(
 ) {
   void request;
 
-  const { userId } = await auth();
-  if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  await requireAdmin();
 
   const { type, id } = await params;
   

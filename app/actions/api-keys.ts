@@ -1,17 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin, generateApiKey, type ApiKeyRow } from "@/lib/api-keys";
-
-async function requireAuth() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
+import { requireAdmin } from "@/lib/authz";
 
 export async function getApiKeys(): Promise<ApiKeyRow[]> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   const { data, error } = await supabaseAdmin
     .from("api_keys")
@@ -24,7 +18,7 @@ export async function getApiKeys(): Promise<ApiKeyRow[]> {
 }
 
 export async function createApiKey(name: string): Promise<{ id: string; key: string; prefix: string }> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   const { raw, prefix, hash } = generateApiKey();
 
@@ -46,7 +40,7 @@ export async function createApiKey(name: string): Promise<{ id: string; key: str
 }
 
 export async function revokeApiKey(id: string): Promise<void> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   // Verify ownership
   const { data: existing } = await supabaseAdmin
@@ -69,7 +63,7 @@ export async function revokeApiKey(id: string): Promise<void> {
 }
 
 export async function deleteApiKey(id: string): Promise<void> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   // Verify ownership
   const { data: existing } = await supabaseAdmin

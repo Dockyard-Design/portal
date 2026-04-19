@@ -1,9 +1,12 @@
 "use server";
 
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 import type { ExpenseMetrics } from "@/types/expense";
 
 export async function getExpenseMetrics(): Promise<ExpenseMetrics> {
+  await requireAdmin();
+
   const today = new Date();
   const currentMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
   const currentMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);

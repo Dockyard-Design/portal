@@ -1,9 +1,9 @@
-import { auth } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { InvoicePDF } from "@/app/components/pdf/invoice-template";
 import { getInvoice } from "@/app/actions/agency";
 import { getCustomer } from "@/app/actions/kanban";
+import { requireAdmin } from "@/lib/authz";
 import fs from "fs/promises";
 import path from "path";
 
@@ -14,10 +14,7 @@ export async function GET(
   try {
     void request;
 
-    const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    await requireAdmin();
 
     const { id } = await params;
     

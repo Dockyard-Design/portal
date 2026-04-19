@@ -1,14 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth, clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from "@clerk/nextjs/server";
 import type { User } from "@clerk/nextjs/server";
-
-async function requireAuth() {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
+import { requireAdmin } from "@/lib/authz";
 
 interface ClerkErrorLike {
   errors?: Array<{
@@ -78,7 +73,7 @@ function serializeUser(user: User): SimpleUser {
 }
 
 export async function getUsers(): Promise<SimpleUser[]> {
-  await requireAuth();
+  await requireAdmin();
 
   const client = await clerkClient();
   const { data } = await client.users.getUserList({
@@ -95,7 +90,7 @@ export async function createUser(params: {
   lastName?: string;
   password?: string;
 }): Promise<SimpleUser> {
-  await requireAuth();
+  await requireAdmin();
 
   try {
     const client = await clerkClient();
@@ -123,7 +118,7 @@ export async function updateUser(
     primaryEmailAddressID?: string;
   }
 ): Promise<SimpleUser> {
-  await requireAuth();
+  await requireAdmin();
 
   try {
     const client = await clerkClient();
@@ -141,7 +136,7 @@ export async function updateUser(
 }
 
 export async function deleteUser(userId: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   try {
     const client = await clerkClient();
@@ -154,7 +149,7 @@ export async function deleteUser(userId: string): Promise<void> {
 }
 
 export async function lockUser(userId: string): Promise<SimpleUser> {
-  await requireAuth();
+  await requireAdmin();
 
   try {
     const client = await clerkClient();
@@ -168,7 +163,7 @@ export async function lockUser(userId: string): Promise<SimpleUser> {
 }
 
 export async function unlockUser(userId: string): Promise<SimpleUser> {
-  await requireAuth();
+  await requireAdmin();
 
   try {
     const client = await clerkClient();
@@ -185,7 +180,7 @@ export async function resetUserPassword(
   userId: string,
   newPassword: string
 ): Promise<SimpleUser> {
-  await requireAuth();
+  await requireAdmin();
 
   try {
     const client = await clerkClient();

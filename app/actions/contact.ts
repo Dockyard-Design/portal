@@ -1,11 +1,14 @@
 "use server";
 
 import { supabaseAdmin } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 import { revalidatePath } from "next/cache";
 
 import { ContactSubmission, ContactSummary, ContactStatus } from "@/types/contact";
 
 export async function getContactSummary(): Promise<ContactSummary> {
+  await requireAdmin();
+
   const statuses: (keyof ContactSummary)[] = ["new", "read", "replied", "closed"];
   const summary: ContactSummary = { new: 0, read: 0, replied: 0, closed: 0 };
 
@@ -24,6 +27,8 @@ export async function getContactSummary(): Promise<ContactSummary> {
 }
 
 export async function getContactSubmissions(filters: { archived?: boolean } = {}) {
+  await requireAdmin();
+
   const { data, error } = await supabaseAdmin
     .from("contact_submissions")
     .select("*")
@@ -39,6 +44,8 @@ export async function getContactSubmissions(filters: { archived?: boolean } = {}
 }
 
 export async function updateSubmissionStatus(id: string, status: ContactStatus) {
+  await requireAdmin();
+
   const { error } = await supabaseAdmin
     .from("contact_submissions")
     .update({ status })
@@ -54,6 +61,8 @@ export async function updateSubmissionStatus(id: string, status: ContactStatus) 
 }
 
 export async function toggleArchiveSubmission(id: string, archived: boolean) {
+  await requireAdmin();
+
   const { error } = await supabaseAdmin
     .from("contact_submissions")
     .update({ archived })
@@ -69,6 +78,8 @@ export async function toggleArchiveSubmission(id: string, archived: boolean) {
 }
 
 export async function deleteSubmission(id: string) {
+  await requireAdmin();
+
   const { error } = await supabaseAdmin
     .from("contact_submissions")
     .delete()

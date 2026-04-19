@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 
 export interface AgencyMetrics {
   quotes: {
@@ -36,6 +37,8 @@ export interface AgencyMetrics {
 }
 
 export async function getAgencyMetrics(): Promise<AgencyMetrics> {
+  await requireAdmin();
+
   // Get all quotes
   const { data: quotes, error: quotesError } = await supabase
     .from("quotes")

@@ -1,8 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 import type {
   Expense,
   ExpenseCategory,
@@ -25,14 +25,10 @@ function sanitizeError(error: { code?: string; message: string }): string {
   return error.message || "Something went wrong. Please try again.";
 }
 
-async function requireAuth(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
-
 // Expense Categories
 export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("expense_categories")
     .select("*")
@@ -44,6 +40,8 @@ export async function getExpenseCategories(): Promise<ExpenseCategory[]> {
 }
 
 export async function getAllExpenseCategories(): Promise<ExpenseCategory[]> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("expense_categories")
     .select("*")
@@ -55,6 +53,8 @@ export async function getAllExpenseCategories(): Promise<ExpenseCategory[]> {
 }
 
 export async function getExpenseCategory(id: string): Promise<ExpenseCategory | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("expense_categories")
     .select("*")
@@ -68,7 +68,7 @@ export async function getExpenseCategory(id: string): Promise<ExpenseCategory | 
 export async function createExpenseCategory(
   input: CreateExpenseCategoryInput
 ): Promise<ExpenseCategory> {
-  await requireAuth();
+  await requireAdmin();
 
   const { data, error } = await supabase
     .from("expense_categories")
@@ -90,7 +90,7 @@ export async function updateExpenseCategory(
   id: string,
   input: UpdateExpenseCategoryInput
 ): Promise<ExpenseCategory> {
-  await requireAuth();
+  await requireAdmin();
 
   const updateData: Record<string, unknown> = {};
   if (input.name !== undefined) updateData.name = input.name;
@@ -118,6 +118,8 @@ export async function getExpenses(filters?: {
   endDate?: string;
   taxDeductible?: boolean;
 }): Promise<Expense[]> {
+  await requireAdmin();
+
   let query = supabase
     .from("expenses")
     .select("*, category:expense_categories(*)")
@@ -143,6 +145,8 @@ export async function getExpenses(filters?: {
 }
 
 export async function getExpense(id: string): Promise<Expense | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("expenses")
     .select("*, category:expense_categories(*)")
@@ -156,7 +160,7 @@ export async function getExpense(id: string): Promise<Expense | null> {
 export async function createExpense(
   input: CreateExpenseInput
 ): Promise<Expense> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   const { data, error } = await supabase
     .from("expenses")
@@ -186,7 +190,7 @@ export async function updateExpense(
   id: string,
   input: UpdateExpenseInput
 ): Promise<Expense> {
-  await requireAuth();
+  await requireAdmin();
 
   const updateData: Record<string, unknown> = {};
   if (input.title !== undefined) updateData.title = input.title;
@@ -214,7 +218,7 @@ export async function updateExpense(
 }
 
 export async function deleteExpense(id: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   const { error } = await supabase.from("expenses").delete().eq("id", id);
 

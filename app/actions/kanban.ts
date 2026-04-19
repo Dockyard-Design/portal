@@ -1,9 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 import type { 
   Customer, 
   KanbanBoard,
@@ -31,14 +31,10 @@ function sanitizeError(error: { code?: string; message: string }): string {
   return error.message || "Something went wrong. Please try again.";
 }
 
-async function requireAuth(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
-
 // Team Members (Clerk Users)
 export async function getTeamMembers(): Promise<ClerkUser[]> {
+  await requireAdmin();
+
   const clerk = await clerkClient();
   
   try {
@@ -61,6 +57,8 @@ export async function getTeamMembers(): Promise<ClerkUser[]> {
 
 // Customers
 export async function getCustomers(): Promise<Customer[]> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("customers")
     .select("*")
@@ -71,6 +69,8 @@ export async function getCustomers(): Promise<Customer[]> {
 }
 
 export async function getCustomer(id: string): Promise<Customer | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("customers")
     .select("*")
@@ -82,7 +82,7 @@ export async function getCustomer(id: string): Promise<Customer | null> {
 }
 
 export async function createCustomer(customer: CreateCustomerInput): Promise<Customer> {
-  await requireAuth();
+  await requireAdmin();
 
   const { data, error } = await supabase
     .from("customers")
@@ -97,7 +97,7 @@ export async function createCustomer(customer: CreateCustomerInput): Promise<Cus
 }
 
 export async function updateCustomer(id: string, updates: UpdateCustomerInput): Promise<Customer> {
-  await requireAuth();
+  await requireAdmin();
 
   const { data, error } = await supabase
     .from("customers")
@@ -113,7 +113,7 @@ export async function updateCustomer(id: string, updates: UpdateCustomerInput): 
 }
 
 export async function deleteCustomer(id: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   const { error } = await supabase
     .from("customers")
@@ -127,6 +127,8 @@ export async function deleteCustomer(id: string): Promise<void> {
 
 // Kanban Boards
 export async function getBoards(customerId: string): Promise<KanbanBoard[]> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("kanban_boards")
     .select("*")
@@ -138,6 +140,8 @@ export async function getBoards(customerId: string): Promise<KanbanBoard[]> {
 }
 
 export async function getBoard(id: string): Promise<KanbanBoard | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("kanban_boards")
     .select("*")
@@ -149,6 +153,8 @@ export async function getBoard(id: string): Promise<KanbanBoard | null> {
 }
 
 export async function getBoardWithCustomer(id: string): Promise<{ board: KanbanBoard; customer: Customer } | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("kanban_boards")
     .select(`*, customers(*)`)
@@ -165,7 +171,7 @@ export async function getBoardWithCustomer(id: string): Promise<{ board: KanbanB
 }
 
 export async function createBoard(board: CreateBoardInput): Promise<KanbanBoard> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   // If this is the first board for this customer, make it default
   const { data: existingBoards } = await supabase
@@ -200,7 +206,7 @@ export async function createBoard(board: CreateBoardInput): Promise<KanbanBoard>
 }
 
 export async function updateBoard(id: string, updates: UpdateBoardInput): Promise<KanbanBoard> {
-  await requireAuth();
+  await requireAdmin();
 
   const { data: board } = await supabase
     .from("kanban_boards")
@@ -229,7 +235,7 @@ export async function updateBoard(id: string, updates: UpdateBoardInput): Promis
 }
 
 export async function deleteBoard(id: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   const { error } = await supabase
     .from("kanban_boards")
@@ -242,6 +248,8 @@ export async function deleteBoard(id: string): Promise<void> {
 
 // Tasks
 export async function getTasks(boardId: string): Promise<Task[]> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("kanban_tasks")
     .select("*")
@@ -253,6 +261,8 @@ export async function getTasks(boardId: string): Promise<Task[]> {
 }
 
 export async function getAllTasks(): Promise<Task[]> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("kanban_tasks")
     .select("*")
@@ -263,6 +273,8 @@ export async function getAllTasks(): Promise<Task[]> {
 }
 
 export async function getTask(id: string): Promise<Task | null> {
+  await requireAdmin();
+
   const { data, error } = await supabase
     .from("kanban_tasks")
     .select("*")
@@ -274,7 +286,7 @@ export async function getTask(id: string): Promise<Task | null> {
 }
 
 export async function createTask(task: CreateTaskInput): Promise<Task> {
-  const userId = await requireAuth();
+  const userId = await requireAdmin();
 
   // Get max position for the status column
   const { data: existingTasks } = await supabase
@@ -305,7 +317,7 @@ export async function createTask(task: CreateTaskInput): Promise<Task> {
 }
 
 export async function updateTask(id: string, updates: UpdateTaskInput): Promise<Task> {
-  await requireAuth();
+  await requireAdmin();
 
   const { data, error } = await supabase
     .from("kanban_tasks")
@@ -320,7 +332,7 @@ export async function updateTask(id: string, updates: UpdateTaskInput): Promise<
 }
 
 export async function deleteTask(id: string): Promise<void> {
-  await requireAuth();
+  await requireAdmin();
 
   const { error } = await supabase
     .from("kanban_tasks")
@@ -332,7 +344,7 @@ export async function deleteTask(id: string): Promise<void> {
 }
 
 export async function moveTask(id: string, newStatus: TaskStatus, newPosition: number): Promise<Task> {
-  await requireAuth();
+  await requireAdmin();
 
   const { data, error } = await supabase
     .from("kanban_tasks")
@@ -362,6 +374,8 @@ export async function getTasksByStatus(boardId: string): Promise<TasksByStatus> 
 
 // Legacy: Get tasks grouped by status for a customer (uses default board)
 export async function getTasksByStatusForCustomer(customerId: string): Promise<{ board: KanbanBoard | null; tasks: TasksByStatus }> {
+  await requireAdmin();
+
   // Get the default board for this customer, or the first board
   const { data: boards } = await supabase
     .from("kanban_boards")

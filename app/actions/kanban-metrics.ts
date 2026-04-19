@@ -1,6 +1,7 @@
 "use server";
 
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
+import { requireAdmin } from "@/lib/authz";
 
 export interface KanbanMetrics {
   totalCustomers: number;
@@ -15,6 +16,8 @@ export interface KanbanMetrics {
 }
 
 export async function getKanbanMetrics(): Promise<KanbanMetrics> {
+  await requireAdmin();
+
   // Get customers count
   const { data: customers, error: customersError } = await supabase
     .from("customers")

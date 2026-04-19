@@ -1,8 +1,8 @@
 /**
- * CI check: Ensure SUPABASE_SERVICE_ROLE_KEY is never exposed to the browser.
+ * CI check: Ensure privileged Supabase keys are never exposed to the browser.
  *
  * Next.js exposes any env var prefixed with NEXT_PUBLIC_ to the client bundle.
- * The service role key bypasses all RLS policies and must remain server-only.
+ * Supabase secret/service-role keys bypass all RLS policies and must remain server-only.
  *
  * Run: npx tsx scripts/check-env.ts
  * (Also called by `pnpm check`)
@@ -23,19 +23,32 @@ function checkEnvSafety() {
     }
   }
 
-  // Explicitly check that the service role key is NOT prefixed with NEXT_PUBLIC_
+  // Explicitly check that privileged keys are NOT prefixed with NEXT_PUBLIC_
+  const secretKey = process.env.SUPABASE_SECRET_KEY;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const leakedSecretKey = process.env.NEXT_PUBLIC_SUPABASE_SECRET_KEY;
   const leakedKey = process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY;
+  if (leakedSecretKey) {
+    errors.push(
+      "SECURITY: NEXT_PUBLIC_SUPABASE_SECRET_KEY is set — Supabase secret keys must never be client-accessible"
+    );
+  }
   if (leakedKey) {
     errors.push(
       "SECURITY: NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY is set — service role keys must never be client-accessible"
     );
   }
 
-  // Warn if the service role key is empty in production-like contexts
-  if (!serviceRoleKey && process.env.NODE_ENV === "production") {
+  // Fail if the actual privileged key used by the app is empty in production-like contexts
+  if (!secretKey && process.env.NODE_ENV === "production") {
     errors.push(
-      "CONFIG: SUPABASE_SERVICE_ROLE_KEY is not set — API key auth will fall back to anon client (no RLS bypass)"
+      "CONFIG: SUPABASE_SECRET_KEY is not set — server-side Supabase admin operations cannot run"
+    );
+  }
+
+  if (serviceRoleKey && !secretKey && process.env.NODE_ENV === "production") {
+    errors.push(
+      "CONFIG: SUPABASE_SERVICE_ROLE_KEY is set but SUPABASE_SECRET_KEY is missing — this app reads SUPABASE_SECRET_KEY"
     );
   }
 
@@ -48,7 +61,7 @@ function checkEnvSafety() {
     process.exit(1);
   }
 
-  console.log("✅ Environment safety check passed — service role key is not client-accessible");
+  console.log("✅ Environment safety check passed — privileged Supabase keys are not client-accessible");
 }
 
 checkEnvSafety();

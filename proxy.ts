@@ -15,8 +15,9 @@ const isPublicRoute = (request: NextRequest) => {
   return false;
 };
 
-const isApiRoute = (request: NextRequest) => {
-  return request.nextUrl.pathname.startsWith("/api/");
+const isPublicApiRoute = (request: NextRequest) => {
+  const { pathname } = request.nextUrl;
+  return pathname === "/api/contact" || pathname === "/api/posts" || pathname.startsWith("/api/posts/");
 };
 
 const isSignUpRoute = (request: NextRequest) => {
@@ -29,8 +30,8 @@ export default clerkMiddleware(async (auth, request) => {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  // API routes use their own key-based auth — skip Clerk entirely
-  if (isApiRoute(request)) {
+  // Public API-key endpoints handle their own auth. Other API routes stay behind Clerk.
+  if (isPublicApiRoute(request)) {
     return NextResponse.next();
   }
 
