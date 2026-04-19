@@ -98,3 +98,13 @@
 ## 15. Git Commit
 
 - [x] Commit all changes with a detailed message.
+
+## 16. Regression Fixes
+
+- [x] Restore always-visible Kanban and All Customers sidebar links.
+- [x] Remove duplicate Messaging Centre link from customer-specific sidebar section.
+- [x] Show Customer Details only when a customer is selected.
+- [x] Replace bugged sidebar customer select so selected customers display by name, not ID.
+- [x] Refresh customer list/sidebar after creating a customer.
+- [x] Allow editing user role and assigned company.
+- [x] Fix duplicate sidebar keys for customer board links.

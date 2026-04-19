@@ -141,17 +141,43 @@ export async function updateUser(
     firstName?: string;
     lastName?: string;
     primaryEmailAddressID?: string;
+    role?: UserRole;
+    customerId?: string | null;
   }
 ): Promise<SimpleUser> {
   await requireAdmin();
 
   try {
     const client = await clerkClient();
-    const user = await client.users.updateUser(userId, {
+    const updateParams: {
+      firstName?: string;
+      lastName?: string;
+      primaryEmailAddressID?: string;
+      publicMetadata?: CustomerUserMetadata;
+      privateMetadata?: CustomerUserMetadata;
+    } = {
       firstName: params.firstName,
       lastName: params.lastName,
       primaryEmailAddressID: params.primaryEmailAddressID,
-    });
+    };
+
+    if (params.role) {
+      if (params.role === "customer" && !params.customerId) {
+        throw new Error("Customer users must be assigned to a company.");
+      }
+
+      const metadata: CustomerUserMetadata = {
+        role: params.role,
+        roles: [params.role],
+        admin: params.role === "admin",
+        customerId: params.role === "customer" ? params.customerId ?? undefined : undefined,
+      };
+
+      updateParams.publicMetadata = metadata;
+      updateParams.privateMetadata = metadata;
+    }
+
+    const user = await client.users.updateUser(userId, updateParams);
 
     revalidatePath("/dashboard/users");
     return serializeUser(user);

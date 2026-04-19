@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Image from "next/image";
 import {
   LayoutDashboard,
@@ -18,6 +18,7 @@ import {
   Trash2,
   AlertTriangle,
   X,
+  Check,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -57,13 +58,20 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -146,32 +154,36 @@ function getCustomerNavGroup(
   selectedCustomerId: string | null,
   boards: KanbanBoard[],
 ): MenuGroup {
-  const items: SubMenuItem[] = selectedCustomerId
-    ? [
-        ...[...boards].sort((a, b) => a.name.localeCompare(b.name)).map((board) => ({
+  const items: SubMenuItem[] = [
+    {
+      title: "Kanban Board",
+      href: "/dashboard/kanban",
+      icon: KanbanSquare,
+    },
+    {
+      title: "All Customers",
+      href: "/dashboard/customers",
+      icon: Building,
+    },
+  ];
+
+  if (selectedCustomerId) {
+    items.push(
+      ...[...boards]
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((board) => ({
           title: board.name,
           href: "/dashboard/kanban",
           icon: KanbanSquare,
           boardId: board.id,
         })),
-        {
-          title: "Messages",
-          href: "/dashboard/messages",
-          icon: MessageSquare,
-        },
-        {
-          title: "Customer Details",
-          href: `/dashboard/customers/${selectedCustomerId}`,
-          icon: Building,
-        },
-      ]
-    : [
-        {
-          title: "Select a customer",
-          href: "/dashboard/customers",
-          icon: Building,
-        },
-      ];
+      {
+        title: "Customer Details",
+        href: `/dashboard/customers/${selectedCustomerId}`,
+        icon: Building,
+      },
+    );
+  }
 
   return {
     title: "Customers",
@@ -196,6 +208,8 @@ export default function AppSidebar() {
   const [wipePassword, setWipePassword] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
+  const [boardsCustomerId, setBoardsCustomerId] = useState<string | null>(null);
+  const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
 
   // Check if user can wipe database - computed directly from user data
   const canWipe =
@@ -226,7 +240,7 @@ export default function AppSidebar() {
     });
   }, [pathname, setGroupOpen, selectedCustomerId, boards]);
 
-  useEffect(() => {
+  const loadCustomers = useCallback(() => {
     let cancelled = false;
     getCustomers()
       .then((data) => {
@@ -241,6 +255,17 @@ export default function AppSidebar() {
     };
   }, []);
 
+  useEffect(() => loadCustomers(), [loadCustomers]);
+
+  useEffect(() => {
+    const handleCustomersChanged = () => {
+      loadCustomers();
+    };
+
+    window.addEventListener("customers:changed", handleCustomersChanged);
+    return () => window.removeEventListener("customers:changed", handleCustomersChanged);
+  }, [loadCustomers]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -254,6 +279,7 @@ export default function AppSidebar() {
       .then((data) => {
         if (cancelled) return;
         setBoards([...data].sort((a, b) => a.name.localeCompare(b.name)));
+        setBoardsCustomerId(selectedCustomerId);
         if (data.length > 0 && !data.some((board) => board.id === selectedBoardId)) {
           setSelectedBoard(data.find((board) => board.is_default)?.id ?? data[0].id);
         }
@@ -268,7 +294,13 @@ export default function AppSidebar() {
   }, [selectedCustomerId, selectedBoardId, setSelectedBoard]);
 
   const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
-  const navGroups = [getCustomerNavGroup(selectedCustomerId, boards), ...NAV_GROUPS];
+  const navGroups = [
+    getCustomerNavGroup(
+      selectedCustomerId,
+      selectedCustomerId === boardsCustomerId ? boards : [],
+    ),
+    ...NAV_GROUPS,
+  ];
 
   return (
     <Sidebar className="border-r-border/40">
@@ -284,21 +316,66 @@ export default function AppSidebar() {
         </div>
         <div className="mt-5 space-y-2">
           <div className="flex items-center gap-2">
-            <Select
-              value={selectedCustomer && selectedCustomerId ? selectedCustomerId : ""}
-              onValueChange={(value) => setSelectedCustomer(value || null)}
-            >
-              <SelectTrigger className="h-9 bg-background text-sm">
-                <SelectValue placeholder="Select customer" />
-              </SelectTrigger>
-              <SelectContent>
-                {customers.map((customer) => (
-                  <SelectItem key={customer.id} value={customer.id}>
-                    {customer.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
+              <PopoverTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-9 min-w-0 flex-1 justify-start overflow-hidden bg-background px-3 text-left text-sm font-medium"
+                  >
+                    <Building className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate">
+                      {selectedCustomer?.name ?? "All customers"}
+                    </span>
+                  </Button>
+                }
+              />
+              <PopoverContent align="start" className="w-72 p-1">
+                <Command>
+                  <CommandInput placeholder="Search customers..." />
+                  <CommandList>
+                    <CommandEmpty>No customers found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="all-customers"
+                        onSelect={() => {
+                          clearSelection();
+                          setCustomerPickerOpen(false);
+                        }}
+                      >
+                        <Building className="size-4 text-muted-foreground" />
+                        <span>All customers</span>
+                        {!selectedCustomerId && <Check className="ml-auto size-4" />}
+                      </CommandItem>
+                      {customers.map((customer) => (
+                        <CommandItem
+                          key={customer.id}
+                          value={`${customer.name} ${customer.company ?? ""} ${customer.email ?? ""}`}
+                          onSelect={() => {
+                            setSelectedCustomer(customer.id);
+                            setCustomerPickerOpen(false);
+                          }}
+                        >
+                          <Building className="size-4 text-muted-foreground" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-medium">{customer.name}</p>
+                            {(customer.company || customer.email) && (
+                              <p className="truncate text-xs text-muted-foreground">
+                                {customer.company || customer.email}
+                              </p>
+                            )}
+                          </div>
+                          {selectedCustomerId === customer.id && (
+                            <Check className="ml-auto size-4" />
+                          )}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
             {selectedCustomerId && (
               <button
                 type="button"
@@ -385,7 +462,7 @@ export default function AppSidebar() {
                       {group.items.map((item) => {
                         const isItemActive = pathname === item.href;
                         return (
-                          <SidebarMenuSubItem key={item.href}>
+                          <SidebarMenuSubItem key={`${item.href}:${item.boardId ?? item.title}`}>
                             <SidebarMenuSubButton
                               isActive={isItemActive}
                               className={cn(

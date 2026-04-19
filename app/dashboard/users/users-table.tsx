@@ -314,6 +314,7 @@ export function UsersTable({ users, customers }: { users: SimpleUser[]; customer
       {editUser && (
         <EditUserDialog 
           user={editUser} 
+          customers={customers}
           open={!!editUser} 
           onOpenChange={(open) => !open && setEditUser(null)} 
         />

@@ -124,7 +124,11 @@ export default function CustomersPage() {
 
       setCustomerForm({ name: "", email: "", company: "", notes: "" });
       setIsCustomerDialogOpen(false);
-      router.push(`/dashboard/customers/${customer.id}`);
+      setSelectedCustomer(customer.id);
+      window.dispatchEvent(new CustomEvent("customers:changed"));
+      await loadData();
+      router.refresh();
+      toast.success(`${customer.name} created`);
     } catch {
       toast.error("Failed to create customer");
     } finally {

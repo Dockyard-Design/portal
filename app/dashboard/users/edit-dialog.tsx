@@ -13,19 +13,31 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "sonner";
 import { updateUser } from "@/app/actions/users";
 import type { SimpleUser } from "@/app/actions/users";
+import type { UserRole } from "@/types/auth";
+import type { Customer } from "@/types/kanban";
 
 interface EditUserDialogProps {
   user: SimpleUser;
+  customers: Customer[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps) {
+export function EditUserDialog({ user, customers, open, onOpenChange }: EditUserDialogProps) {
   const [firstName, setFirstName] = useState(user.firstName || "");
   const [lastName, setLastName] = useState(user.lastName || "");
+  const [role, setRole] = useState<UserRole>(user.role);
+  const [customerId, setCustomerId] = useState(user.customerId || "");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
@@ -33,16 +45,24 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
   useEffect(() => {
     setFirstName(user.firstName || "");
     setLastName(user.lastName || "");
+    setRole(user.role);
+    setCustomerId(user.customerId || "");
   }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (role === "customer" && !customerId) {
+      toast.error("Select a company for customer users");
+      return;
+    }
 
     setIsLoading(true);
     try {
       await updateUser(user.id, {
         firstName: firstName || undefined,
         lastName: lastName || undefined,
+        role,
+        customerId: role === "customer" ? customerId : null,
       });
       toast.success("User updated successfully");
       onOpenChange(false);
@@ -99,12 +119,41 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                 />
               </div>
             </div>
+            <div className="grid gap-2">
+              <Label htmlFor="editRole">Role</Label>
+              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+                <SelectTrigger id="editRole">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="customer">Customer</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {role === "customer" && (
+              <div className="grid gap-2">
+                <Label htmlFor="editCustomer">Company</Label>
+                <Select value={customerId} onValueChange={(value) => setCustomerId(value ?? "")}>
+                  <SelectTrigger id="editCustomer">
+                    <SelectValue placeholder="Select company" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {customers.map((customer) => (
+                      <SelectItem key={customer.id} value={customer.id}>
+                        {customer.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isLoading}>
+            <Button type="submit" disabled={isLoading || (role === "customer" && !customerId)}>
               {isLoading ? "Saving..." : "Save Changes"}
             </Button>
           </DialogFooter>
