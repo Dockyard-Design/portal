@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -32,34 +33,74 @@ import {
   Receipt,
   LayoutGrid,
   PoundSterling,
-  CheckCircle,
   Clock,
   MoreVertical,
   Plus,
   Trash2,
   Eye,
   Download,
-  Send,
-  FileSpreadsheet,
 } from "lucide-react";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import { QuoteModal } from "../../components/quote-modal";
+import { InvoiceModal } from "../../components/invoice-modal";
 import type { Customer } from "@/types/kanban";
 import type { Quote, Invoice, CustomerStats } from "@/types/agency";
 
-interface CustomerDetailProps {
-  customer: Customer;
-  quotes: Quote[];
-  invoices: Invoice[];
-  stats: CustomerStats;
-}
-
-export default function CustomerDetailPage({ 
-  customer, 
-  quotes, 
-  invoices, 
-  stats 
-}: CustomerDetailProps) {
+export default function CustomerDetailPage() {
+  const params = useParams();
+  const customerId = params.id as string;
+  
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [quotes, setQuotes] = useState<Quote[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([]);
+  const [stats, setStats] = useState<CustomerStats | null>(null);
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("overview");
+  
+  // Modal states
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [quoteModalMode, setQuoteModalMode] = useState<"create" | "edit" | "view">("create");
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceModalMode, setInvoiceModalMode] = useState<"create" | "edit" | "view">("create");
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+
+  useEffect(() => { loadData(); }, [customerId]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const { getCustomer, getCustomers } = await import("@/app/actions/kanban");
+      const { getQuotes, getInvoices, getCustomerStats } = await import("@/app/actions/agency");
+      
+      const [customerData, customersData, quotesData, invoicesData, statsData] = await Promise.all([
+        getCustomer(customerId),
+        getCustomers(),
+        getQuotes(customerId),
+        getInvoices(customerId),
+        getCustomerStats(customerId),
+      ]);
+      
+      if (!customerData) {
+        notFound();
+        return;
+      }
+      
+      setCustomer(customerData);
+      setAllCustomers(customersData);
+      setQuotes(quotesData);
+      setInvoices(invoicesData);
+      setStats(statsData);
+    } catch (error) {
+      console.error("Error loading customer data:", error);
+      toast.error("Failed to load customer data");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const getQuoteStatusColor = (status: string) => {
     switch (status) {
@@ -82,14 +123,89 @@ export default function CustomerDetailPage({
     }
   };
 
-  if (!customer) {
-    notFound();
+  const handleDeleteQuote = async (quoteId: string) => {
+    if (!confirm("Are you sure you want to delete this quote?")) return;
+    try {
+      const { deleteQuote } = await import("@/app/actions/agency");
+      await deleteQuote(quoteId);
+      toast.success("Quote deleted");
+      loadData();
+    } catch (error) {
+      toast.error("Failed to delete quote");
+    }
+  };
+
+  const handleDeleteInvoice = async (invoiceId: string) => {
+    if (!confirm("Are you sure you want to delete this invoice?")) return;
+    try {
+      const { deleteInvoice } = await import("@/app/actions/agency");
+      await deleteInvoice(invoiceId);
+      toast.success("Invoice deleted");
+      loadData();
+    } catch (error) {
+      toast.error("Failed to delete invoice");
+    }
+  };
+
+  const generatePDF = async (type: "quote" | "invoice", id: string) => {
+    window.open(`/api/pdf/${type}/${id}`, "_blank");
+  };
+
+  // Modal handlers
+  const openCreateQuote = () => {
+    setSelectedQuote(null);
+    setQuoteModalMode("create");
+    setQuoteModalOpen(true);
+  };
+
+  const openViewQuote = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setQuoteModalMode("view");
+    setQuoteModalOpen(true);
+  };
+
+  const openEditQuote = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setQuoteModalMode("edit");
+    setQuoteModalOpen(true);
+  };
+
+  const openCreateInvoice = () => {
+    setSelectedInvoice(null);
+    setInvoiceModalMode("create");
+    setInvoiceModalOpen(true);
+  };
+
+  const openViewInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setInvoiceModalMode("view");
+    setInvoiceModalOpen(true);
+  };
+
+  const openEditInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setInvoiceModalMode("edit");
+    setInvoiceModalOpen(true);
+  };
+
+  if (loading) {
+    return (
+      <div className="w-full min-h-screen p-6 space-y-6">
+        <div className="h-8 bg-muted animate-pulse rounded w-1/3" />
+        <div className="h-32 bg-muted animate-pulse rounded" />
+        <div className="h-64 bg-muted animate-pulse rounded" />
+      </div>
+    );
+  }
+
+  if (!customer || !stats) {
+    return notFound();
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="w-full min-h-screen p-6 space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <Button variant="outline" size="icon" asChild>
             <Link href="/dashboard/customers">
@@ -97,9 +213,9 @@ export default function CustomerDetailPage({
             </Link>
           </Button>
           <div>
-            <h1 className="text-2xl font-semibold">{customer.name}</h1>
+            <h1 className="text-3xl font-semibold">{customer.name}</h1>
             {customer.company && (
-              <p className="text-sm text-muted-foreground">{customer.company}</p>
+              <p className="text-muted-foreground">{customer.company}</p>
             )}
           </div>
         </div>
@@ -107,13 +223,13 @@ export default function CustomerDetailPage({
         <div className="flex gap-2">
           <Button variant="outline" asChild>
             <Link href="/dashboard/kanban">
-              <LayoutGrid className="size-4 mr-1" />
+              <LayoutGrid className="size-4 mr-2" />
               Kanban
             </Link>
           </Button>
-          <Button asChild>
+          <Button variant="outline" asChild>
             <Link href={`/dashboard/customers/${customer.id}/edit`}>
-              <Edit className="size-4 mr-1" />
+              <Edit className="size-4 mr-2" />
               Edit Customer
             </Link>
           </Button>
@@ -167,10 +283,19 @@ export default function CustomerDetailPage({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 lg:w-auto">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="quotes">Quotes ({quotes.length})</TabsTrigger>
-          <TabsTrigger value="invoices">Invoices ({invoices.length})</TabsTrigger>
+        <TabsList variant="line" className="w-full justify-start h-auto p-0 bg-transparent border-b border-border/50 rounded-none">
+          <TabsTrigger value="overview" className="gap-2 rounded-none border-b-2 border-transparent data-[active]:border-primary data-[active]:bg-transparent data-[active]:shadow-none px-4 py-3">
+            <Building className="size-4" />
+            Overview
+          </TabsTrigger>
+          <TabsTrigger value="quotes" className="gap-2 rounded-none border-b-2 border-transparent data-[active]:border-primary data-[active]:bg-transparent data-[active]:shadow-none px-4 py-3">
+            <Receipt className="size-4" />
+            Quotes ({quotes.length})
+          </TabsTrigger>
+          <TabsTrigger value="invoices" className="gap-2 rounded-none border-b-2 border-transparent data-[active]:border-primary data-[active]:bg-transparent data-[active]:shadow-none px-4 py-3">
+            <FileText className="size-4" />
+            Invoices ({invoices.length})
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4 mt-6">
@@ -233,7 +358,7 @@ export default function CustomerDetailPage({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Quotes</CardTitle>
-              <Button><Plus className="size-4 mr-1" />Create Quote</Button>
+              <Button onClick={openCreateQuote}><Plus className="size-4 mr-1" />Create Quote</Button>
             </CardHeader>
             <CardContent>
               {quotes.length === 0 ? (
@@ -242,37 +367,38 @@ export default function CustomerDetailPage({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Quote</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead className="w-[35%]">Quote</TableHead>
+                      <TableHead className="w-[15%]">Status</TableHead>
+                      <TableHead className="w-[15%]">Date</TableHead>
+                      <TableHead className="w-[15%] text-right">Amount</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {quotes.map((quote) => (
                       <TableRow key={quote.id}>
                         <TableCell>
-                          <p className="font-medium">{quote.title}</p>
+                          <button onClick={() => openViewQuote(quote)} className="text-left w-full">
+                            <p className="font-medium hover:text-primary transition-colors">{quote.title}</p>
+                          </button>
                         </TableCell>
                         <TableCell>
                           <Badge className={getQuoteStatusColor(quote.status)}>{quote.status}</Badge>
                         </TableCell>
                         <TableCell>{format(new Date(quote.created_at), "MMM d, yyyy")}</TableCell>
                         <TableCell className="text-right font-semibold">£{quote.total.toLocaleString()}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="size-4" />
-                              </Button>
+                            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
+                              <MoreVertical className="size-4" />
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem><Eye className="size-4 mr-2" />View Details</DropdownMenuItem>
-                              <DropdownMenuItem><Edit className="size-4 mr-2" />Edit</DropdownMenuItem>
-                              <DropdownMenuItem><Download className="size-4 mr-2" />Download PDF</DropdownMenuItem>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => openViewQuote(quote)}><Eye className="size-4 mr-2" />View Details</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditQuote(quote)}><Edit className="size-4 mr-2" />Edit</DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive"><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => generatePDF("quote", quote.id)}><Download className="size-4 mr-2" />Download PDF</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteQuote(quote.id)}><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -289,7 +415,7 @@ export default function CustomerDetailPage({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Invoices</CardTitle>
-              <Button><Plus className="size-4 mr-1" />Create Invoice</Button>
+              <Button onClick={openCreateInvoice}><Plus className="size-4 mr-1" />Create Invoice</Button>
             </CardHeader>
             <CardContent>
               {invoices.length === 0 ? (
@@ -298,42 +424,39 @@ export default function CustomerDetailPage({
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Invoice #</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Due Date</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead></TableHead>
+                      <TableHead className="w-[35%]">Invoice #</TableHead>
+                      <TableHead className="w-[15%]">Status</TableHead>
+                      <TableHead className="w-[15%]">Due Date</TableHead>
+                      <TableHead className="w-[15%] text-right">Amount</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {invoices.map((invoice) => (
                       <TableRow key={invoice.id}>
                         <TableCell>
-                          <div>
-                            <p className="font-medium">{invoice.invoice_number}</p>
+                          <button onClick={() => openViewInvoice(invoice)} className="text-left w-full">
+                            <p className="font-medium hover:text-primary transition-colors">{invoice.invoice_number}</p>
                             <p className="text-sm text-muted-foreground">{invoice.title}</p>
-                          </div>
+                          </button>
                         </TableCell>
                         <TableCell>
                           <Badge className={getInvoiceStatusColor(invoice.status)}>{invoice.status}</Badge>
                         </TableCell>
-                        <TableCell>
-                          {invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "-"}
-                        </TableCell>
+                        <TableCell>{invoice.due_date ? format(new Date(invoice.due_date), "MMM d, yyyy") : "-"}</TableCell>
                         <TableCell className="text-right font-semibold">£{invoice.total.toLocaleString()}</TableCell>
-                        <TableCell>
+                        <TableCell className="text-right">
                           <DropdownMenu>
-                            <DropdownMenuTrigger>
-                              <Button variant="ghost" size="icon" className="h-8 w-8">
-                                <MoreVertical className="size-4" />
-                              </Button>
+                            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
+                              <MoreVertical className="size-4" />
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem><Eye className="size-4 mr-2" />View Details</DropdownMenuItem>
-                              <DropdownMenuItem><Edit className="size-4 mr-2" />Edit</DropdownMenuItem>
-                              <DropdownMenuItem><Download className="size-4 mr-2" />Download PDF</DropdownMenuItem>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => openViewInvoice(invoice)}><Eye className="size-4 mr-2" />View Details</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openEditInvoice(invoice)}><Edit className="size-4 mr-2" />Edit</DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive"><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => generatePDF("invoice", invoice.id)}><Download className="size-4 mr-2" />Download PDF</DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteInvoice(invoice.id)}><Trash2 className="size-4 mr-2" />Delete</DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -346,6 +469,29 @@ export default function CustomerDetailPage({
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* Quote Modal */}
+      <QuoteModal
+        quote={selectedQuote}
+        customers={allCustomers}
+        preselectedCustomerId={customerId}
+        mode={quoteModalMode}
+        open={quoteModalOpen}
+        onOpenChange={setQuoteModalOpen}
+        onSuccess={loadData}
+      />
+
+      {/* Invoice Modal */}
+      <InvoiceModal
+        invoice={selectedInvoice}
+        customers={allCustomers}
+        quotes={quotes}
+        preselectedCustomerId={customerId}
+        mode={invoiceModalMode}
+        open={invoiceModalOpen}
+        onOpenChange={setInvoiceModalOpen}
+        onSuccess={loadData}
+      />
     </div>
   );
 }

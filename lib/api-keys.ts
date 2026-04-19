@@ -4,29 +4,27 @@ import crypto from "crypto";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const publishableKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const secretKey = process.env.SUPABASE_SECRET_KEY;
 
 if (!supabaseUrl || !publishableKey) {
   throw new Error("Missing Supabase environment variables");
 }
 
-// Regular client — respects RLS, used for Clerk-authenticated reads
+if (!secretKey) {
+  throw new Error("Missing SUPABASE_SECRET_KEY environment variable");
+}
+
+// Regular client — respects RLS (for client-side/user-authenticated operations)
 export const supabase = createClient(supabaseUrl, publishableKey);
 
-// Admin client — bypasses RLS
-export const supabaseAdmin = serviceRoleKey
-  ? createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-      global: {
-        headers: {
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      },
-    })
-  : supabase;
+// Admin client — uses secret key to bypass RLS for server-side operations
+export const supabaseAdmin = createClient(supabaseUrl, secretKey!, {
+  auth: {
+    autoRefreshToken: false,
+    persistSession: false,
+    detectSessionInUrl: false,
+  },
+});
 
 export interface RecentRequest {
   id: string;

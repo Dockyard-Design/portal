@@ -69,8 +69,29 @@ export default async function DashboardPage() {
     })),
     getContactSubmissions({ archived: false }).catch(() => []),
     getAgencyMetrics().catch(() => ({
-      quotes: { total: 0, draft: 0, sent: 0, accepted: 0, rejected: 0, expired: 0, totalValue: 0, acceptedValue: 0 },
-      invoices: { total: 0, draft: 0, sent: 0, paid: 0, partial: 0, overdue: 0, cancelled: 0, totalValue: 0, paidValue: 0, outstandingValue: 0, overdueValue: 0 },
+      quotes: {
+        total: 0,
+        draft: 0,
+        sent: 0,
+        accepted: 0,
+        rejected: 0,
+        expired: 0,
+        totalValue: 0,
+        acceptedValue: 0,
+      },
+      invoices: {
+        total: 0,
+        draft: 0,
+        sent: 0,
+        paid: 0,
+        partial: 0,
+        overdue: 0,
+        cancelled: 0,
+        totalValue: 0,
+        paidValue: 0,
+        outstandingValue: 0,
+        overdueValue: 0,
+      },
       monthlyData: [],
     })),
     getExpenseMetrics().catch(() => ({
@@ -95,10 +116,6 @@ export default async function DashboardPage() {
       <AgencyMetrics metrics={agencyMetrics} />
 
       {/* Expense Metrics */}
-      <div className="flex items-center gap-2 pt-4">
-        <Receipt className="size-5 text-primary" />
-        <h2 className="text-lg font-semibold">Expense Tracker</h2>
-      </div>
       <ExpenseMetrics metrics={expenseMetrics} />
 
       {/* Kanban Metrics */}

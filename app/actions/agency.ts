@@ -395,3 +395,29 @@ export async function getCustomerStats(customerId: string): Promise<CustomerStat
     }, 0),
   };
 }
+
+// Delete Quote
+export async function deleteQuote(id: string): Promise<void> {
+  await requireAuth();
+
+  const { error } = await supabase
+    .from("quotes")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw new Error(sanitizeError(error));
+  revalidatePath("/dashboard/quotes");
+}
+
+// Delete Invoice
+export async function deleteInvoice(id: string): Promise<void> {
+  await requireAuth();
+
+  const { error } = await supabase
+    .from("invoices")
+    .delete()
+    .eq("id", id);
+
+  if (error) throw new Error(sanitizeError(error));
+  revalidatePath("/dashboard/invoices");
+}

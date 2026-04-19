@@ -52,6 +52,8 @@ export interface UpdateQuoteInput {
   notes?: string | null;
   terms?: string | null;
   status?: QuoteStatus;
+  sent_at?: string | null;
+  accepted_at?: string | null;
   items?: CreateQuoteItemInput[];
 }
 
@@ -125,6 +127,8 @@ export interface UpdateInvoiceInput {
   payment_instructions?: string | null;
   status?: InvoiceStatus;
   amount_paid?: number;
+  sent_at?: string | null;
+  paid_at?: string | null;
   items?: CreateInvoiceItemInput[];
 }
 
