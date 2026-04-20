@@ -16,20 +16,22 @@ Implement the following features:
 
 ---
 
-### 1. Updates
+### 1. List of bugs and updates.
 
-- Every quote created should create a thread and send a message to the company, if the quote is updated a message is sent, if the quote is accepted or rejected a message is sent, if the invoice linked to that quote is created a message is sent on that thread, if the invoice is paid a message is sent on that thread. Currently we only have emails being sent, but for now remove the emails being send on Quotes/Invoices, instead we will use the messsaging system we have got here.
-- For every message a customer receives they should receive an email from no-reply@dockyard.design.
-- If the customer sends us a message support@dockyard.design should receive a message.
-- Projects API: Remove the content field, as we have our 4 dedicated sections for content. Update the UI, for each section we should accept 4 pictures. ATM i only see 1 place for 1 picture.
-- Projects API: Create/Edit shouldn't have a modal anymore, the modals are too big, they need dedicated pages.
-- Create a reports page, reporting monthly and year expenses, and earnings, as detailed as you can.
-- Creating a quote should have its dedicated page and not a modal.
-- While creating or editing a task, the dropdown for assigning a user is too small.
-- Contact submissions, when clicking on a message it should mark it as read, but we also need to make sure the ui refreshes while keeping that message open.
-- Contact submissions the content is currently centered, it should be full width.
-- MEssaging centre threads and message bit have inner scrollbars, these need styling like we did for our dashboard kanban tasks.
-- Contact Submissions its the same will the syling the inner scrollbars
+- Need custom settings page, as using clerks stops me from updating "first_login" on database when the user actually changed their password for the first time.
+- All emails need custom templates.
+- Dockyard needs to receive emails when quotes/invoices get updated not just the customer.
+- Creating a quote sends an email when quote is only in draft mode and it shouldnt. We should send the quote manually.
+- Inside the messaging system we should have a button to View quotes/invoices
+- View quotes/invoices doesn't work as its not displaying the pdfs and the modal is scuffed.
+- Quotes page looks good, invoice page should look the same, scuffed at the moment.
+- Messaging Centre/Contact submission needs to mark stuff has read when we go into it, but without refreshing page.
+- Performance issue when marking multiple contact submission stuff as read or deleting.
+- Vercel blob has issues uploading images for projects.
+- I have no way to create categories for expenses.
+- Need to merge Reports and both metrics page.
+- I want to be able to download yearly report for expenses and earnings as pdf.
+- I want to be able to download monthly report for expenses and earnings as pdf.
 
 ### 2. Full check
 
@@ -49,14 +51,6 @@ Implement the following features:
   git add .
   git commit -m "<your detailed commit message describing all changes>"
   ```
-
-### 3. Create a release.md
-
-- Create a release.md document where you create a full review of this website. I want to know how far are we from being able to use this with real customers.
-- I want you to look into the features we have, the code, the security, the ui.
-- Anything you find wrong, once you finish writing the release.md you need to fix it.
-- Make sure everything is mobile ready as well.
-- If you change any code, at the end run the Full check #2.
 
 ---
 

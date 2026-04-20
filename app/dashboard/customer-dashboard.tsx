@@ -25,29 +25,37 @@ const EMPTY_TASKS_BY_STATUS: DashboardTasksByStatus = {
 const STATUSES: TaskStatus[] = ["backlog", "todo", "in_progress", "complete"];
 
 export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
-  const defaultBoardId = data.boards.find((board) => board.is_default)?.id ?? data.boards[0]?.id ?? "";
+  const defaultBoardId =
+    data.boards.find((board) => board.is_default)?.id ??
+    data.boards[0]?.id ??
+    "";
   const [selectedBoardId, setSelectedBoardId] = useState(defaultBoardId);
   const selectedBoard = useMemo(
-    () => data.boards.find((board) => board.id === selectedBoardId) ?? data.boards[0],
-    [data.boards, selectedBoardId]
+    () =>
+      data.boards.find((board) => board.id === selectedBoardId) ??
+      data.boards[0],
+    [data.boards, selectedBoardId],
   );
   const selectedTasksByStatus = useMemo<DashboardTasksByStatus>(() => {
     if (!selectedBoard) return EMPTY_TASKS_BY_STATUS;
 
-    return STATUSES.reduce((grouped, status) => {
-      grouped[status] = selectedBoard.tasks[status].map((task) => ({
-        ...task,
-        board_name: selectedBoard.name,
-        customer_id: "",
-        customer_name: data.customerCompany || data.customerName,
-        customer_company: data.customerCompany,
-      }));
-      return grouped;
-    }, { ...EMPTY_TASKS_BY_STATUS });
+    return STATUSES.reduce(
+      (grouped, status) => {
+        grouped[status] = selectedBoard.tasks[status].map((task) => ({
+          ...task,
+          board_name: selectedBoard.name,
+          customer_id: "",
+          customer_name: data.customerCompany || data.customerName,
+          customer_company: data.customerCompany,
+        }));
+        return grouped;
+      },
+      { ...EMPTY_TASKS_BY_STATUS },
+    );
   }, [data.customerCompany, data.customerName, selectedBoard]);
   const totalTasks = STATUSES.reduce(
     (total, status) => total + (selectedBoard?.tasks[status].length ?? 0),
-    0
+    0,
   );
   const money = new Intl.NumberFormat("en-GB", {
     style: "currency",
@@ -62,14 +70,19 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
             <LayoutGrid className="size-5 text-primary" />
           </div>
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight">{data.customerCompany || data.customerName}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {data.customerCompany || data.customerName}
+            </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {selectedBoard?.name ?? "Customer project board"}
             </p>
           </div>
         </div>
         {data.boards.length > 1 && (
-          <Select value={selectedBoard?.id ?? ""} onValueChange={(value) => setSelectedBoardId(value ?? "")}>
+          <Select
+            value={selectedBoard?.id ?? ""}
+            onValueChange={(value) => setSelectedBoardId(value ?? "")}
+          >
             <SelectTrigger className="w-full lg:w-80">
               <SelectValue placeholder="Select board">
                 {selectedBoard?.name ?? "Select board"}
@@ -78,7 +91,8 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
             <SelectContent>
               {data.boards.map((board) => (
                 <SelectItem key={board.id} value={board.id}>
-                  {board.name}{board.is_default ? " (default)" : ""}
+                  {board.name}
+                  {board.is_default ? " (default)" : ""}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -142,7 +156,9 @@ function SummaryCard({
   return (
     <Card className="border-border/40">
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
         <Icon className="size-4 text-muted-foreground" />
       </CardHeader>
       <CardContent>

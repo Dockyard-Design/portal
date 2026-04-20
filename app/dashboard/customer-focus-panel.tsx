@@ -19,7 +19,8 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
   const [tasks, setTasks] = useState<DashboardTask[]>([]);
 
   const customer = customers.find((item) => item.id === selectedCustomerId);
-  const customerDisplayName = customer?.company || customer?.name || customer?.email || "Customer";
+  const customerDisplayName =
+    customer?.company || customer?.name || customer?.email || "Customer";
   const customerCompany = customer?.company || null;
 
   useEffect(() => {
@@ -40,7 +41,7 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
         nextBoards.map(async (board) => ({
           board,
           tasks: await getTasksByStatus(board.id),
-        }))
+        })),
       );
       const nextTasks = taskGroups.flatMap(({ board, tasks: group }) =>
         [
@@ -54,7 +55,7 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
           customer_id: customerId,
           customer_name: customerDisplayName,
           customer_company: customerCompany,
-        }))
+        })),
       );
 
       if (!cancelled) {
@@ -84,7 +85,12 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
     const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
     return {
       urgent: tasks.filter((task) => task.priority === "urgent").length,
-      overdue: tasks.filter((task) => task.due_date && new Date(task.due_date) < now && task.status !== "complete").length,
+      overdue: tasks.filter(
+        (task) =>
+          task.due_date &&
+          new Date(task.due_date) < now &&
+          task.status !== "complete",
+      ).length,
       dueSoon: tasks.filter((task) => {
         if (!task.due_date || task.status === "complete") return false;
         const dueDate = new Date(task.due_date);
@@ -93,7 +99,13 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
     };
   }, [tasks]);
 
-  if (!selectedCustomerId || loadedCustomerId !== selectedCustomerId || !customer || !stats) return null;
+  if (
+    !selectedCustomerId ||
+    loadedCustomerId !== selectedCustomerId ||
+    !customer ||
+    !stats
+  )
+    return null;
 
   const money = new Intl.NumberFormat("en-GB", {
     style: "currency",
@@ -101,24 +113,44 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
   });
 
   return (
-    <section className="rounded-xl border border-primary/20 bg-primary/5 p-5">
+    <section className="p-5">
       <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-semibold tracking-tight">{customer.name}</h1>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {customer.name}
+            </h1>
             <Badge variant="outline">Focused customer</Badge>
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
             {customer.company || customer.email || "Customer workspace"}
           </p>
         </div>
-        <p className="text-sm text-muted-foreground">{boards.length} boards · {tasks.length} tasks</p>
+        <p className="text-sm text-muted-foreground">
+          {boards.length} boards · {tasks.length} tasks
+        </p>
       </div>
       <div className="grid gap-4 md:grid-cols-4">
-        <FocusMetric title="Quotes" value={stats.totalQuotes} detail={`${stats.quotesAccepted} accepted, ${stats.quotesPending} pending`} />
-        <FocusMetric title="Invoices" value={stats.totalInvoices} detail={`${stats.invoicesPaid} paid, ${stats.invoicesOverdue} overdue`} />
-        <FocusMetric title="Outstanding" value={money.format(stats.outstandingBalance)} detail="Balance due" />
-        <FocusMetric title="Kanban" value={taskMetrics.urgent} detail={`${taskMetrics.overdue} overdue, ${taskMetrics.dueSoon} due soon`} />
+        <FocusMetric
+          title="Quotes"
+          value={stats.totalQuotes}
+          detail={`${stats.quotesAccepted} accepted, ${stats.quotesPending} pending`}
+        />
+        <FocusMetric
+          title="Invoices"
+          value={stats.totalInvoices}
+          detail={`${stats.invoicesPaid} paid, ${stats.invoicesOverdue} overdue`}
+        />
+        <FocusMetric
+          title="Outstanding"
+          value={money.format(stats.outstandingBalance)}
+          detail="Balance due"
+        />
+        <FocusMetric
+          title="Kanban"
+          value={taskMetrics.urgent}
+          detail={`${taskMetrics.overdue} overdue, ${taskMetrics.dueSoon} due soon`}
+        />
       </div>
       <div className="mt-6">
         <DashboardTaskKanban
@@ -136,7 +168,15 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
   );
 }
 
-function FocusMetric({ title, value, detail }: { title: string; value: string | number; detail: string }) {
+function FocusMetric({
+  title,
+  value,
+  detail,
+}: {
+  title: string;
+  value: string | number;
+  detail: string;
+}) {
   return (
     <Card className="border-border/40 bg-background/80">
       <CardHeader className="pb-2">

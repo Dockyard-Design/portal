@@ -146,7 +146,7 @@ const NAV_GROUPS: MenuGroup[] = [
         icon: MessageSquare,
       },
       {
-        title: "Expense Tracker",
+        title: "Expenses",
         href: "/dashboard/expenses",
         icon: Receipt,
       },
@@ -273,10 +273,10 @@ export default function AppSidebar({
   const [unreadMessageCount, setUnreadMessageCount] = useState(
     initialUnreadMessageCount,
   );
-  const [unreadContactSubmissionCount, setUnreadContactSubmissionCount] = useState(
-    initialUnreadContactSubmissionCount,
-  );
-  const [showPasswordChangePrompt, setShowPasswordChangePrompt] = useState(false);
+  const [unreadContactSubmissionCount, setUnreadContactSubmissionCount] =
+    useState(initialUnreadContactSubmissionCount);
+  const [showPasswordChangePrompt, setShowPasswordChangePrompt] =
+    useState(false);
   const isCustomerRole = role === "customer";
   const isSubMenuItemActive = useCallback(
     (item: SubMenuItem) =>
@@ -335,21 +335,27 @@ export default function AppSidebar({
       selectedCustomer,
       selectedCustomerBoards,
     );
-    const groupsToExpand = "items" in customerNavGroup
-      ? [customerNavGroup, ...NAV_GROUPS]
-      : NAV_GROUPS;
+    const groupsToExpand =
+      "items" in customerNavGroup
+        ? [customerNavGroup, ...NAV_GROUPS]
+        : NAV_GROUPS;
 
-    groupsToExpand.forEach(
-      (group) => {
-        const isGroupActive = group.items.some((item) =>
-          isSubMenuItemActive(item),
-        );
-        if (isGroupActive) {
-          setGroupOpen(group.title, true);
-        }
-      },
-    );
-  }, [customers, isCustomerRole, isSubMenuItemActive, selectedCustomerBoards, setGroupOpen, selectedCustomerId]);
+    groupsToExpand.forEach((group) => {
+      const isGroupActive = group.items.some((item) =>
+        isSubMenuItemActive(item),
+      );
+      if (isGroupActive) {
+        setGroupOpen(group.title, true);
+      }
+    });
+  }, [
+    customers,
+    isCustomerRole,
+    isSubMenuItemActive,
+    selectedCustomerBoards,
+    setGroupOpen,
+    selectedCustomerId,
+  ]);
 
   const refreshUnreadMessageCount = useCallback(() => {
     getUnreadMessageCount()
@@ -387,11 +393,17 @@ export default function AppSidebar({
   useEffect(() => {
     if (isCustomerRole) return;
     window.addEventListener("focus", refreshUnreadContactSubmissionCount);
-    window.addEventListener("contact-submissions:changed", refreshUnreadContactSubmissionCount);
+    window.addEventListener(
+      "contact-submissions:changed",
+      refreshUnreadContactSubmissionCount,
+    );
 
     return () => {
       window.removeEventListener("focus", refreshUnreadContactSubmissionCount);
-      window.removeEventListener("contact-submissions:changed", refreshUnreadContactSubmissionCount);
+      window.removeEventListener(
+        "contact-submissions:changed",
+        refreshUnreadContactSubmissionCount,
+      );
     };
   }, [isCustomerRole, refreshUnreadContactSubmissionCount]);
 
@@ -488,9 +500,8 @@ export default function AppSidebar({
     : "items" in customerNavGroup
       ? [customerNavGroup, ...NAV_GROUPS]
       : NAV_GROUPS;
-  const customerLink = !isCustomerRole && "href" in customerNavGroup
-    ? customerNavGroup
-    : null;
+  const customerLink =
+    !isCustomerRole && "href" in customerNavGroup ? customerNavGroup : null;
   const messageBadgeCount = unreadMessageCount;
 
   return (
@@ -520,8 +531,10 @@ export default function AppSidebar({
                       className="h-9 min-w-0 flex-1 justify-start overflow-hidden bg-background px-3 text-left text-sm font-medium"
                     >
                       <Building className="mr-2 size-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate">
-                        {selectedCustomer ? getCustomerLabel(selectedCustomer) : "All customers"}
+                      <span className="truncate">
+                        {selectedCustomer
+                          ? getCustomerLabel(selectedCustomer)
+                          : "All customers"}
                       </span>
                     </Button>
                   }
@@ -753,16 +766,17 @@ export default function AppSidebar({
                       <span className="font-medium flex-1 text-left">
                         {group.title}
                       </span>
-                      {group.title === "Dockyard" && unreadContactSubmissionCount > 0 && (
-                        <span
-                          aria-label={`${unreadContactSubmissionCount} unread contact submissions`}
-                          className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold leading-none text-primary-foreground"
-                        >
-                          {unreadContactSubmissionCount > 99
-                            ? "99+"
-                            : unreadContactSubmissionCount}
-                        </span>
-                      )}
+                      {group.title === "Dockyard" &&
+                        unreadContactSubmissionCount > 0 && (
+                          <span
+                            aria-label={`${unreadContactSubmissionCount} unread contact submissions`}
+                            className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold leading-none text-primary-foreground"
+                          >
+                            {unreadContactSubmissionCount > 99
+                              ? "99+"
+                              : unreadContactSubmissionCount}
+                          </span>
+                        )}
                       <ChevronRight className="size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                     </CollapsibleTrigger>
                   </SidebarMenuItem>
@@ -832,15 +846,17 @@ export default function AppSidebar({
                                             : "text-muted-foreground hover:text-foreground hover:bg-secondary",
                                         )}
                                         render={
-                                           <Link
-                                             href={nestedItem.href}
-                                             className="flex items-center gap-2"
-                                             onClick={() => {
-                                               if (nestedItem.boardId) {
-                                                 setSelectedBoard(nestedItem.boardId);
-                                               }
-                                             }}
-                                           >
+                                          <Link
+                                            href={nestedItem.href}
+                                            className="flex items-center gap-2"
+                                            onClick={() => {
+                                              if (nestedItem.boardId) {
+                                                setSelectedBoard(
+                                                  nestedItem.boardId,
+                                                );
+                                              }
+                                            }}
+                                          >
                                             <nestedItem.icon
                                               className={cn(
                                                 "size-4",
