@@ -69,12 +69,20 @@ describe("release hardening guardrails", () => {
   it("adds extended project API fields and keeps writes private", () => {
     const projectsRoute = read("app/api/projects/route.ts");
     const projectRoute = read("app/api/projects/[slug]/route.ts");
+    const projectTypes = read("types/project.ts");
+    const projectForm = read("app/dashboard/projects/project-form.tsx");
 
     for (const source of [projectsRoute, projectRoute]) {
       expect(source).toContain("brief_text");
       expect(source).toContain("feedback_gallery");
+      expect(source).not.toContain('"content"');
       expect(source).toContain("Project writes require Clerk-authenticated app actions");
     }
+
+    expect(projectTypes).not.toContain("content: string");
+    expect(projectForm).not.toContain('register("content")');
+    expect(projectForm).toContain("brief_gallery: z.array(z.string().url()).max(4)");
+    expect(projectForm).toContain("feedback_gallery: z.array(z.string().url()).max(4)");
   });
 
   it("covers invoice numbering and kanban drag persistence code paths", () => {
@@ -102,5 +110,100 @@ describe("release hardening guardrails", () => {
     expect(sidebar).toContain("customer.name");
     expect(sidebar).toContain("board.name");
     expect(sidebar).toContain("localeCompare");
+  });
+
+  it("routes quote and invoice lifecycle updates through messaging instead of document emails", () => {
+    const agency = read("app/actions/agency.ts");
+    const schema = read("database/database.sql");
+    const seed = read("database/seed.sql");
+
+    expect(agency).not.toContain("sendDocumentEmail");
+    expect(agency).not.toContain("sendFormSubmissionEmail");
+    expect(agency).toContain("getOrCreateQuoteThread");
+    expect(agency).toContain("addQuoteThreadMessage");
+    expect(agency).toContain('quote_id: quote.id');
+    expect(agency).toContain("threadUpdate.invoice_id = input.invoiceId");
+    expect(agency).toContain("Quote accepted");
+    expect(agency).toContain("Quote rejected");
+    expect(agency).toContain("has been paid");
+    expect(schema).toContain("quote_id UUID UNIQUE REFERENCES quotes(id)");
+    expect(schema).toContain("invoice_id UUID REFERENCES invoices(id)");
+    expect(seed).toContain("INSERT INTO message_threads");
+  });
+
+  it("keeps message email routing explicit for customer and support notifications", () => {
+    const email = read("lib/email.ts");
+    const messaging = read("app/actions/messaging.ts");
+
+    expect(email).toContain('const SUPPORT_EMAIL = "support@dockyard.design"');
+    expect(email).toContain('const NO_REPLY_EMAIL = "no-reply@dockyard.design"');
+    expect(email).toContain("sendCustomerMessageEmail");
+    expect(email).toContain("sendSupportMessageEmail");
+    expect(messaging).toContain("sendMessageEmailNotification");
+    expect(messaging).toContain('input.senderRole === "admin"');
+    expect(messaging).toContain('input.senderRole === "system"');
+    expect(messaging).toContain("sendSupportMessageEmail");
+  });
+
+  it("keeps the new reports page and navigation wired in", () => {
+    const reportsPage = read("app/dashboard/reports/page.tsx");
+    const sidebar = read("components/app-sidebar.tsx");
+
+    expect(reportsPage).toContain("MonthlyReportRow");
+    expect(reportsPage).toContain("Year Earnings");
+    expect(reportsPage).toContain("Year Expenses");
+    expect(reportsPage).toContain("Outstanding");
+    expect(sidebar).toContain('title: "Reports"');
+    expect(sidebar).toContain('href: "/dashboard/reports"');
+  });
+
+  it("keeps large create/edit flows out of project and quote modals", () => {
+    const projectsTable = read("app/dashboard/projects/projects-table.tsx");
+    const newProjectPage = read("app/dashboard/projects/new/page.tsx");
+    const editProjectPage = read("app/dashboard/projects/[id]/page.tsx");
+    const quotesWorkspace = read("app/dashboard/quotes/quotes-workspace.tsx");
+    const newQuotePage = read("app/dashboard/quotes/new/page.tsx");
+
+    expect(projectsTable).not.toContain("DialogContent");
+    expect(projectsTable).toContain('href="/dashboard/projects/new"');
+    expect(newProjectPage).toContain("NewProjectClient");
+    expect(editProjectPage).toContain("EditProjectClient");
+    expect(quotesWorkspace).toContain("/dashboard/quotes/new");
+    expect(newQuotePage).toContain("NewQuoteClient");
+  });
+
+  it("keeps contact and messaging inbox refinements in place", () => {
+    const contactInbox = read("app/dashboard/contact/contact-inbox.tsx");
+    const messagesClient = read("app/dashboard/messages/messages-client.tsx");
+    const kanbanBoard = read("app/dashboard/kanban/kanban-board.tsx");
+    const globals = read("app/globals.css");
+
+    expect(contactInbox).toContain("openSubmission");
+    expect(contactInbox).toContain('updateSubmissionStatus(submission.id, "read")');
+    expect(contactInbox).toContain('className="w-full rounded-lg border bg-background shadow-sm"');
+    expect(contactInbox.match(/dashboard-scrollbar/g)?.length).toBeGreaterThanOrEqual(2);
+    expect(messagesClient.match(/dashboard-scrollbar/g)?.length).toBeGreaterThanOrEqual(4);
+    expect(kanbanBoard).toContain('SelectContent className="min-w-[320px]"');
+    expect(globals).toContain(".dashboard-scrollbar");
+  });
+
+  it("does not render raw database IDs in audited dashboard surfaces", () => {
+    const auditedFiles = [
+      "components/app-sidebar.tsx",
+      "app/dashboard/api-keys/api-keys-table.tsx",
+      "app/dashboard/api-requests-table.tsx",
+      "app/dashboard/customers/page.tsx",
+      "app/dashboard/projects/projects-table.tsx",
+      "app/dashboard/quotes/quotes-workspace.tsx",
+      "app/dashboard/invoices/invoices-workspace.tsx",
+      "app/dashboard/users/users-table.tsx",
+    ];
+
+    for (const file of auditedFiles) {
+      const source = read(file);
+      expect(source, file).not.toMatch(/>\s*(?:ID|Id)\s*</);
+      expect(source, file).not.toMatch(/(?:Customer|Project|Quote|Invoice|Thread|User)\s+ID/);
+      expect(source, file).not.toMatch(/\.slice\(0,\s*8\)/);
+    }
   });
 });

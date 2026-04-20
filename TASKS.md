@@ -19,8 +19,8 @@
 
 - [x] Update `.env.example` with every required variable.
 - [x] Update `database/database.sql` and `database/seed.sql` for seedable development testing.
-- [ ] Remove user-visible raw IDs where they are displayed.
-- [ ] Write tests for newly covered functionality.
+- [x] Remove user-visible raw IDs where they are displayed.
+- [x] Write tests for newly covered functionality.
 - [x] Run all tests.
 - [x] Run ESLint.
 - [x] Run TypeScript checks.
