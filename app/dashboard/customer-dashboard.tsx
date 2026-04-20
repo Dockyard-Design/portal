@@ -1,8 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarDays, CheckCircle2, Circle, Clock, LayoutGrid } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { LayoutGrid } from "lucide-react";
 import {
   Select,
   SelectContent,
@@ -10,8 +9,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { DashboardTaskKanban } from "./dashboard-task-kanban";
 import type { CustomerDashboardData } from "@/types/customer-dashboard";
-import type { Task, TaskPriority, TaskStatus } from "@/types/kanban";
+import type { DashboardTasksByStatus } from "@/types/dashboard-tasks";
+import type { TaskStatus } from "@/types/kanban";
+
+const EMPTY_TASKS_BY_STATUS: DashboardTasksByStatus = {
+  backlog: [],
+  todo: [],
+  in_progress: [],
+  complete: [],
+};
+
+const STATUSES: TaskStatus[] = ["backlog", "todo", "in_progress", "complete"];
 
 export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
   const defaultBoardId = data.boards.find((board) => board.is_default)?.id ?? data.boards[0]?.id ?? "";
@@ -20,6 +30,20 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
     () => data.boards.find((board) => board.id === selectedBoardId) ?? data.boards[0],
     [data.boards, selectedBoardId]
   );
+  const selectedTasksByStatus = useMemo<DashboardTasksByStatus>(() => {
+    if (!selectedBoard) return EMPTY_TASKS_BY_STATUS;
+
+    return STATUSES.reduce((grouped, status) => {
+      grouped[status] = selectedBoard.tasks[status].map((task) => ({
+        ...task,
+        board_name: selectedBoard.name,
+        customer_id: "",
+        customer_name: data.customerCompany || data.customerName,
+        customer_company: data.customerCompany,
+      }));
+      return grouped;
+    }, { ...EMPTY_TASKS_BY_STATUS });
+  }, [data.customerCompany, data.customerName, selectedBoard]);
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -52,77 +76,16 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
       </div>
 
       {selectedBoard ? (
-        <div className="grid min-h-[calc(100vh-12rem)] gap-4 xl:grid-cols-4">
-          {COLUMNS.map((column) => (
-            <section key={column.id} className="flex min-h-0 flex-col rounded-lg border bg-muted/20">
-              <div className="flex items-center justify-between border-b px-4 py-3">
-                <div className="flex items-center gap-2">
-                  <column.icon className="size-4 text-muted-foreground" />
-                  <h2 className="font-medium">{column.title}</h2>
-                </div>
-                <Badge variant="secondary">{selectedBoard.tasks[column.id].length}</Badge>
-              </div>
-              <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3">
-                {selectedBoard.tasks[column.id].length === 0 ? (
-                  <div className="flex min-h-32 items-center justify-center rounded-lg border border-dashed bg-background/60 text-sm text-muted-foreground">
-                    No tasks
-                  </div>
-                ) : (
-                  selectedBoard.tasks[column.id].map((task) => (
-                    <CustomerTaskCard key={task.id} task={task} />
-                  ))
-                )}
-              </div>
-            </section>
-          ))}
-        </div>
+        <DashboardTaskKanban
+          title="Kanban Board"
+          description="Read-only view of your selected project board."
+          tasksByStatus={selectedTasksByStatus}
+        />
       ) : (
         <div className="flex min-h-[50vh] items-center justify-center rounded-lg border border-dashed text-sm text-muted-foreground">
           No project boards are available yet.
         </div>
       )}
     </div>
-  );
-}
-
-const COLUMNS: Array<{ id: TaskStatus; title: string; icon: typeof Circle }> = [
-  { id: "backlog", title: "Backlog", icon: Circle },
-  { id: "todo", title: "To Do", icon: Clock },
-  { id: "in_progress", title: "In Progress", icon: LayoutGrid },
-  { id: "complete", title: "Complete", icon: CheckCircle2 },
-];
-
-const PRIORITY_LABELS: Record<TaskPriority, string> = {
-  low: "Low",
-  medium: "Medium",
-  high: "High",
-  urgent: "Urgent",
-};
-
-function CustomerTaskCard({ task }: { task: Task }) {
-  return (
-    <article className="rounded-lg border bg-background p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
-        <h3 className="font-medium leading-5">{task.title}</h3>
-        <Badge variant={task.priority === "urgent" ? "destructive" : "outline"}>
-          {PRIORITY_LABELS[task.priority]}
-        </Badge>
-      </div>
-      {task.description && (
-        <p className="mt-3 line-clamp-3 text-sm leading-6 text-muted-foreground">
-          {task.description}
-        </p>
-      )}
-      {task.due_date && (
-        <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-          <CalendarDays className="size-3.5" />
-          {new Intl.DateTimeFormat("en-GB", {
-            day: "2-digit",
-            month: "short",
-            year: "numeric",
-          }).format(new Date(task.due_date))}
-        </div>
-      )}
-    </article>
   );
 }

@@ -17,6 +17,7 @@ import { KanbanMetrics } from "./kanban-metrics";
 import { CustomerDashboard } from "./customer-dashboard";
 import { CustomerFocusPanel } from "./customer-focus-panel";
 import { DashboardOverviewClient } from "./dashboard-overview-client";
+import { UpcomingTasksKanban } from "./upcoming-tasks-kanban";
 
 export default async function DashboardPage() {
   const access = await getCurrentUserAccess();
@@ -56,6 +57,7 @@ export default async function DashboardPage() {
     <DashboardOverviewClient customers={customers}>
       <div className="flex w-full flex-col gap-8">
         <CustomerFocusPanel customers={customers} />
+        <UpcomingTasksKanban />
       {/* Kanban Metrics */}
       <div className="flex items-center gap-2">
         <LayoutGrid className="size-5 text-primary" />

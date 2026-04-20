@@ -6,17 +6,21 @@ import { Badge } from "@/components/ui/badge";
 import { getCustomerStats } from "@/app/actions/agency";
 import { getBoards, getTasksByStatus } from "@/app/actions/kanban";
 import { useKanbanStore } from "@/lib/store";
+import { DashboardTaskKanban } from "./dashboard-task-kanban";
 import type { CustomerStats } from "@/types/agency";
-import type { Customer, KanbanBoard, Task } from "@/types/kanban";
+import type { DashboardTask } from "@/types/dashboard-tasks";
+import type { Customer, KanbanBoard } from "@/types/kanban";
 
 export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
   const { selectedCustomerId } = useKanbanStore();
   const [stats, setStats] = useState<CustomerStats | null>(null);
   const [loadedCustomerId, setLoadedCustomerId] = useState<string | null>(null);
   const [boards, setBoards] = useState<KanbanBoard[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [tasks, setTasks] = useState<DashboardTask[]>([]);
 
   const customer = customers.find((item) => item.id === selectedCustomerId);
+  const customerDisplayName = customer?.company || customer?.name || customer?.email || "Customer";
+  const customerCompany = customer?.company || null;
 
   useEffect(() => {
     let cancelled = false;
@@ -33,14 +37,25 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
         getBoards(customerId),
       ]);
       const taskGroups = await Promise.all(
-        nextBoards.map((board) => getTasksByStatus(board.id))
+        nextBoards.map(async (board) => ({
+          board,
+          tasks: await getTasksByStatus(board.id),
+        }))
       );
-      const nextTasks = taskGroups.flatMap((group) => [
-        ...group.backlog,
-        ...group.todo,
-        ...group.in_progress,
-        ...group.complete,
-      ]);
+      const nextTasks = taskGroups.flatMap(({ board, tasks: group }) =>
+        [
+          ...group.backlog,
+          ...group.todo,
+          ...group.in_progress,
+          ...group.complete,
+        ].map((task) => ({
+          ...task,
+          board_name: board.name,
+          customer_id: customerId,
+          customer_name: customerDisplayName,
+          customer_company: customerCompany,
+        }))
+      );
 
       if (!cancelled) {
         setStats(nextStats);
@@ -62,7 +77,7 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
     return () => {
       cancelled = true;
     };
-  }, [selectedCustomerId]);
+  }, [customerCompany, customerDisplayName, selectedCustomerId]);
 
   const taskMetrics = useMemo(() => {
     const now = new Date();
@@ -104,6 +119,18 @@ export function CustomerFocusPanel({ customers }: { customers: Customer[] }) {
         <FocusMetric title="Invoices" value={stats.totalInvoices} detail={`${stats.invoicesPaid} paid, ${stats.invoicesOverdue} overdue`} />
         <FocusMetric title="Outstanding" value={money.format(stats.outstandingBalance)} detail="Balance due" />
         <FocusMetric title="Kanban" value={taskMetrics.urgent} detail={`${taskMetrics.overdue} overdue, ${taskMetrics.dueSoon} due soon`} />
+      </div>
+      <div className="mt-6">
+        <DashboardTaskKanban
+          title="All Customer Tasks"
+          description="Read-only view of every task from every board for this customer."
+          tasksByStatus={{
+            backlog: tasks.filter((task) => task.status === "backlog"),
+            todo: tasks.filter((task) => task.status === "todo"),
+            in_progress: tasks.filter((task) => task.status === "in_progress"),
+            complete: tasks.filter((task) => task.status === "complete"),
+          }}
+        />
       </div>
     </section>
   );
