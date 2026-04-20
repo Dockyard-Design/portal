@@ -16,96 +16,82 @@ Implement the following features:
 
 ---
 
-### 1. Customer Selection
+### 1. Customer facing Dashboard
 
-- Add a customer dropdown to the sidebar, just below the logo
-- Persist selected customer in Zustand store with the ability to clear the selection
-- When a customer is selected, enable sidebar sub-menus:
-  - **Kanban**: list that customer's boards
-  - **Customer Management**: link to the customer's detail page
+- Full width view only kanban board, so customers can track their projects, ability to select each kanban board they want to view, use the default one by default. remove the 3 cards regarding tasks, make sure everything has a header lie on admin dashboard.
 
-### 2. Form Submission Emails (Resend)
+### 2. Quotes (customer view and admin view)
 
-- On any form submission, send an email to `support@dockyard.design` with all submitted details using Resend
+- Quotes 3 dots menu needs widening.
+- Quotes status filter show all lwoer case instead of actual dropdown names.
+- Search bar placeholder should state Search by reference or quote and name (make sure its functional as well)
+- Creating a new quote live summary doesnt work.
+- For customer view, the 3 dots menu should have 3 buttons only, View, Accept, Reject.
+- For customer view, clicking view button should pop a modal with the pdf embeded and option to download.
 
-### 3. Quote & Invoice Email (Resend)
+### 2. Invoices (customer view and admin view)
 
-- Add a button to send a quote or invoice directly to the customer
-- Send from `support@dockyard.design` using Resend
+- Need redesigning to match exactly the quotes pages. These pages should look exactly the same but with invoice data instead isnt it ?
+- All above problems for quotes apply here too.
+- For customer view, the 3 dots menu should have 3 buttons only, View, Pay.
+- For customer view, clicking view button should pop a modal with the pdf embeded and option to download.
 
-### 4. Vercel Blob Image Storage
+### 3. Dashboard
 
-- Enable and configure Vercel Blob for all image uploads throughout the app
+- Move Agency Metrics, Expense Metrics into their own pages. Under Dockyard, create a new menu with these 2 sub menued.
+- When having a customer selected hide all the other metrics, focus just on having customer focused metrics in as much detail as possible.
+- Make sure Agency Metrics and Expense Metrics pages have as much detail as possible.
 
-### 5. Projects API — Extended
+### 4. Sidebar
 
-- Add 4 text sections to projects: **The Brief**, **Prototyping**, **Building**, **Feedback**
-  - Each section: max 500 characters of text
-  - Each section: its own image gallery (max 4 images, stored in Vercel Blob)
-- Add a **featured image** field (stored in Vercel Blob)
-- Move Create/Edit project UI to a **modal** (not a separate page)
-- Projects API must be **publicly readable** with a valid API key, but all write operations require Clerk authentication from within the app
+- Same as messaging centre, add buble for unread contact form submissions.
+- When we have a customer selected we see their id, can you make sure it shows their company name instead.
+- If no customer selected, just have the "Customers" button not be a dropdown but a link to all customers page.
 
-### 6. Customer-Focused Dashboard
+### 5. Kanban
 
-- When a customer is selected, the dashboard becomes fully focused on that customer
-- Display: Quotes metrics, Invoices metrics, Kanban metrics (urgent items, due dates, overdue, etc.)
-- Design it to be an exceptional, actionable internal dashboard
+- Creating a task should NOT be required to have a due date.
 
-### 7. User Roles
+### 6. Messaging Centre
 
-- Add two roles: **Admin** and **Customer**
-- When creating a user, prompt for role selection
-- If Customer: assign them to a company
-- Customer users only access a **Customer Dashboard** showing their own data
+- on top of mssages should show user first name and last name, Dockyard. for customer just display company name as it is.
 
-### 8. Messaging Centre
+### 7. User management and Customer Creation
 
-- Customers can create message threads; admins can view all threads
-- Admins can initiate conversations with any customer
-- Each new thread triggers an **auto-reply** informing the customer to allow 24 hours for a response
-- Include all standard messaging centre features: read/unread state, timestamps, notifications, thread management
-- Add Messaging Centre to Customer role permissions
+- Creating a new customer should ask for First Name, Last Name, Phone Number, Email, Company Name, Notes.
+- When creating a new customer, automatically create their user account. Send an email with an auto generated password.
+- Track when the user logs in for the first time, and prompt a password change immeadiatly.
 
-### 9. Contacts API
+### 8. Other
 
-- Contacts API must be **publicly POST-able** with a valid API key
-- All other operations require Clerk authentication from within the app
+- On /dashboard/customers when clicking details on a customer should automatically select that customer on the sidebar too.
+- /dashboard/projects should take full width of page
 
-### 10. Finish release.md Tasks
+### 9. Contact Form Submissions
 
-- Read `release.md` and complete everything listed there
+- Full redesign, make it look like an email. Look at shadcn. Like gmail like.
 
-### 11. README.md
+### 10. File Management
 
-- Completely rewrite `README.md` — keep it concise but detailed
-- Structure: **Project Name**, **Project Description**, **API Documentation** (endpoints, auth, public vs private access)
+- For all the views we have, we need to make it more manageabable to work. So I want you to create seperate files for customer views and admin views, then in the files we have name just render based on condition (if this is not a best practice, then find the best practice possible and implement it.)
 
-### 12. Environment Variables
+### 11. Final
 
 - Update `.env.example` with every required variable
-
-### 13. Tests
-
+- database/database.sql and database/seed.sql need updating, as this is a development project no need for migrations right now.
 - Write tests for all untested functionality
 - All tests must pass
+- Before committing, ensure:
+  - ✅ All tests pass
+  - ✅ No lint errors (`eslint`)
+  - ✅ No TypeScript errors (`tsc --noEmit`)
 
-### 14. Final Checks
+- Once everything passes:
 
-Before committing, ensure:
-
-- ✅ All tests pass
-- ✅ No lint errors (`eslint`)
-- ✅ No TypeScript errors (`tsc --noEmit`)
-
-### 15. Git Commit
-
-Once everything passes:
-
-```bash
-git add .
-git commit -m "<your detailed commit message describing all changes>"
-```
+  ```bash
+  git add .
+  git commit -m "<your detailed commit message describing all changes>"
+  ```
 
 ---
 
@@ -118,3 +104,4 @@ git commit -m "<your detailed commit message describing all changes>"
 - Use Vercel Blob for all image storage
 - Use Zustand for all client-side global state
 - Do not use the type any anywhere, everything single type must be declared in its own file.
+- When making changing to existing features, you must make sure you find everything related to that feature and update it accordinly.

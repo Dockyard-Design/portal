@@ -211,12 +211,6 @@ export default function CustomerDetailClient({
     setQuoteModalOpen(true);
   };
 
-  const openCreateInvoice = () => {
-    setSelectedInvoice(null);
-    setInvoiceModalMode("create");
-    setInvoiceModalOpen(true);
-  };
-
   const openViewInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setInvoiceModalMode("view");
@@ -453,10 +447,6 @@ export default function CustomerDetailClient({
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <CardTitle>Invoices</CardTitle>
-              <Button onClick={openCreateInvoice}>
-                <Plus className="size-4 mr-1" />
-                Create Invoice
-              </Button>
             </CardHeader>
             <CardContent>
               {invoices.length === 0 ? (

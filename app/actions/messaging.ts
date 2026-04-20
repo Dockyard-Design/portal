@@ -13,6 +13,22 @@ import type {
 const AUTO_REPLY =
   "Thanks for your message. A member of the Dockyard team will respond within 24 hours.";
 
+type ThreadRowWithCustomer = MessageThread & {
+  customers: { name: string; email: string | null } | null;
+};
+
+function formatThread(
+  thread: ThreadRowWithCustomer,
+  messages: Message[] = []
+): MessageThreadWithMessages {
+  return {
+    ...thread,
+    customer_name: thread.customers?.name ?? "Unknown customer",
+    customer_email: thread.customers?.email ?? null,
+    messages,
+  };
+}
+
 export async function getMessageThreads(): Promise<MessageThreadWithMessages[]> {
   const access = await getCurrentUserAccess();
 
@@ -28,9 +44,7 @@ export async function getMessageThreads(): Promise<MessageThreadWithMessages[]> 
   const { data: threadRows, error } = await threadQuery;
   if (error) throw new Error("Failed to load message threads");
 
-  const threads = (threadRows || []) as Array<MessageThread & {
-    customers: { name: string; email: string | null } | null;
-  }>;
+  const threads = (threadRows || []) as ThreadRowWithCustomer[];
   const threadIds = threads.map((thread) => thread.id);
 
   const messagesResult = threadIds.length > 0
@@ -45,19 +59,38 @@ export async function getMessageThreads(): Promise<MessageThreadWithMessages[]> 
 
   const messages = (messagesResult.data || []) as Message[];
 
-  return threads.map((thread) => ({
-    ...thread,
-    customer_name: thread.customers?.name ?? "Unknown customer",
-    customer_email: thread.customers?.email ?? null,
-    messages: messages.filter((message) => message.thread_id === thread.id),
-  }));
+  return threads.map((thread) =>
+    formatThread(
+      thread,
+      messages.filter((message) => message.thread_id === thread.id)
+    )
+  );
+}
+
+export async function getUnreadMessageCount(): Promise<number> {
+  const access = await getCurrentUserAccess();
+  const unreadColumn = access.role === "admin" ? "unread_admin" : "unread_customer";
+
+  let query = supabaseAdmin
+    .from("message_threads")
+    .select("id", { count: "exact", head: true })
+    .eq(unreadColumn, true);
+
+  if (access.role === "customer") {
+    query = query.eq("customer_id", access.customerId);
+  }
+
+  const { count, error } = await query;
+  if (error) throw new Error("Failed to load unread message count");
+
+  return count ?? 0;
 }
 
 export async function createMessageThread(input: {
   customerId: string;
   subject: string;
   body: string;
-}): Promise<void> {
+}): Promise<MessageThreadWithMessages> {
   const access = await getCurrentUserAccess();
   const userId = access.userId;
   const customerId = access.role === "customer" ? access.customerId : input.customerId;
@@ -73,7 +106,7 @@ export async function createMessageThread(input: {
       unread_admin: access.role === "customer",
       unread_customer: access.role === "admin",
     })
-    .select()
+    .select("*, customers(name, email)")
     .single();
 
   if (threadError || !thread) throw new Error("Failed to create thread");
@@ -101,35 +134,55 @@ export async function createMessageThread(input: {
     });
   }
 
-  const { error: messageError } = await supabaseAdmin.from("messages").insert(messages);
+  const { data: createdMessages, error: messageError } = await supabaseAdmin
+    .from("messages")
+    .insert(messages)
+    .select("*")
+    .order("created_at", { ascending: true });
   if (messageError) throw new Error("Failed to create message");
 
   revalidatePath("/dashboard/messages");
+  return formatThread(thread as ThreadRowWithCustomer, (createdMessages || []) as Message[]);
 }
 
-export async function replyToThread(threadId: string, body: string): Promise<void> {
+export async function replyToThread(threadId: string, body: string): Promise<{
+  message: Message;
+  thread: MessageThreadWithMessages;
+}> {
   const access = await getCurrentUserAccess();
   await assertThreadAccess(threadId, access.role, access.customerId);
 
-  const { error } = await supabaseAdmin.from("messages").insert({
-    thread_id: threadId,
-    sender_id: access.userId,
-    sender_role: access.role,
-    body,
-  });
+  const now = new Date().toISOString();
+  const { data: message, error } = await supabaseAdmin
+    .from("messages")
+    .insert({
+      thread_id: threadId,
+      sender_id: access.userId,
+      sender_role: access.role,
+      body,
+    })
+    .select("*")
+    .single();
 
-  if (error) throw new Error("Failed to send reply");
+  if (error || !message) throw new Error("Failed to send reply");
 
-  await supabaseAdmin
+  const { data: thread, error: threadError } = await supabaseAdmin
     .from("message_threads")
     .update({
-      last_message_at: new Date().toISOString(),
+      last_message_at: now,
       unread_admin: access.role === "customer",
       unread_customer: access.role === "admin",
     })
-    .eq("id", threadId);
+    .eq("id", threadId)
+    .select("*, customers(name, email)")
+    .single();
 
+  if (threadError || !thread) throw new Error("Failed to update thread");
   revalidatePath("/dashboard/messages");
+  return {
+    message: message as Message,
+    thread: formatThread(thread as ThreadRowWithCustomer),
+  };
 }
 
 export async function updateThreadStatus(

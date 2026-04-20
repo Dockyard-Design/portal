@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -31,36 +30,52 @@ import {
 } from "@/components/ui/select";
 import {
   Receipt,
-  Plus,
   MoreVertical,
   Eye,
   Download,
   Send,
   Trash2,
   Edit,
+  CreditCard,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
-import type { Invoice } from "@/types/agency";
-import { sendInvoiceToCustomer } from "@/app/actions/agency";
+import type { Invoice, Quote } from "@/types/agency";
+import type { UserRole } from "@/types/auth";
+import { payInvoice, sendInvoiceToCustomer } from "@/app/actions/agency";
+import { InvoiceModal } from "@/app/dashboard/components/invoice-modal-v2";
 import { toast } from "sonner";
 
 interface InvoicesClientProps {
   invoices: Invoice[];
+  quotes: Quote[];
   customers: Customer[];
+  role: UserRole;
+  selectedCustomerId?: string;
 }
 
-export default function InvoicesClient({ invoices, customers }: InvoicesClientProps) {
+export default function InvoicesClient({
+  invoices,
+  quotes,
+  customers,
+  role,
+  selectedCustomerId,
+}: InvoicesClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
+  const [invoiceModalMode, setInvoiceModalMode] = useState<"edit" | "view">("view");
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const router = useRouter();
+  const isCustomerRole = role === "customer";
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch = 
       invoice.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customers.find(c => c.id === invoice.customer_id)?.name.toLowerCase().includes(searchQuery.toLowerCase());
+      (customers.find(c => c.id === invoice.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -93,6 +108,44 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
     }
   };
 
+  const handlePayInvoice = async (invoiceId: string) => {
+    alert("Payment placeholder: this will be replaced with a real payment flow.");
+    setPayingId(invoiceId);
+    try {
+      await payInvoice(invoiceId);
+      toast.success("Invoice marked as paid");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to pay invoice");
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const openPdf = (invoiceId: string) => {
+    window.open(`/api/pdf/invoice/${invoiceId}`, "_blank", "noopener,noreferrer");
+  };
+
+  const openViewInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setInvoiceModalMode("view");
+    setInvoiceModalOpen(true);
+  };
+
+  const openEditInvoice = (invoice: Invoice) => {
+    setSelectedInvoice(invoice);
+    setInvoiceModalMode("edit");
+    setInvoiceModalOpen(true);
+  };
+
+  const refreshData = () => {
+    router.refresh();
+  };
+
+  const selectedCustomer = selectedCustomerId
+    ? customers.find((customer) => customer.id === selectedCustomerId)
+    : null;
+
   return (
     <div className="w-full min-h-screen p-6 space-y-6">
       {/* Header */}
@@ -102,14 +155,14 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
           <div>
             <h1 className="text-3xl font-semibold">Invoices</h1>
             <p className="text-muted-foreground">
-              {filteredInvoices.length} invoices
+              {selectedCustomer
+                ? `${filteredInvoices.length} invoices for ${selectedCustomer.name}`
+                : isCustomerRole
+                ? `${filteredInvoices.length} invoices available to view or pay`
+                : `${filteredInvoices.length} invoices`}
             </p>
           </div>
         </div>
-        <Button>
-          <Plus className="size-4 mr-2" />
-          Create Invoice
-        </Button>
       </div>
 
       {/* Filters */}
@@ -158,14 +211,16 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
                 <Receipt className="size-8 text-muted-foreground/50" />
               </div>
               <h3 className="text-lg font-medium mb-2">No invoices found</h3>
-              <p className="text-muted-foreground mb-4">Create your first invoice</p>
+              <p className="text-muted-foreground mb-4">
+                {isCustomerRole ? "No invoices are ready for you yet." : "No invoices match the current view."}
+              </p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Invoice #</TableHead>
-                  <TableHead>Customer</TableHead>
+                  {!isCustomerRole && <TableHead>Customer</TableHead>}
                   <TableHead>Title</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Due Date</TableHead>
@@ -179,9 +234,11 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
                     <TableCell>
                       <span className="font-medium">{invoice.invoice_number}</span>
                     </TableCell>
-                    <TableCell>
-                      {getCustomerName(invoice.customer_id)}
-                    </TableCell>
+                    {!isCustomerRole && (
+                      <TableCell>
+                        {getCustomerName(invoice.customer_id)}
+                      </TableCell>
+                    )}
                     <TableCell>
                       <span className="text-sm">{invoice.title}</span>
                     </TableCell>
@@ -205,31 +262,48 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
                           <MoreVertical className="size-4" />
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openViewInvoice(invoice)}>
                             <Eye className="size-4 mr-2" />
                             View Details
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
-                            <Edit className="size-4 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
+                          {!isCustomerRole && (
+                            <DropdownMenuItem onClick={() => openEditInvoice(invoice)}>
+                              <Edit className="size-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openPdf(invoice.id)}>
                             <Download className="size-4 mr-2" />
                             Download PDF
                           </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={() => void handleSendInvoice(invoice.id)}
-                            disabled={sendingId === invoice.id}
-                          >
-                            <Send className="size-4 mr-2" />
-                            {sendingId === invoice.id ? "Sending..." : "Send Email"}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">
-                            <Trash2 className="size-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
+                          {!isCustomerRole && (
+                            <DropdownMenuItem
+                              onClick={() => void handleSendInvoice(invoice.id)}
+                              disabled={sendingId === invoice.id}
+                            >
+                              <Send className="size-4 mr-2" />
+                              {sendingId === invoice.id ? "Sending..." : "Send Email"}
+                            </DropdownMenuItem>
+                          )}
+                          {isCustomerRole && invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                            <DropdownMenuItem
+                              onClick={() => void handlePayInvoice(invoice.id)}
+                              disabled={payingId === invoice.id}
+                            >
+                              <CreditCard className="size-4 mr-2" />
+                              {payingId === invoice.id ? "Paying..." : "Pay Invoice"}
+                            </DropdownMenuItem>
+                          )}
+                          {!isCustomerRole && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem className="text-destructive">
+                                <Trash2 className="size-4 mr-2" />
+                                Delete
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -240,6 +314,17 @@ export default function InvoicesClient({ invoices, customers }: InvoicesClientPr
           )}
         </CardContent>
       </Card>
+      <InvoiceModal
+        invoice={selectedInvoice}
+        customers={customers}
+        quotes={quotes}
+        preselectedCustomerId={selectedCustomerId ?? null}
+        mode={invoiceModalMode}
+        open={invoiceModalOpen}
+        onOpenChange={setInvoiceModalOpen}
+        onSuccess={refreshData}
+        role={role}
+      />
     </div>
   );
 }

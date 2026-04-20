@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import { requireAdmin } from "@/lib/authz";
+import type { CustomerUserMetadata } from "@/types/auth";
 import type { 
   Customer, 
   KanbanBoard,
@@ -24,6 +25,17 @@ const KNOWN_ERRORS: Record<string, string> = {
   "23503": "Customer not found.",
 };
 
+const ADMIN_ROLES = new Set(["admin", "owner"]);
+
+function getAdminUserIds(): Set<string> {
+  return new Set(
+    (process.env.DASHBOARD_ADMIN_USER_IDS || "")
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean)
+  );
+}
+
 function sanitizeError(error: { code?: string; message: string }): string {
   if (error.code && KNOWN_ERRORS[error.code]) {
     return KNOWN_ERRORS[error.code];
@@ -31,25 +43,75 @@ function sanitizeError(error: { code?: string; message: string }): string {
   return error.message || "Something went wrong. Please try again.";
 }
 
+function hasAdminMetadata(metadata: CustomerUserMetadata): boolean {
+  if (metadata.admin === true) return true;
+
+  if (typeof metadata.role === "string" && ADMIN_ROLES.has(metadata.role.toLowerCase())) {
+    return true;
+  }
+
+  if (Array.isArray(metadata.roles)) {
+    return metadata.roles.some(
+      (role) => typeof role === "string" && ADMIN_ROLES.has(role.toLowerCase())
+    );
+  }
+
+  return false;
+}
+
+function isAssignableAdmin(metadata: CustomerUserMetadata): boolean {
+  if (metadata.role === "customer") return false;
+  return hasAdminMetadata(metadata) || metadata.role === undefined;
+}
+
+async function assertAdminAssignee(assigneeId?: string | null): Promise<void> {
+  if (!assigneeId) return;
+  const adminUserIds = getAdminUserIds();
+  if (adminUserIds.has(assigneeId)) return;
+
+  const clerk = await clerkClient();
+  const user = await clerk.users.getUser(assigneeId);
+  const metadata = {
+    ...(user.privateMetadata as CustomerUserMetadata),
+    ...(user.publicMetadata as CustomerUserMetadata),
+  };
+
+  if (!isAssignableAdmin(metadata)) {
+    throw new Error("Tasks can only be assigned to admin users.");
+  }
+}
+
 // Team Members (Clerk Users)
 export async function getTeamMembers(): Promise<ClerkUser[]> {
   await requireAdmin();
 
   const clerk = await clerkClient();
+  const adminUserIds = getAdminUserIds();
   
   try {
     const users = await clerk.users.getUserList({
       limit: 100,
     });
     
-    return users.data.map(user => ({
-      id: user.id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      username: user.username,
-      emailAddress: user.emailAddresses[0]?.emailAddress || null,
-      imageUrl: user.imageUrl,
-    }));
+    return users.data
+      .filter((user) => {
+        if (adminUserIds.has(user.id)) return true;
+
+        const metadata = {
+          ...(user.privateMetadata as CustomerUserMetadata),
+          ...(user.publicMetadata as CustomerUserMetadata),
+        };
+
+        return isAssignableAdmin(metadata);
+      })
+      .map(user => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        emailAddress: user.emailAddresses[0]?.emailAddress || null,
+        imageUrl: user.imageUrl,
+      }));
   } catch {
     return [];
   }
@@ -288,6 +350,12 @@ export async function getTask(id: string): Promise<Task | null> {
 export async function createTask(task: CreateTaskInput): Promise<Task> {
   const userId = await requireAdmin();
 
+  if (!task.due_date) {
+    throw new Error("Tasks require a due date.");
+  }
+
+  await assertAdminAssignee(task.assigned_to);
+
   // Get max position for the status column
   const { data: existingTasks } = await supabase
     .from("kanban_tasks")
@@ -318,6 +386,12 @@ export async function createTask(task: CreateTaskInput): Promise<Task> {
 
 export async function updateTask(id: string, updates: UpdateTaskInput): Promise<Task> {
   await requireAdmin();
+
+  if ("due_date" in updates && !updates.due_date) {
+    throw new Error("Tasks require a due date.");
+  }
+
+  await assertAdminAssignee(updates.assigned_to);
 
   const { data, error } = await supabase
     .from("kanban_tasks")

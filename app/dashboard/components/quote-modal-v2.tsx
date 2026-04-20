@@ -2,19 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { format, parseISO } from "date-fns";
+import { format } from "date-fns";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
-import { CalendarIcon, CheckCircle, Download, Plus, Send, Trash2, X } from "lucide-react";
+import { CheckCircle, Download, Plus, Send, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -23,8 +21,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 import type { Quote } from "@/types/agency";
+import type { UserRole } from "@/types/auth";
 import type { Customer } from "@/types/kanban";
 
 const quoteItemSchema = z.object({
@@ -41,7 +39,6 @@ const quoteSchema = z.object({
     .number()
     .min(0, "Tax rate cannot be negative")
     .max(100, "Tax rate cannot exceed 100"),
-  validUntil: z.date().optional(),
   notes: z.string().trim().optional(),
   terms: z.string().trim().optional(),
   items: z.array(quoteItemSchema).min(1, "Add at least one line item"),
@@ -59,6 +56,7 @@ interface QuoteModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  role?: UserRole;
 }
 
 function getDefaultValues(
@@ -71,7 +69,6 @@ function getDefaultValues(
       title: quote.title,
       description: quote.description ?? "",
       taxRate: quote.tax_rate,
-      validUntil: quote.valid_until ? parseISO(quote.valid_until) : undefined,
       notes: quote.notes ?? "",
       terms: quote.terms ?? "",
       items:
@@ -88,9 +85,8 @@ function getDefaultValues(
     title: "",
     description: "",
     taxRate: 20,
-    validUntil: undefined,
     notes: "",
-    terms: "Payment due within 30 days of acceptance.",
+    terms: "This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance.",
     items: [{ description: "", quantity: 1, unit_price: 0 }],
   };
 }
@@ -98,41 +94,6 @@ function getDefaultValues(
 function FieldError({ message }: { message?: string }) {
   if (!message) return null;
   return <p className="text-xs text-destructive">{message}</p>;
-}
-
-function DatePickerField({
-  value,
-  onChange,
-  placeholder,
-  disabled,
-  invalid,
-}: {
-  value?: Date;
-  onChange: (value?: Date) => void;
-  placeholder: string;
-  disabled?: boolean;
-  invalid?: boolean;
-}) {
-  return (
-    <Popover>
-      <PopoverTrigger
-        disabled={disabled}
-        aria-invalid={invalid}
-        className={cn(
-          "inline-flex h-9 w-full items-center justify-start rounded-md border border-input bg-background px-3 py-2 text-left text-sm shadow-xs transition-colors hover:bg-accent hover:text-accent-foreground",
-          "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] outline-none",
-          !value && "text-muted-foreground",
-          invalid && "border-destructive focus-visible:ring-destructive/20"
-        )}
-      >
-        <CalendarIcon className="mr-2 size-4" />
-        {value ? format(value, "PPP") : placeholder}
-      </PopoverTrigger>
-      <PopoverContent className="w-auto p-0" align="start">
-        <Calendar mode="single" selected={value} onSelect={onChange} initialFocus />
-      </PopoverContent>
-    </Popover>
-  );
 }
 
 function getQuoteStatusColor(status: string) {
@@ -150,6 +111,14 @@ function getQuoteStatusColor(status: string) {
   }
 }
 
+function canAcceptQuote(quote: Quote): boolean {
+  if (quote.status !== "sent") return false;
+  if (!quote.valid_until) return true;
+  const validUntil = new Date(quote.valid_until);
+  validUntil.setHours(23, 59, 59, 999);
+  return validUntil.getTime() >= Date.now();
+}
+
 export function QuoteModal({
   quote,
   customers,
@@ -158,9 +127,11 @@ export function QuoteModal({
   open,
   onOpenChange,
   onSuccess,
+  role = "admin",
 }: QuoteModalProps) {
   const [saving, setSaving] = useState(false);
   const isViewOnly = mode === "view";
+  const isCustomerView = role === "customer" && isViewOnly;
   const isCustomerLocked = Boolean(preselectedCustomerId);
 
   const form = useForm<QuoteFormInput, unknown, QuoteFormOutput>({
@@ -224,7 +195,6 @@ export function QuoteModal({
         title: values.title.trim(),
         description: values.description?.trim() || undefined,
         tax_rate: values.taxRate,
-        valid_until: values.validUntil ? format(values.validUntil, "yyyy-MM-dd") : undefined,
         notes: values.notes?.trim() || undefined,
         terms: values.terms?.trim() || undefined,
         items: values.items.map((item) => ({
@@ -257,27 +227,21 @@ export function QuoteModal({
   const handleSendQuote = async () => {
     if (!quote) return;
     try {
-      const { updateQuote } = await import("@/app/actions/agency");
-      await updateQuote(quote.id, {
-        status: "sent",
-        sent_at: new Date().toISOString(),
-      });
-      toast.success("Quote sent");
+      const { sendQuoteToCustomer } = await import("@/app/actions/agency");
+      await sendQuoteToCustomer(quote.id);
+      toast.success("Quote sent to customer");
       onSuccess?.();
-    } catch {
-      toast.error("Failed to send quote");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to send quote");
     }
   };
 
   const handleAcceptQuote = async () => {
     if (!quote) return;
     try {
-      const { updateQuote } = await import("@/app/actions/agency");
-      await updateQuote(quote.id, {
-        status: "accepted",
-        accepted_at: new Date().toISOString(),
-      });
-      toast.success("Quote marked as accepted");
+      const { acceptQuote } = await import("@/app/actions/agency");
+      await acceptQuote(quote.id);
+      toast.success("Quote accepted and invoice generated");
       onSuccess?.();
     } catch {
       toast.error("Failed to accept quote");
@@ -287,16 +251,128 @@ export function QuoteModal({
   const handleRejectQuote = async () => {
     if (!quote) return;
     try {
-      const { updateQuote } = await import("@/app/actions/agency");
-      await updateQuote(quote.id, {
-        status: "rejected",
-      });
+      const { rejectQuote } = await import("@/app/actions/agency");
+      await rejectQuote(quote.id);
       toast.success("Quote marked as rejected");
       onSuccess?.();
     } catch {
       toast.error("Failed to reject quote");
     }
   };
+
+  if (isCustomerView && quote) {
+    const canRespond = canAcceptQuote(quote);
+
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto border-border/60 bg-background p-0">
+          <DialogHeader className="border-b border-border/60 px-6 py-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-2">
+                <DialogTitle className="text-2xl tracking-tight">{quote.title}</DialogTitle>
+                <p className="text-sm text-muted-foreground">
+                  Review the scope, line items, and terms before responding.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={getQuoteStatusColor(quote.status)}>{quote.status}</Badge>
+                <Button variant="outline" size="sm" onClick={handleGeneratePdf}>
+                  <Download className="mr-2 size-4" />
+                  PDF
+                </Button>
+                {canRespond && (
+                  <>
+                    <Button size="sm" onClick={handleAcceptQuote}>
+                      <CheckCircle className="mr-2 size-4" />
+                      Accept
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={handleRejectQuote}>
+                      <X className="mr-2 size-4" />
+                      Reject
+                    </Button>
+                  </>
+                )}
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="space-y-6">
+              {quote.description && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Scope</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">{quote.description}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Line Items</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {(quote.items ?? []).map((item) => (
+                    <div key={item.id} className="grid gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[1fr_auto]">
+                      <div>
+                        <p className="font-medium">{item.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} x £{item.unit_price.toLocaleString()}
+                        </p>
+                      </div>
+                      <p className="font-semibold md:text-right">£{item.total.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {(quote.terms || quote.notes) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Terms & Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {quote.terms && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">{quote.terms}</p>
+                    )}
+                    {quote.notes && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">{quote.notes}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <aside>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Total</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>£{quote.subtotal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span>£{quote.tax_amount.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-border/70 pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Grand total</span>
+                      <span className="text-xl font-semibold">£{quote.total.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -325,19 +401,23 @@ export function QuoteModal({
               {mode === "view" && quote?.status === "draft" && (
                 <Button size="sm" onClick={handleSendQuote}>
                   <Send className="mr-2 size-4" />
-                  Mark Sent
+                  Send Email
                 </Button>
               )}
               {mode === "view" && quote?.status === "sent" && (
                 <>
-                  <Button size="sm" onClick={handleAcceptQuote}>
-                    <CheckCircle className="mr-2 size-4" />
-                    Accept
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={handleRejectQuote}>
-                    <X className="mr-2 size-4" />
-                    Reject
-                  </Button>
+                  {canAcceptQuote(quote) && (
+                    <>
+                      <Button size="sm" onClick={handleAcceptQuote}>
+                        <CheckCircle className="mr-2 size-4" />
+                        Accept
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={handleRejectQuote}>
+                        <X className="mr-2 size-4" />
+                        Reject
+                      </Button>
+                    </>
+                  )}
                 </>
               )}
             </div>
@@ -349,7 +429,7 @@ export function QuoteModal({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Client & Scope</CardTitle>
-                <CardDescription>Set the recipient, headline, and validity window.</CardDescription>
+                <CardDescription>Set the recipient, headline, and quote scope.</CardDescription>
               </CardHeader>
               <CardContent className="grid gap-5 md:grid-cols-2">
                 {isCustomerLocked ? (
@@ -429,23 +509,6 @@ export function QuoteModal({
                     {...register("taxRate")}
                   />
                   <FieldError message={errors.taxRate?.message} />
-                </div>
-
-                <div className="grid gap-2">
-                  <Label>Valid until</Label>
-                  <DatePickerField
-                    value={watch("validUntil")}
-                    invalid={Boolean(errors.validUntil)}
-                    disabled={isViewOnly}
-                    placeholder="Pick a validity date"
-                    onChange={(value) =>
-                      setValue("validUntil", value, {
-                        shouldValidate: true,
-                        shouldDirty: true,
-                      })
-                    }
-                  />
-                  <FieldError message={errors.validUntil?.message} />
                 </div>
               </CardContent>
             </Card>
@@ -551,7 +614,7 @@ export function QuoteModal({
                     id="quote-terms"
                     disabled={isViewOnly}
                     rows={4}
-                    placeholder="Payment due within 30 days of acceptance."
+                    placeholder="This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance."
                     {...register("terms")}
                   />
                 </div>
@@ -612,11 +675,6 @@ export function QuoteModal({
                     <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Quote Timeline</p>
                     <p className="mt-2 font-medium">
                       Created {format(new Date(quote.created_at), "MMM d, yyyy")}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {quote.valid_until
-                        ? `Valid until ${format(parseISO(quote.valid_until), "MMM d, yyyy")}`
-                        : "No validity date set"}
                     </p>
                   </div>
                 )}

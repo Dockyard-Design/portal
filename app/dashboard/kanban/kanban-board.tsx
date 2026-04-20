@@ -305,6 +305,10 @@ export function KanbanBoard({
   async function handleSaveTask(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     if (!selectedBoard?.id) return;
+    if (!taskForm.due_date) {
+      toast.error("Select a due date before saving the task");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -1109,6 +1113,9 @@ export function KanbanBoard({
                   ))}
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground">
+                Only admin users can be assigned to tasks.
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -1157,9 +1164,10 @@ export function KanbanBoard({
               <Label>Due Date</Label>
               <Popover>
                 <PopoverTrigger
+                  aria-invalid={!taskForm.due_date}
                   className={cn(
                     "w-full justify-start text-left font-normal flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
-                    !taskForm.due_date && "text-muted-foreground"
+                    !taskForm.due_date && "border-destructive text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="h-4 w-4" />
@@ -1183,6 +1191,9 @@ export function KanbanBoard({
                   />
                 </PopoverContent>
               </Popover>
+              {!taskForm.due_date && (
+                <p className="text-xs text-destructive">A due date is required.</p>
+              )}
             </div>
 
             <div className="flex justify-end gap-3">
@@ -1193,7 +1204,7 @@ export function KanbanBoard({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || !taskForm.due_date}>
                 {editingTask ? "Update Task" : "Create Task"}
               </Button>
             </div>

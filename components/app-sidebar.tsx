@@ -15,6 +15,7 @@ import {
   Briefcase,
   Users,
   Receipt,
+  FileText,
   Trash2,
   AlertTriangle,
   X,
@@ -79,7 +80,9 @@ import { cn } from "@/lib/utils";
 import { useKanbanStore, useSidebarStore } from "@/lib/store";
 import { wipeDatabase } from "@/app/actions/dev-wipe";
 import { getBoards, getCustomers } from "@/app/actions/kanban";
+import { getUnreadMessageCount } from "@/app/actions/messaging";
 import { toast } from "sonner";
+import type { UserRole } from "@/types/auth";
 import type { Customer } from "@/types/kanban";
 
 // Sidebar Menu Configuration
@@ -90,6 +93,7 @@ interface SubMenuItem {
   href: string;
   icon: LucideIcon;
   boardId?: string;
+  items?: SubMenuItem[];
 }
 
 interface MenuGroup {
@@ -110,6 +114,24 @@ const NAV_OVERVIEW: SingleMenuItem = {
   icon: LayoutDashboard,
 };
 
+const NAV_MESSAGES: SingleMenuItem = {
+  title: "Messaging Centre",
+  href: "/dashboard/messages",
+  icon: MessageSquare,
+};
+
+const NAV_QUOTES: SingleMenuItem = {
+  title: "Quotes",
+  href: "/dashboard/quotes",
+  icon: Receipt,
+};
+
+const NAV_INVOICES: SingleMenuItem = {
+  title: "Invoices",
+  href: "/dashboard/invoices",
+  icon: FileText,
+};
+
 const NAV_GROUPS: MenuGroup[] = [
   {
     title: "Dockyard",
@@ -119,11 +141,6 @@ const NAV_GROUPS: MenuGroup[] = [
       {
         title: "Contact Submissions",
         href: "/dashboard/contact",
-        icon: MessageSquare,
-      },
-      {
-        title: "Messaging Centre",
-        href: "/dashboard/messages",
         icon: MessageSquare,
       },
       {
@@ -150,40 +167,52 @@ const NAV_SETTINGS: SingleMenuItem[] = [
 
 const ALLOWED_WIPE_EMAIL = "fredericomelogarcia@outlook.com";
 
-function getCustomerNavGroup(
-  selectedCustomerId: string | null,
-): MenuGroup {
-  const items: SubMenuItem[] = [
-    {
-      title: "Kanban Board",
-      href: "/dashboard/kanban",
-      icon: KanbanSquare,
-    },
-    {
-      title: "All Customers",
-      href: "/dashboard/customers",
-      icon: Building,
-    },
-  ];
+function getCustomerNavGroup(selectedCustomerId: string | null): MenuGroup {
+  const items: SubMenuItem[] = [];
 
   if (selectedCustomerId) {
-    items.push(
-      {
-        title: "Customer Details",
-        href: `/dashboard/customers/${selectedCustomerId}`,
-        icon: Building,
-      },
-    );
+    items.push({
+      title: "Details",
+      href: `/dashboard/customers/${selectedCustomerId}`,
+      icon: Building,
+      items: [
+        {
+          title: "Quotes",
+          href: `/dashboard/quotes?customerId=${selectedCustomerId}`,
+          icon: Receipt,
+        },
+        {
+          title: "Invoices",
+          href: `/dashboard/invoices?customerId=${selectedCustomerId}`,
+          icon: FileText,
+        },
+        {
+          title: "Kanban Board",
+          href: "/dashboard/kanban",
+          icon: KanbanSquare,
+        },
+      ],
+    });
   }
 
   return {
-    title: "Customers",
+    title: selectedCustomerId ? `${selectedCustomerId}` : "Customers",
     icon: Briefcase,
     items,
   };
 }
 
-export default function AppSidebar() {
+function getRoutePath(href: string): string {
+  return href.split("?")[0] ?? href;
+}
+
+export default function AppSidebar({
+  initialUnreadMessageCount,
+  role,
+}: {
+  initialUnreadMessageCount: number;
+  role: UserRole;
+}) {
   const pathname = usePathname();
   const { isLoaded, user } = useUser();
   const { openUserProfile, signOut } = useClerk();
@@ -199,10 +228,24 @@ export default function AppSidebar() {
   const [wipePassword, setWipePassword] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
+  const [unreadMessageCount, setUnreadMessageCount] = useState(
+    initialUnreadMessageCount,
+  );
+  const isCustomerRole = role === "customer";
+  const isSubMenuItemActive = useCallback(
+    (item: SubMenuItem) =>
+      pathname === getRoutePath(item.href) ||
+      item.items?.some(
+        (nestedItem) => pathname === getRoutePath(nestedItem.href),
+      ) === true,
+    [pathname],
+  );
 
   // Check if user can wipe database - computed directly from user data
   const canWipe =
-    isLoaded && user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL;
+    !isCustomerRole &&
+    isLoaded &&
+    user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL;
 
   const handleWipe = async () => {
     const result = await wipeDatabase(wipePassword);
@@ -219,21 +262,57 @@ export default function AppSidebar() {
 
   // Auto-expand groups with active items on navigation
   useEffect(() => {
-    [getCustomerNavGroup(selectedCustomerId), ...NAV_GROUPS].forEach((group) => {
-      const isGroupActive = group.items.some((item) =>
-        pathname.startsWith(item.href),
-      );
-      if (isGroupActive) {
-        setGroupOpen(group.title, true);
-      }
-    });
-  }, [pathname, setGroupOpen, selectedCustomerId]);
+    if (isCustomerRole) return;
+
+    [getCustomerNavGroup(selectedCustomerId), ...NAV_GROUPS].forEach(
+      (group) => {
+        const isGroupActive = group.items.some((item) =>
+          isSubMenuItemActive(item),
+        );
+        if (isGroupActive) {
+          setGroupOpen(group.title, true);
+        }
+      },
+    );
+  }, [isCustomerRole, isSubMenuItemActive, setGroupOpen, selectedCustomerId]);
+
+  const refreshUnreadMessageCount = useCallback(() => {
+    getUnreadMessageCount()
+      .then(setUnreadMessageCount)
+      .catch(() => {
+        setUnreadMessageCount(0);
+      });
+  }, []);
+
+  useEffect(() => {
+    setUnreadMessageCount(initialUnreadMessageCount);
+  }, [initialUnreadMessageCount]);
+
+  useEffect(() => {
+    refreshUnreadMessageCount();
+  }, [pathname, refreshUnreadMessageCount]);
+
+  useEffect(() => {
+    window.addEventListener("focus", refreshUnreadMessageCount);
+    window.addEventListener("messages:changed", refreshUnreadMessageCount);
+
+    return () => {
+      window.removeEventListener("focus", refreshUnreadMessageCount);
+      window.removeEventListener("messages:changed", refreshUnreadMessageCount);
+    };
+  }, [refreshUnreadMessageCount]);
 
   const loadCustomers = useCallback(() => {
+    if (isCustomerRole) {
+      setCustomers([]);
+      return () => {};
+    }
+
     let cancelled = false;
     getCustomers()
       .then((data) => {
-        if (!cancelled) setCustomers([...data].sort((a, b) => a.name.localeCompare(b.name)));
+        if (!cancelled)
+          setCustomers([...data].sort((a, b) => a.name.localeCompare(b.name)));
       })
       .catch(() => {
         if (!cancelled) toast.error("Failed to load customers");
@@ -242,7 +321,7 @@ export default function AppSidebar() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isCustomerRole]);
 
   useEffect(() => loadCustomers(), [loadCustomers]);
 
@@ -252,13 +331,14 @@ export default function AppSidebar() {
     };
 
     window.addEventListener("customers:changed", handleCustomersChanged);
-    return () => window.removeEventListener("customers:changed", handleCustomersChanged);
+    return () =>
+      window.removeEventListener("customers:changed", handleCustomersChanged);
   }, [loadCustomers]);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!selectedCustomerId) {
+    if (isCustomerRole || !selectedCustomerId) {
       return () => {
         cancelled = true;
       };
@@ -267,8 +347,13 @@ export default function AppSidebar() {
     getBoards(selectedCustomerId)
       .then((data) => {
         if (cancelled) return;
-        if (data.length > 0 && !data.some((board) => board.id === selectedBoardId)) {
-          setSelectedBoard(data.find((board) => board.is_default)?.id ?? data[0].id);
+        if (
+          data.length > 0 &&
+          !data.some((board) => board.id === selectedBoardId)
+        ) {
+          setSelectedBoard(
+            data.find((board) => board.is_default)?.id ?? data[0].id,
+          );
         }
       })
       .catch(() => {
@@ -278,13 +363,15 @@ export default function AppSidebar() {
     return () => {
       cancelled = true;
     };
-  }, [selectedCustomerId, selectedBoardId, setSelectedBoard]);
+  }, [isCustomerRole, selectedCustomerId, selectedBoardId, setSelectedBoard]);
 
-  const selectedCustomer = customers.find((customer) => customer.id === selectedCustomerId);
-  const navGroups = [
-    getCustomerNavGroup(selectedCustomerId),
-    ...NAV_GROUPS,
-  ];
+  const selectedCustomer = customers.find(
+    (customer) => customer.id === selectedCustomerId,
+  );
+  const navGroups = isCustomerRole
+    ? []
+    : [getCustomerNavGroup(selectedCustomerId), ...NAV_GROUPS];
+  const messageBadgeCount = unreadMessageCount;
 
   return (
     <Sidebar className="border-r-border/40">
@@ -298,85 +385,94 @@ export default function AppSidebar() {
             className="h-8 w-auto"
           />
         </div>
-        <div className="mt-5 space-y-2">
-          <div className="flex items-center gap-2">
-            <Popover open={customerPickerOpen} onOpenChange={setCustomerPickerOpen}>
-              <PopoverTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="h-9 min-w-0 flex-1 justify-start overflow-hidden bg-background px-3 text-left text-sm font-medium"
-                  >
-                    <Building className="mr-2 size-4 shrink-0 text-muted-foreground" />
-                    <span className="truncate">
-                      {selectedCustomer?.name ?? "All customers"}
-                    </span>
-                  </Button>
-                }
-              />
-              <PopoverContent align="start" className="w-72 p-1">
-                <Command>
-                  <CommandInput placeholder="Search customers..." />
-                  <CommandList>
-                    <CommandEmpty>No customers found.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="all-customers"
-                        onSelect={() => {
-                          clearSelection();
-                          setCustomerPickerOpen(false);
-                        }}
-                      >
-                        <Building className="size-4 text-muted-foreground" />
-                        <span>All customers</span>
-                        {!selectedCustomerId && <Check className="ml-auto size-4" />}
-                      </CommandItem>
-                      {customers.map((customer) => (
+        {!isCustomerRole && (
+          <div className="mt-5 space-y-2">
+            <div className="flex items-center gap-2">
+              <Popover
+                open={customerPickerOpen}
+                onOpenChange={setCustomerPickerOpen}
+              >
+                <PopoverTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-9 min-w-0 flex-1 justify-start overflow-hidden bg-background px-3 text-left text-sm font-medium"
+                    >
+                      <Building className="mr-2 size-4 shrink-0 text-muted-foreground" />
+                      <span className="truncate">
+                        {selectedCustomer?.name ?? "All customers"}
+                      </span>
+                    </Button>
+                  }
+                />
+                <PopoverContent align="start" className="w-72 p-1">
+                  <Command>
+                    <CommandInput placeholder="Search customers..." />
+                    <CommandList>
+                      <CommandEmpty>No customers found.</CommandEmpty>
+                      <CommandGroup>
                         <CommandItem
-                          key={customer.id}
-                          value={`${customer.name} ${customer.company ?? ""} ${customer.email ?? ""}`}
+                          value="all-customers"
                           onSelect={() => {
-                            setSelectedCustomer(customer.id);
+                            clearSelection();
                             setCustomerPickerOpen(false);
                           }}
                         >
                           <Building className="size-4 text-muted-foreground" />
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium">{customer.name}</p>
-                            {(customer.company || customer.email) && (
-                              <p className="truncate text-xs text-muted-foreground">
-                                {customer.company || customer.email}
-                              </p>
-                            )}
-                          </div>
-                          {selectedCustomerId === customer.id && (
+                          <span>All customers</span>
+                          {!selectedCustomerId && (
                             <Check className="ml-auto size-4" />
                           )}
                         </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            {selectedCustomerId && (
-              <button
-                type="button"
-                onClick={clearSelection}
-                className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
-                aria-label="Clear customer selection"
-              >
-                <X className="size-4" />
-              </button>
+                        {customers.map((customer) => (
+                          <CommandItem
+                            key={customer.id}
+                            value={`${customer.name} ${customer.company ?? ""} ${customer.email ?? ""}`}
+                            onSelect={() => {
+                              setSelectedCustomer(customer.id);
+                              setCustomerPickerOpen(false);
+                            }}
+                          >
+                            <Building className="size-4 text-muted-foreground" />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate font-medium">
+                                {customer.name}
+                              </p>
+                              {(customer.company || customer.email) && (
+                                <p className="truncate text-xs text-muted-foreground">
+                                  {customer.company || customer.email}
+                                </p>
+                              )}
+                            </div>
+                            {selectedCustomerId === customer.id && (
+                              <Check className="ml-auto size-4" />
+                            )}
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {selectedCustomerId && (
+                <button
+                  type="button"
+                  onClick={clearSelection}
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="Clear customer selection"
+                >
+                  <X className="size-4" />
+                </button>
+              )}
+            </div>
+            {selectedCustomer && (
+              <p className="truncate text-xs text-muted-foreground">
+                Focused on {selectedCustomer.name}
+              </p>
             )}
           </div>
-          {selectedCustomer && (
-            <p className="truncate text-xs text-muted-foreground">
-              Focused on {selectedCustomer.name}
-            </p>
-          )}
-        </div>
+        )}
       </SidebarHeader>
       <SidebarContent className="px-4">
         <SidebarGroup>
@@ -407,10 +503,80 @@ export default function AppSidebar() {
               </SidebarMenuButton>
             </SidebarMenuItem>
 
+            {isCustomerRole && (
+              <>
+                {[NAV_QUOTES, NAV_INVOICES].map((item) => {
+                  const isActive = pathname === item.href;
+
+                  return (
+                    <SidebarMenuItem key={item.href}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        className={cn(
+                          "transition-all duration-200 rounded-lg h-10 px-3",
+                          isActive
+                            ? "bg-primary/10 hover:bg-primary/20"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                        )}
+                      >
+                        <Link
+                          href={item.href}
+                          className="flex w-full items-center gap-3"
+                        >
+                          <item.icon
+                            className={cn("size-4", isActive && "text-primary")}
+                          />
+                          <span className="min-w-0 flex-1 truncate font-medium">
+                            {item.title}
+                          </span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </>
+            )}
+
+            {/* Messaging Centre - Single Item */}
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                isActive={pathname === NAV_MESSAGES.href}
+                className={cn(
+                  "transition-all duration-200 rounded-lg h-10 px-3",
+                  pathname === NAV_MESSAGES.href
+                    ? "bg-primary/10 hover:bg-primary/20"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                )}
+              >
+                <Link
+                  href={NAV_MESSAGES.href}
+                  className="flex w-full items-center gap-3"
+                >
+                  <NAV_MESSAGES.icon
+                    className={cn(
+                      "size-4",
+                      pathname === NAV_MESSAGES.href && "text-primary",
+                    )}
+                  />
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {NAV_MESSAGES.title}
+                  </span>
+                  {messageBadgeCount > 0 && (
+                    <span
+                      aria-label={`${messageBadgeCount} unread messages`}
+                      className="ml-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold leading-none text-primary-foreground"
+                    >
+                      {messageBadgeCount > 99 ? "99+" : messageBadgeCount}
+                    </span>
+                  )}
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+
             {/* Menu Groups with Submenus */}
             {navGroups.map((group) => {
               const isGroupActive = group.items.some((item) =>
-                pathname.startsWith(item.href),
+                isSubMenuItemActive(item),
               );
 
               return (
@@ -444,9 +610,11 @@ export default function AppSidebar() {
                   <CollapsibleContent>
                     <SidebarMenuSub>
                       {group.items.map((item) => {
-                        const isItemActive = pathname === item.href;
+                        const isItemActive = isSubMenuItemActive(item);
                         return (
-                          <SidebarMenuSubItem key={`${item.href}:${item.boardId ?? item.title}`}>
+                          <SidebarMenuSubItem
+                            key={`${item.href}:${item.boardId ?? item.title}`}
+                          >
                             <SidebarMenuSubButton
                               isActive={isItemActive}
                               className={cn(
@@ -460,7 +628,8 @@ export default function AppSidebar() {
                                   href={item.href}
                                   className="flex items-center gap-2"
                                   onClick={() => {
-                                    if (item.boardId) setSelectedBoard(item.boardId);
+                                    if (item.boardId)
+                                      setSelectedBoard(item.boardId);
                                   }}
                                 >
                                   <item.icon
@@ -473,6 +642,46 @@ export default function AppSidebar() {
                                 </Link>
                               }
                             />
+                            {item.items && item.items.length > 0 && (
+                              <SidebarMenuSub className="mx-4 mt-1 py-0">
+                                {item.items.map((nestedItem) => {
+                                  const isNestedItemActive =
+                                    pathname === getRoutePath(nestedItem.href);
+
+                                  return (
+                                    <SidebarMenuSubItem
+                                      key={`${nestedItem.href}:${nestedItem.title}`}
+                                    >
+                                      <SidebarMenuSubButton
+                                        size="sm"
+                                        isActive={isNestedItemActive}
+                                        className={cn(
+                                          "transition-all duration-200 rounded-md h-8",
+                                          isNestedItemActive
+                                            ? "bg-primary/10"
+                                            : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                                        )}
+                                        render={
+                                          <Link
+                                            href={nestedItem.href}
+                                            className="flex items-center gap-2"
+                                          >
+                                            <nestedItem.icon
+                                              className={cn(
+                                                "size-4",
+                                                isNestedItemActive &&
+                                                  "text-primary!",
+                                              )}
+                                            />
+                                            <span>{nestedItem.title}</span>
+                                          </Link>
+                                        }
+                                      />
+                                    </SidebarMenuSubItem>
+                                  );
+                                })}
+                              </SidebarMenuSub>
+                            )}
                           </SidebarMenuSubItem>
                         );
                       })}
@@ -486,36 +695,38 @@ export default function AppSidebar() {
       </SidebarContent>
 
       {/* Settings Section */}
-      <div className="mt-auto px-4 pb-2">
-        <SidebarMenu className="gap-1">
-          {NAV_SETTINGS.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <SidebarMenuButton
-                isActive={pathname === item.href}
-                className={cn(
-                  "transition-all duration-200 rounded-lg h-10 px-3",
-                  pathname === item.href
-                    ? "bg-primary/10 hover:bg-primary/20"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary",
-                )}
-              >
-                <Link
-                  href={item.href}
-                  className="flex items-center gap-3 w-full"
+      {!isCustomerRole && (
+        <div className="mt-auto px-4 pb-2">
+          <SidebarMenu className="gap-1">
+            {NAV_SETTINGS.map((item) => (
+              <SidebarMenuItem key={item.href}>
+                <SidebarMenuButton
+                  isActive={pathname === item.href}
+                  className={cn(
+                    "transition-all duration-200 rounded-lg h-10 px-3",
+                    pathname === item.href
+                      ? "bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                  )}
                 >
-                  <item.icon
-                    className={cn(
-                      "size-4",
-                      pathname === item.href && "text-primary",
-                    )}
-                  />
-                  <span className="font-medium">{item.title}</span>
-                </Link>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </div>
+                  <Link
+                    href={item.href}
+                    className="flex items-center gap-3 w-full"
+                  >
+                    <item.icon
+                      className={cn(
+                        "size-4",
+                        pathname === item.href && "text-primary",
+                      )}
+                    />
+                    <span className="font-medium">{item.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </div>
+      )}
 
       {/* Account Section */}
       <div className="mt-auto p-6 border-t border-border/40">
@@ -575,10 +786,13 @@ export default function AppSidebar() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <AlertDialog open={showWipeDialog} onOpenChange={(open) => {
-          setShowWipeDialog(open);
-          if (!open) setWipePassword("");
-        }}>
+        <AlertDialog
+          open={showWipeDialog}
+          onOpenChange={(open) => {
+            setShowWipeDialog(open);
+            if (!open) setWipePassword("");
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle className="flex items-center gap-2">
@@ -603,7 +817,9 @@ export default function AppSidebar() {
               />
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setWipePassword("")}>Cancel</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => setWipePassword("")}>
+                Cancel
+              </AlertDialogCancel>
               <AlertDialogAction
                 onClick={handleWipe}
                 disabled={!wipePassword}

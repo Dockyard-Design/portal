@@ -46,24 +46,38 @@ import {
 import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Quote } from "@/types/agency";
-import { sendQuoteToCustomer } from "@/app/actions/agency";
+import type { UserRole } from "@/types/auth";
+import { acceptQuote, rejectQuote, sendQuoteToCustomer } from "@/app/actions/agency";
+import { QuoteModal } from "@/app/dashboard/components/quote-modal-v2";
 import { toast } from "sonner";
 
 interface QuotesClientProps {
   quotes: Quote[];
   customers: Customer[];
+  role: UserRole;
+  selectedCustomerId?: string;
 }
 
-export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
+export default function QuotesClient({
+  quotes,
+  customers,
+  role,
+  selectedCustomerId,
+}: QuotesClientProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sendingId, setSendingId] = useState<string | null>(null);
+  const [actionId, setActionId] = useState<string | null>(null);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
+  const [quoteModalMode, setQuoteModalMode] = useState<"create" | "edit" | "view">("create");
+  const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
   const router = useRouter();
+  const isCustomerRole = role === "customer";
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch = 
       quote.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      customers.find(c => c.id === quote.customer_id)?.name.toLowerCase().includes(searchQuery.toLowerCase());
+      (customers.find(c => c.id === quote.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -91,6 +105,69 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
     }
   };
 
+  const handleAcceptQuote = async (quoteId: string) => {
+    setActionId(quoteId);
+    try {
+      await acceptQuote(quoteId);
+      toast.success("Quote accepted and invoice generated");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to accept quote");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const handleRejectQuote = async (quoteId: string) => {
+    setActionId(quoteId);
+    try {
+      await rejectQuote(quoteId);
+      toast.success("Quote rejected");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to reject quote");
+    } finally {
+      setActionId(null);
+    }
+  };
+
+  const openPdf = (quoteId: string) => {
+    window.open(`/api/pdf/quote/${quoteId}`, "_blank", "noopener,noreferrer");
+  };
+
+  const openCreateQuote = () => {
+    setSelectedQuote(null);
+    setQuoteModalMode("create");
+    setQuoteModalOpen(true);
+  };
+
+  const openViewQuote = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setQuoteModalMode("view");
+    setQuoteModalOpen(true);
+  };
+
+  const openEditQuote = (quote: Quote) => {
+    setSelectedQuote(quote);
+    setQuoteModalMode("edit");
+    setQuoteModalOpen(true);
+  };
+
+  const refreshData = () => {
+    router.refresh();
+  };
+
+  const selectedCustomer = selectedCustomerId
+    ? customers.find((customer) => customer.id === selectedCustomerId)
+    : null;
+  const canCustomerAcceptQuote = (quote: Quote) => {
+    if (quote.status !== "sent") return false;
+    if (!quote.valid_until) return true;
+    const validUntil = new Date(quote.valid_until);
+    validUntil.setHours(23, 59, 59, 999);
+    return validUntil.getTime() >= Date.now();
+  };
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -104,14 +181,20 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
           <div>
             <h1 className="text-2xl font-semibold">Quotes</h1>
             <p className="text-sm text-muted-foreground">
-              Manage quotes and proposals
+              {selectedCustomer
+                ? `Quotes for ${selectedCustomer.name}`
+                : isCustomerRole
+                ? "Review proposals and respond when you are ready"
+                : "Manage quotes and proposals"}
             </p>
           </div>
         </div>
-        <Button>
-          <Plus className="size-4 mr-1" />
-          Create Quote
-        </Button>
+        {!isCustomerRole && (
+          <Button onClick={openCreateQuote}>
+            <Plus className="size-4 mr-1" />
+            Create Quote
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -167,7 +250,7 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Quote</TableHead>
-                  <TableHead>Customer</TableHead>
+                  {!isCustomerRole && <TableHead>Customer</TableHead>}
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Total</TableHead>
@@ -189,9 +272,11 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
                           )}
                         </div>
                       </TableCell>
-                      <TableCell>
-                        {customer?.name || "Unknown Customer"}
-                      </TableCell>
+                      {!isCustomerRole && (
+                        <TableCell>
+                          {customer?.name || "Unknown Customer"}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <Badge className={getStatusColor(quote.status)}>
                           {quote.status}
@@ -204,48 +289,74 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
                         £{quote.total.toLocaleString()}
                       </TableCell>
                       <TableCell>
+                        {!isCustomerRole && quote.status === "draft" && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void handleSendQuote(quote.id)}
+                            disabled={sendingId === quote.id}
+                            className="mr-2"
+                          >
+                            <Send className="mr-2 size-4" />
+                            {sendingId === quote.id ? "Sending..." : "Send"}
+                          </Button>
+                        )}
                         <DropdownMenu>
                           <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
                             <MoreVertical className="size-4" />
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => openViewQuote(quote)}>
                               <Eye className="size-4 mr-2" />
                               View
                             </DropdownMenuItem>
-                            <DropdownMenuItem>
-                              <FileText className="size-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem>
+                            {!isCustomerRole && (
+                              <DropdownMenuItem onClick={() => openEditQuote(quote)}>
+                                <FileText className="size-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem onClick={() => openPdf(quote.id)}>
                               <Download className="size-4 mr-2" />
                               Download PDF
                             </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => void handleSendQuote(quote.id)}
-                              disabled={sendingId === quote.id}
-                            >
-                              <Send className="size-4 mr-2" />
-                              {sendingId === quote.id ? "Sending..." : "Send Email"}
-                            </DropdownMenuItem>
-                            {quote.status === "sent" && (
+                            {!isCustomerRole && (
+                              <DropdownMenuItem
+                                onClick={() => void handleSendQuote(quote.id)}
+                                disabled={sendingId === quote.id}
+                              >
+                                <Send className="size-4 mr-2" />
+                                {sendingId === quote.id ? "Sending..." : "Send Email"}
+                              </DropdownMenuItem>
+                            )}
+                            {isCustomerRole && quote.status === "sent" && canCustomerAcceptQuote(quote) && (
                               <>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => void handleAcceptQuote(quote.id)}
+                                  disabled={actionId === quote.id}
+                                >
                                   <CheckCircle className="size-4 mr-2" />
-                                  Mark Accepted
+                                  Accept Quote
                                 </DropdownMenuItem>
-                                <DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => void handleRejectQuote(quote.id)}
+                                  disabled={actionId === quote.id}
+                                >
                                   <X className="size-4 mr-2" />
-                                  Mark Rejected
+                                  Reject Quote
                                 </DropdownMenuItem>
                               </>
                             )}
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem className="text-destructive">
-                              <Trash2 className="size-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
+                            {!isCustomerRole && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive">
+                                  <Trash2 className="size-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
@@ -257,6 +368,16 @@ export default function QuotesClient({ quotes, customers }: QuotesClientProps) {
           )}
         </CardContent>
       </Card>
+      <QuoteModal
+        quote={selectedQuote}
+        customers={customers}
+        preselectedCustomerId={selectedCustomerId ?? null}
+        mode={quoteModalMode}
+        open={quoteModalOpen}
+        onOpenChange={setQuoteModalOpen}
+        onSuccess={refreshData}
+        role={role}
+      />
     </div>
   );
 }

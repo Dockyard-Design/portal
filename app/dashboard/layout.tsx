@@ -7,12 +7,22 @@ import AppSidebar from "@/components/app-sidebar";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { Breadcrumbs } from "@/components/breadcrumbs";
+import { getUnreadMessageCount } from "@/app/actions/messaging";
+import { getCurrentUserAccess } from "@/lib/authz";
 
-export default function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const [access, unreadMessageCount] = await Promise.all([
+    getCurrentUserAccess(),
+    getUnreadMessageCount().catch(() => 0),
+  ]);
+
   return (
     <TooltipProvider>
       <SidebarProvider>
-        <AppSidebar />
+        <AppSidebar
+          initialUnreadMessageCount={unreadMessageCount}
+          role={access.role}
+        />
         <SidebarInset>
           <header className="flex h-16 shrink-0 items-center gap-4 px-4 border-b">
             <SidebarTrigger />

@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import type { Invoice, Quote } from "@/types/agency";
+import type { UserRole } from "@/types/auth";
 import type { Customer } from "@/types/kanban";
 
 const invoiceItemSchema = z.object({
@@ -62,6 +63,7 @@ interface InvoiceModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+  role?: UserRole;
 }
 
 function getDefaultValues(
@@ -168,9 +170,11 @@ export function InvoiceModal({
   open,
   onOpenChange,
   onSuccess,
+  role = "admin",
 }: InvoiceModalProps) {
   const [saving, setSaving] = useState(false);
   const isViewOnly = mode === "view";
+  const isCustomerView = role === "customer" && isViewOnly;
   const isCustomerLocked = Boolean(preselectedCustomerId);
 
   const form = useForm<InvoiceFormInput, unknown, InvoiceFormOutput>({
@@ -332,17 +336,138 @@ export function InvoiceModal({
   const handleMarkPaid = async () => {
     if (!invoice) return;
     try {
-      const { updateInvoice } = await import("@/app/actions/agency");
-      await updateInvoice(invoice.id, {
-        status: "paid",
-        amount_paid: invoice.total,
-      });
+      if (role === "customer") {
+        alert("Payment placeholder: this will be replaced with a real payment flow.");
+        const { payInvoice } = await import("@/app/actions/agency");
+        await payInvoice(invoice.id);
+      } else {
+        const { updateInvoice } = await import("@/app/actions/agency");
+        await updateInvoice(invoice.id, {
+          status: "paid",
+          amount_paid: invoice.total,
+        });
+      }
       toast.success("Invoice marked as paid");
       onSuccess?.();
     } catch {
       toast.error("Failed to update invoice");
     }
   };
+
+  if (isCustomerView && invoice) {
+    const viewLinkedQuote = quotes.find((entry) => entry.id === invoice.quote_id) ?? null;
+
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[92vh] overflow-y-auto border-border/60 bg-background p-0">
+          <DialogHeader className="border-b border-border/60 px-6 py-5">
+            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-2">
+                <DialogTitle className="text-2xl tracking-tight">{invoice.invoice_number}</DialogTitle>
+                <p className="text-sm text-muted-foreground">{invoice.title}</p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge className={getInvoiceStatusColor(invoice.status)}>{invoice.status}</Badge>
+                <Button variant="outline" size="sm" onClick={handleGeneratePdf}>
+                  <Download className="mr-2 size-4" />
+                  PDF
+                </Button>
+                {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                  <Button size="sm" onClick={handleMarkPaid}>
+                    <CheckCircle className="mr-2 size-4" />
+                    Pay Invoice
+                  </Button>
+                )}
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="grid gap-6 px-6 py-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <div className="space-y-6">
+              {invoice.description && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Summary</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="whitespace-pre-wrap text-sm text-muted-foreground">{invoice.description}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Line Items</CardTitle>
+                  {viewLinkedQuote && (
+                    <CardDescription>Linked to quote: {viewLinkedQuote.title}</CardDescription>
+                  )}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {(invoice.items ?? []).map((item) => (
+                    <div key={item.id} className="grid gap-2 rounded-lg border border-border/70 bg-muted/20 p-3 md:grid-cols-[1fr_auto]">
+                      <div>
+                        <p className="font-medium">{item.description}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} x £{item.unit_price.toLocaleString()}
+                        </p>
+                      </div>
+                      <p className="font-semibold md:text-right">£{item.total.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {(invoice.terms || invoice.payment_instructions || invoice.notes) && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Payment Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {invoice.payment_instructions && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">{invoice.payment_instructions}</p>
+                    )}
+                    {invoice.terms && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">{invoice.terms}</p>
+                    )}
+                    {invoice.notes && (
+                      <p className="whitespace-pre-wrap text-sm text-muted-foreground">{invoice.notes}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            <aside>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Amount Due</CardTitle>
+                  <CardDescription>
+                    {invoice.due_date ? `Due ${format(parseISO(invoice.due_date), "MMM d, yyyy")}` : "No due date set"}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>£{invoice.subtotal.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span>£{invoice.tax_amount.toLocaleString()}</span>
+                  </div>
+                  <div className="border-t border-border/70 pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-sm text-muted-foreground">Balance</span>
+                      <span className="text-xl font-semibold">£{invoice.balance_due.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </aside>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

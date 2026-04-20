@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
-import { requireAdmin } from "@/lib/authz";
+import { getCurrentUserAccess, requireAdmin } from "@/lib/authz";
 import { sendDocumentEmail, sendFormSubmissionEmail } from "@/lib/email";
 import type {
   Quote,
@@ -13,11 +13,15 @@ import type {
   UpdateInvoiceInput,
   CustomerStats,
 } from "@/types/agency";
+import type { UserRole } from "@/types/auth";
 
 const KNOWN_ERRORS: Record<string, string> = {
   "23505": "A record with this identifier already exists.",
   "23503": "Related record not found.",
 };
+
+const DEFAULT_QUOTE_TERMS =
+  "This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance.";
 
 function sanitizeError(error: { code?: string; message: string }): string {
   if (error.code && KNOWN_ERRORS[error.code]) {
@@ -37,16 +41,44 @@ function calculateTotals(
   return { subtotal, tax_amount, total };
 }
 
+function isQuotePastValidityDate(quote: Quote): boolean {
+  if (!quote.valid_until) return false;
+  const validUntil = new Date(quote.valid_until);
+  validUntil.setHours(23, 59, 59, 999);
+  return validUntil.getTime() < Date.now();
+}
+
+function getDefaultQuoteExpiryDate(): string {
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 14);
+  return expiresAt.toISOString().slice(0, 10);
+}
+
+function getQuoteTerms(inputTerms?: string): string {
+  const terms = inputTerms?.trim();
+  if (!terms) return DEFAULT_QUOTE_TERMS;
+
+  if (terms.toLowerCase().includes("14 days")) {
+    return terms;
+  }
+
+  return `${DEFAULT_QUOTE_TERMS}\n\n${terms}`;
+}
+
 // Quotes
 export async function getQuotes(customerId?: string): Promise<Quote[]> {
-  await requireAdmin();
+  const access = await getCurrentUserAccess();
 
   let query = supabase
     .from("quotes")
     .select("*, items:quote_items(*)")
     .order("created_at", { ascending: false });
 
-  if (customerId) {
+  if (access.role === "customer") {
+    query = query
+      .eq("customer_id", access.customerId)
+      .neq("status", "draft");
+  } else if (customerId) {
     query = query.eq("customer_id", customerId);
   }
 
@@ -57,13 +89,20 @@ export async function getQuotes(customerId?: string): Promise<Quote[]> {
 }
 
 export async function getQuote(id: string): Promise<Quote | null> {
-  await requireAdmin();
+  const access = await getCurrentUserAccess();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("quotes")
     .select("*, items:quote_items(*)")
-    .eq("id", id)
-    .single();
+    .eq("id", id);
+
+  if (access.role === "customer") {
+    query = query
+      .eq("customer_id", access.customerId)
+      .neq("status", "draft");
+  }
+
+  const { data, error } = await query.single();
 
   if (error) return null;
   return data as Quote;
@@ -88,9 +127,9 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
       tax_rate: input.tax_rate || 0,
       tax_amount,
       total,
-      valid_until: input.valid_until || null,
+      valid_until: input.valid_until || getDefaultQuoteExpiryDate(),
       notes: input.notes || null,
-      terms: input.terms || null,
+      terms: getQuoteTerms(input.terms),
       author_id: userId,
     })
     .select()
@@ -203,14 +242,18 @@ export async function updateQuote(
 
 // Invoices
 export async function getInvoices(customerId?: string): Promise<Invoice[]> {
-  await requireAdmin();
+  const access = await getCurrentUserAccess();
 
   let query = supabase
     .from("invoices")
     .select("*, items:invoice_items(*)")
     .order("created_at", { ascending: false });
 
-  if (customerId) {
+  if (access.role === "customer") {
+    query = query
+      .eq("customer_id", access.customerId)
+      .neq("status", "draft");
+  } else if (customerId) {
     query = query.eq("customer_id", customerId);
   }
 
@@ -221,13 +264,20 @@ export async function getInvoices(customerId?: string): Promise<Invoice[]> {
 }
 
 export async function getInvoice(id: string): Promise<Invoice | null> {
-  await requireAdmin();
+  const access = await getCurrentUserAccess();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("invoices")
     .select("*, items:invoice_items(*)")
-    .eq("id", id)
-    .single();
+    .eq("id", id);
+
+  if (access.role === "customer") {
+    query = query
+      .eq("customer_id", access.customerId)
+      .neq("status", "draft");
+  }
+
+  const { data, error } = await query.single();
 
   if (error) return null;
   return data as Invoice;
@@ -388,6 +438,173 @@ export async function updateInvoice(
 
   revalidatePath(`/dashboard/customers/${data.customer_id}`);
   return data as Invoice;
+}
+
+async function assertCustomerDocumentAccess(
+  table: "quotes" | "invoices",
+  id: string,
+  role: UserRole,
+  customerId: string | null
+): Promise<void> {
+  if (role === "admin") return;
+
+  const { data, error } = await supabase
+    .from(table)
+    .select("customer_id")
+    .eq("id", id)
+    .single();
+
+  if (error || data?.customer_id !== customerId) {
+    throw new Error("Forbidden");
+  }
+}
+
+async function createInvoiceFromAcceptedQuote(
+  quote: Quote,
+  authorId: string
+): Promise<Invoice> {
+  const { data: existingInvoice, error: existingError } = await supabase
+    .from("invoices")
+    .select("*, items:invoice_items(*)")
+    .eq("quote_id", quote.id)
+    .maybeSingle();
+
+  if (existingError) throw new Error(sanitizeError(existingError));
+  if (existingInvoice) return existingInvoice as Invoice;
+
+  const { data: invoiceNumber } = await supabase.rpc("generate_invoice_number");
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("invoices")
+    .insert({
+      customer_id: quote.customer_id,
+      quote_id: quote.id,
+      invoice_number: invoiceNumber || `INV-${Date.now()}`,
+      title: quote.title,
+      description: quote.description,
+      subtotal: quote.subtotal,
+      tax_rate: quote.tax_rate,
+      tax_amount: quote.tax_amount,
+      total: quote.total,
+      amount_paid: 0,
+      balance_due: quote.total,
+      currency: quote.currency,
+      status: "sent",
+      sent_at: new Date().toISOString(),
+      notes: quote.notes,
+      terms: quote.terms,
+      payment_instructions: "Payment can be completed from the customer invoice screen.",
+      author_id: authorId,
+    })
+    .select()
+    .single();
+
+  if (invoiceError) throw new Error(sanitizeError(invoiceError));
+
+  const itemsToInsert = (quote.items || []).map((item, index) => ({
+    invoice_id: invoice.id,
+    description: item.description,
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    total: item.total,
+    sort_order: item.sort_order ?? index,
+  }));
+
+  if (itemsToInsert.length > 0) {
+    const { error: itemsError } = await supabase
+      .from("invoice_items")
+      .insert(itemsToInsert);
+
+    if (itemsError) throw new Error(sanitizeError(itemsError));
+  }
+
+  return invoice as Invoice;
+}
+
+export async function acceptQuote(id: string): Promise<Invoice> {
+  const access = await getCurrentUserAccess();
+  await assertCustomerDocumentAccess("quotes", id, access.role, access.customerId);
+
+  const quote = await getQuote(id);
+  if (!quote) throw new Error("Quote not found");
+  if (quote.status === "rejected" || quote.status === "expired" || isQuotePastValidityDate(quote)) {
+    throw new Error("This quote can no longer be accepted");
+  }
+
+  if (quote.status !== "accepted") {
+    const { error } = await supabase
+      .from("quotes")
+      .update({
+        status: "accepted",
+        accepted_at: new Date().toISOString(),
+      })
+      .eq("id", id);
+
+    if (error) throw new Error(sanitizeError(error));
+  }
+
+  const invoice = await createInvoiceFromAcceptedQuote(
+    { ...quote, status: "accepted", accepted_at: quote.accepted_at ?? new Date().toISOString() },
+    access.userId
+  );
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath("/dashboard/invoices");
+  revalidatePath(`/dashboard/customers/${quote.customer_id}`);
+  return invoice;
+}
+
+export async function rejectQuote(id: string): Promise<void> {
+  const access = await getCurrentUserAccess();
+  await assertCustomerDocumentAccess("quotes", id, access.role, access.customerId);
+
+  const { data: quote, error: quoteError } = await supabase
+    .from("quotes")
+    .select("customer_id, status, valid_until")
+    .eq("id", id)
+    .single();
+
+  if (quoteError || !quote) throw new Error("Quote not found");
+  if (quote.status === "accepted" || quote.status === "expired" || isQuotePastValidityDate(quote as Quote)) {
+    throw new Error("This quote can no longer be rejected");
+  }
+
+  const { error } = await supabase
+    .from("quotes")
+    .update({ status: "rejected" })
+    .eq("id", id);
+
+  if (error) throw new Error(sanitizeError(error));
+
+  revalidatePath("/dashboard/quotes");
+  revalidatePath(`/dashboard/customers/${quote.customer_id}`);
+}
+
+export async function payInvoice(id: string): Promise<void> {
+  const access = await getCurrentUserAccess();
+  await assertCustomerDocumentAccess("invoices", id, access.role, access.customerId);
+
+  const { data: invoice, error: invoiceError } = await supabase
+    .from("invoices")
+    .select("customer_id, total")
+    .eq("id", id)
+    .single();
+
+  if (invoiceError || !invoice) throw new Error("Invoice not found");
+
+  const { error } = await supabase
+    .from("invoices")
+    .update({
+      status: "paid",
+      amount_paid: invoice.total,
+      balance_due: 0,
+      paid_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+
+  if (error) throw new Error(sanitizeError(error));
+
+  revalidatePath("/dashboard/invoices");
+  revalidatePath(`/dashboard/customers/${invoice.customer_id}`);
 }
 
 // Customer Stats
