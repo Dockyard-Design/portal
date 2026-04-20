@@ -7,7 +7,6 @@ const PROJECT_SELECT = [
   "title",
   "slug",
   "excerpt",
-  "content",
   "status",
   "is_public",
   "is_featured",

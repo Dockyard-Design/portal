@@ -36,3 +36,17 @@ export interface CustomerWelcomeEmailInput {
   password: string;
   signInUrl: string;
 }
+
+export interface CustomerMessageEmailInput {
+  recipientEmail: string;
+  recipientName: string;
+  subject: string;
+  body: string;
+}
+
+export interface SupportMessageEmailInput {
+  customerName: string;
+  customerEmail: string | null;
+  subject: string;
+  body: string;
+}

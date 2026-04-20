@@ -7,7 +7,6 @@ export interface Project {
   title: string;
   slug: string;
   excerpt: string;
-  content: string;
   status: ProjectStatus;
   is_public: boolean;
   is_featured: boolean;

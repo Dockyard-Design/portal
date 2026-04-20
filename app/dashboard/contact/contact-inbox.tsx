@@ -232,6 +232,25 @@ export default function ContactInbox() {
     }
   };
 
+
+  const openSubmission = async (submission: ContactSubmission) => {
+    setSelectedId(submission.id);
+    if (submission.status !== "new" || submission.archived) return;
+
+    const markReadLocally = (items: ContactSubmission[]) =>
+      items.map((item) =>
+        item.id === submission.id ? { ...item, status: "read" as ContactStatus } : item
+      );
+
+    setActiveSubmissions(markReadLocally);
+    try {
+      await updateSubmissionStatus(submission.id, "read");
+      await fetchSubmissions();
+    } catch {
+      toast.error("Failed to mark submission as read");
+    }
+  };
+
   const openDeleteDialog = (id?: string) => {
     setDeleteTarget(id ?? "bulk");
     setDeleteDialogOpen(true);
@@ -332,7 +351,7 @@ export default function ContactInbox() {
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="dashboard-scrollbar min-h-0 flex-1 overflow-y-auto">
             {isLoading ? (
               <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
                 Loading submissions...
@@ -346,7 +365,7 @@ export default function ContactInbox() {
                 <button
                   key={submission.id}
                   type="button"
-                  onClick={() => setSelectedId(submission.id)}
+                  onClick={() => void openSubmission(submission)}
                   className={cn(
                     "flex w-full gap-3 border-b px-3 py-3 text-left transition-colors hover:bg-muted/40",
                     selectedSubmission?.id === submission.id && "bg-muted/60",
@@ -426,8 +445,8 @@ export default function ContactInbox() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-              <div className="min-h-0 flex-1 overflow-y-auto bg-muted/20 p-5">
-                <article className="mx-auto max-w-3xl rounded-lg border bg-background shadow-sm">
+              <div className="dashboard-scrollbar min-h-0 flex-1 overflow-y-auto bg-muted/20 p-5">
+                <article className="w-full rounded-lg border bg-background shadow-sm">
                   <div className="border-b px-5 py-4">
                     <div className="flex items-start gap-3">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">

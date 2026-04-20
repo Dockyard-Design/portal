@@ -4,12 +4,12 @@
 -- 1. Seed Projects/Posts
 -- Note: author_id should ideally match a real User ID from Clerk in your environment.
 -- Using 'seed-author-id' as a placeholder.
-INSERT INTO projects (title, slug, content, excerpt, is_public, is_featured, is_indexable, status, author_id, seo_title, seo_description)
+INSERT INTO projects (title, slug, excerpt, is_public, is_featured, is_indexable, status, author_id, seo_title, seo_description)
 VALUES
-('Getting Started with Next.js', 'getting-started-nextjs', 'Full content for getting started with Next.js. This is a comprehensive guide to building modern web applications.', 'Learn the basics of Next.js and start building today.', true, true, true, 'published', 'seed-author-id', 'Next.js Guide', 'Learn how to get started with Next.js'),
-('Advanced PostgreSQL Techniques', 'advanced-postgresql', 'Deep dive into PostgreSQL performance tuning, indexing strategies, and atomic operations.', 'Master the art of database optimization with these advanced tips.', true, false, true, 'published', 'seed-author-id', 'Advanced Postgres', 'Expert techniques for PostgreSQL'),
-('The Future of AI in Engineering', 'future-ai-engineering', 'Exploring how LLMs and AI agents are transforming the software development lifecycle.', 'How AI is changing the way we write and maintain code.', true, false, true, 'published', 'seed-author-id', 'AI in Engineering', 'The impact of AI on software engineering'),
-('Draft Post: Coming Soon', 'coming-soon', 'This content is still under construction.', 'A sneak peek at what is coming next.', false, false, false, 'draft', 'seed-author-id', NULL, NULL);
+('Getting Started with Next.js', 'getting-started-nextjs', 'Learn the basics of Next.js and start building today.', true, true, true, 'published', 'seed-author-id', 'Next.js Guide', 'Learn how to get started with Next.js'),
+('Advanced PostgreSQL Techniques', 'advanced-postgresql', 'Master the art of database optimization with these advanced tips.', true, false, true, 'published', 'seed-author-id', 'Advanced Postgres', 'Expert techniques for PostgreSQL'),
+('The Future of AI in Engineering', 'future-ai-engineering', 'How AI is changing the way we write and maintain code.', true, false, true, 'published', 'seed-author-id', 'AI in Engineering', 'The impact of AI on software engineering'),
+('Draft Post: Coming Soon', 'coming-soon', 'A sneak peek at what is coming next.', false, false, false, 'draft', 'seed-author-id', NULL, NULL);
 
 -- 2. Seed Contact Form Submissions
 INSERT INTO contact_submissions (name, email, message, status, archived)
@@ -152,7 +152,16 @@ VALUES
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a04', 'Consulting Services', 20, 150.00, 3000.00, 0),
 ('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a05', 'Consulting Services', 20, 150.00, 3000.00, 0);
 
--- 9. Seed Expense Categories
+-- 9. Seed Message Threads
+INSERT INTO message_threads (id, customer_id, subject, created_by, unread_admin, unread_customer, quote_id, invoice_id)
+VALUES
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Quote: Website Development Quote', 'seed-author-id', false, true, 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01');
+
+INSERT INTO messages (thread_id, sender_id, sender_role, body)
+VALUES
+('f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'system', 'system', 'Quote accepted and invoice INV-2024-0001 has been paid.');
+
+-- 10. Seed Expense Categories
 INSERT INTO expense_categories (id, name, color, icon, description)
 VALUES
 ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a01', 'Office Rent', 'bg-blue-500', 'Building', 'Monthly office rental payments'),
@@ -164,7 +173,7 @@ VALUES
 ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a07', 'Freelance', 'bg-orange-500', 'User', 'Contractor and freelancer payments'),
 ('e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a08', 'Supplies', 'bg-slate-500', 'Package', 'Office supplies and misc items');
 
--- 10. Seed Expenses
+-- 11. Seed Expenses
 INSERT INTO expenses (category_id, title, description, amount, expense_date, tax_deductible, is_recurring, recurring_frequency, vendor, author_id)
 VALUES
 -- Office Rent (Recurring)

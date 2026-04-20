@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
+import { NewProjectClient } from "./new-project-client";
 
 export default function NewProjectPage() {
-  redirect("/dashboard/projects");
+  return <NewProjectClient />;
 }

@@ -433,7 +433,7 @@ export function MessagesClient({
         </DialogContent>
       </Dialog>
 
-      <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_280px] xl:overflow-hidden">
+      <div className="dashboard-scrollbar grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[340px_minmax(0,1fr)] xl:grid-cols-[360px_minmax(0,1fr)_280px] xl:overflow-hidden">
         <Card className="min-h-[320px] border-border/50 bg-card/80 py-0 shadow-sm lg:min-h-0">
           <CardHeader className="gap-4 pt-5">
             <div className="flex items-start justify-between gap-3">
@@ -466,7 +466,7 @@ export function MessagesClient({
               </TabsList>
             </Tabs>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-2 pb-4">
+          <CardContent className="dashboard-scrollbar flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-2 pb-4">
             {filteredThreads.map((thread) => {
               const unread = getUnread(thread);
               const latest = thread.messages.at(-1);
@@ -611,7 +611,7 @@ export function MessagesClient({
               <CardContent className="flex min-h-0 flex-1 flex-col gap-4 pb-4">
                 <div
                   ref={messageListRef}
-                  className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-lg bg-background/30 px-3 py-4 sm:px-5"
+                  className="dashboard-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-lg bg-background/30 px-3 py-4 sm:px-5"
                 >
                   {selectedThread.messages.map((message) => {
                     const fromAdmin = message.sender_role === "admin";
@@ -734,7 +734,7 @@ export function MessagesClient({
             <CardTitle>Details</CardTitle>
             <CardDescription>Conversation context</CardDescription>
           </CardHeader>
-          <CardContent className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-4">
+          <CardContent className="dashboard-scrollbar flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-4">
             {selectedThread ? (
               <>
                 <div className="flex flex-col items-center gap-3 rounded-lg border border-border/50 bg-background/35 p-4 text-center">

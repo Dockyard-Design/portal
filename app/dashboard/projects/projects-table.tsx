@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
   Table,
   TableBody,
@@ -15,17 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, ChevronLeft, ChevronRight, Globe, Lock, ExternalLink, Pencil, Star } from "lucide-react";
 import Link from "next/link";
 import { DeleteProjectButton } from "./delete-button";
-import { ProjectForm, type ProjectFormValues } from "./project-form";
-import { createProject, updateProject } from "@/app/actions/projects";
-import { toast } from "sonner";
 import type { Project } from "@/types/project";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 interface ProjectsTableProps {
   projects: Project[];
@@ -36,10 +25,6 @@ const ITEMS_PER_PAGE = 10;
 
 export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
   const [page, setPage] = useState(0);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<Project | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
-  const router = useRouter();
   const totalPages = Math.ceil(projects.length / ITEMS_PER_PAGE);
   const paginatedProjects = projects.slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE);
 
@@ -48,35 +33,6 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
 
   const getAuthorDisplay = (authorId: string) => {
     return authors[authorId] || "Unknown author";
-  };
-
-  const handleCreate = async (values: ProjectFormValues) => {
-    setIsSaving(true);
-    try {
-      await createProject(values);
-      toast.success("Project created");
-      setCreateOpen(false);
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to create project");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleUpdate = async (values: ProjectFormValues) => {
-    if (!editingProject) return;
-    setIsSaving(true);
-    try {
-      await updateProject(editingProject.id, values);
-      toast.success("Project updated");
-      setEditingProject(null);
-      router.refresh();
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update project");
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   return (
@@ -89,9 +45,11 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
             Manage your projects
           </p>
         </div>
-        <Button onClick={() => setCreateOpen(true)} className="inline-flex items-center gap-2">
+        <Button asChild className="inline-flex items-center gap-2">
+          <Link href="/dashboard/projects/new">
             <Plus className="size-4" />
             New Project
+          </Link>
         </Button>
       </div>
 
@@ -178,13 +136,10 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
                         </Button>
                       )}
                       
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => setEditingProject(project)}
-                      >
+                      <Button variant="ghost" size="icon" className="h-8 w-8" asChild>
+                        <Link href={`/dashboard/projects/${project.id}`}>
                           <Pencil className="size-4" />
+                        </Link>
                       </Button>
                       
                       <DeleteProjectButton id={project.id} title={project.title} />
@@ -213,36 +168,6 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
         )}
       </div>
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
-          <DialogHeader>
-            <DialogTitle>New Project</DialogTitle>
-            <DialogDescription>Create a public API-ready project record.</DialogDescription>
-          </DialogHeader>
-          <ProjectForm
-            onSubmit={handleCreate}
-            isPending={isSaving}
-            onCancel={() => setCreateOpen(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editingProject} onOpenChange={(open) => !open && setEditingProject(null)}>
-        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-6xl">
-          <DialogHeader>
-            <DialogTitle>Edit Project</DialogTitle>
-            <DialogDescription>{editingProject?.title}</DialogDescription>
-          </DialogHeader>
-          {editingProject && (
-            <ProjectForm
-              initialData={editingProject}
-              onSubmit={handleUpdate}
-              isPending={isSaving}
-              onCancel={() => setEditingProject(null)}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import { getCurrentUserAccess, requireAdmin } from "@/lib/authz";
-import { sendDocumentEmail, sendFormSubmissionEmail } from "@/lib/email";
+import { sendCustomerMessageEmail } from "@/lib/email";
 import type {
   Quote,
   Invoice,
@@ -63,6 +63,115 @@ function getQuoteTerms(inputTerms?: string): string {
   }
 
   return `${DEFAULT_QUOTE_TERMS}\n\n${terms}`;
+}
+
+function getQuoteReference(quote: Pick<Quote, "id" | "title">): string {
+  return quote.title || `Quote ${quote.id.slice(0, 8)}`;
+}
+
+function getInvoiceReference(invoice: Pick<Invoice, "invoice_number" | "title">): string {
+  return invoice.invoice_number || invoice.title;
+}
+
+type QuoteThreadCustomer = { name: string; company: string | null; email: string | null };
+
+type QuoteThreadRow = {
+  id: string;
+  subject: string;
+  customer_id: string;
+  customers: QuoteThreadCustomer | QuoteThreadCustomer[] | null;
+};
+
+function getThreadCustomer(thread: QuoteThreadRow): QuoteThreadCustomer | null {
+  if (Array.isArray(thread.customers)) return thread.customers[0] ?? null;
+  return thread.customers;
+}
+
+async function sendCustomerThreadEmail(
+  thread: QuoteThreadRow,
+  body: string,
+  context: string
+): Promise<void> {
+  const customer = getThreadCustomer(thread);
+  const email = customer?.email;
+  if (!email) return;
+
+  await sendCustomerMessageEmail({
+    recipientEmail: email,
+    recipientName: customer?.company || customer?.name || "Customer",
+    subject: thread.subject,
+    body,
+  }).catch((emailError) => {
+    console.error(`[${context}] Customer message email failed:`, emailError);
+  });
+}
+
+async function getOrCreateQuoteThread(
+  quote: Pick<Quote, "id" | "customer_id" | "title" | "author_id">
+): Promise<QuoteThreadRow> {
+  const { data: existingThread, error: existingError } = await supabase
+    .from("message_threads")
+    .select("id, subject, customer_id, customers(name, company, email)")
+    .eq("quote_id", quote.id)
+    .maybeSingle();
+
+  if (existingError) throw new Error(sanitizeError(existingError));
+  if (existingThread) return existingThread as QuoteThreadRow;
+
+  const { data: thread, error } = await supabase
+    .from("message_threads")
+    .insert({
+      customer_id: quote.customer_id,
+      quote_id: quote.id,
+      subject: `Quote: ${getQuoteReference(quote)}`,
+      created_by: quote.author_id,
+      unread_admin: false,
+      unread_customer: true,
+    })
+    .select("id, subject, customer_id, customers(name, company, email)")
+    .single();
+
+  if (error || !thread) throw new Error("Failed to create quote thread");
+  return thread as QuoteThreadRow;
+}
+
+async function addQuoteThreadMessage(input: {
+  quote: Pick<Quote, "id" | "customer_id" | "title" | "author_id">;
+  body: string;
+  unreadAdmin?: boolean;
+  unreadCustomer?: boolean;
+  invoiceId?: string | null;
+  context: string;
+}): Promise<void> {
+  const thread = await getOrCreateQuoteThread(input.quote);
+  const now = new Date().toISOString();
+
+  const { error: messageError } = await supabase.from("messages").insert({
+    thread_id: thread.id,
+    sender_id: "system",
+    sender_role: "system",
+    body: input.body,
+  });
+
+  if (messageError) throw new Error(sanitizeError(messageError));
+
+  const threadUpdate: Record<string, string | boolean | null> = {
+    last_message_at: now,
+    unread_admin: input.unreadAdmin ?? false,
+    unread_customer: input.unreadCustomer ?? true,
+  };
+
+  if (input.invoiceId) {
+    threadUpdate.invoice_id = input.invoiceId;
+  }
+
+  const { error: threadError } = await supabase
+    .from("message_threads")
+    .update(threadUpdate)
+    .eq("id", thread.id);
+
+  if (threadError) throw new Error(sanitizeError(threadError));
+  await sendCustomerThreadEmail(thread, input.body, input.context);
 }
 
 // Quotes
@@ -153,18 +262,10 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
 
   if (itemsError) throw new Error(sanitizeError(itemsError));
 
-  await sendFormSubmissionEmail({
-    formName: "Quote",
-    submittedAt: new Date().toISOString(),
-    details: {
-      action: "created",
-      title: quote.title,
-      customer_id: input.customer_id,
-      total,
-      status: quote.status,
-    },
-  }).catch((emailError) => {
-    console.error("[createQuote] Email notification failed:", emailError);
+  await addQuoteThreadMessage({
+    quote: quote as Quote,
+    body: `A new quote has been created: ${quote.title}. Total: ${new Intl.NumberFormat("en-GB", { style: "currency", currency: quote.currency || "GBP" }).format(total)}.`,
+    context: "createQuote",
   });
 
   revalidatePath(`/dashboard/customers/${input.customer_id}`);
@@ -176,6 +277,12 @@ export async function updateQuote(
   input: UpdateQuoteInput
 ): Promise<Quote> {
   await requireAdmin();
+
+  const { data: currentQuote } = await supabase
+    .from("quotes")
+    .select("id, customer_id, title, author_id, status, currency, total")
+    .eq("id", id)
+    .single();
 
   const updateData: Record<string, unknown> = {};
   
@@ -236,8 +343,21 @@ export async function updateQuote(
     await supabase.from("quote_items").insert(itemsToInsert);
   }
 
+  const updatedQuote = data as Quote;
+  const statusChanged = input.status !== undefined && currentQuote?.status !== input.status;
+  const body = statusChanged
+    ? `Quote status changed to ${updatedQuote.status}: ${updatedQuote.title}.`
+    : `Quote updated: ${updatedQuote.title}.`;
+  await addQuoteThreadMessage({
+    quote: updatedQuote,
+    body,
+    unreadAdmin: false,
+    unreadCustomer: true,
+    context: "updateQuote",
+  });
+
   revalidatePath(`/dashboard/customers/${data.customer_id}`);
-  return data as Quote;
+  return updatedQuote;
 }
 
 // Invoices
@@ -334,20 +454,19 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
 
   if (itemsError) throw new Error(sanitizeError(itemsError));
 
-  await sendFormSubmissionEmail({
-    formName: "Invoice",
-    submittedAt: new Date().toISOString(),
-    details: {
-      action: "created",
-      title: invoice.title,
-      invoice_number: invoice.invoice_number,
-      customer_id: input.customer_id,
-      total,
-      status: invoice.status,
-    },
-  }).catch((emailError) => {
-    console.error("[createInvoice] Email notification failed:", emailError);
-  });
+  if (invoice.quote_id) {
+    await addQuoteThreadMessage({
+      quote: {
+        id: invoice.quote_id,
+        customer_id: invoice.customer_id,
+        title: invoice.title,
+        author_id: invoice.author_id,
+      },
+      body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been created for quote ${invoice.title}.`,
+      invoiceId: invoice.id,
+      context: "createInvoice",
+    });
+  }
 
   revalidatePath(`/dashboard/customers/${input.customer_id}`);
   return invoice as Invoice;
@@ -358,6 +477,12 @@ export async function updateInvoice(
   input: UpdateInvoiceInput
 ): Promise<Invoice> {
   await requireAdmin();
+
+  const { data: currentInvoice } = await supabase
+    .from("invoices")
+    .select("id, customer_id, quote_id, invoice_number, title, author_id, status")
+    .eq("id", id)
+    .single();
 
   const updateData: Record<string, unknown> = {};
   
@@ -436,8 +561,23 @@ export async function updateInvoice(
     await supabase.from("invoice_items").insert(itemsToInsert);
   }
 
+  const updatedInvoice = data as Invoice;
+  if (updatedInvoice.quote_id && input.status !== undefined && currentInvoice?.status !== input.status) {
+    await addQuoteThreadMessage({
+      quote: {
+        id: updatedInvoice.quote_id,
+        customer_id: updatedInvoice.customer_id,
+        title: updatedInvoice.title,
+        author_id: updatedInvoice.author_id,
+      },
+      body: `Invoice ${getInvoiceReference(updatedInvoice)} status changed to ${updatedInvoice.status}.`,
+      invoiceId: updatedInvoice.id,
+      context: "updateInvoice",
+    });
+  }
+
   revalidatePath(`/dashboard/customers/${data.customer_id}`);
-  return data as Invoice;
+  return updatedInvoice;
 }
 
 async function assertCustomerDocumentAccess(
@@ -517,6 +657,13 @@ async function createInvoiceFromAcceptedQuote(
     if (itemsError) throw new Error(sanitizeError(itemsError));
   }
 
+  await addQuoteThreadMessage({
+    quote,
+    body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been created from the accepted quote.`,
+    invoiceId: invoice.id,
+    context: "createInvoiceFromAcceptedQuote",
+  });
+
   return invoice as Invoice;
 }
 
@@ -542,8 +689,17 @@ export async function acceptQuote(id: string): Promise<Invoice> {
     if (error) throw new Error(sanitizeError(error));
   }
 
+  const acceptedQuote = { ...quote, status: "accepted" as const, accepted_at: quote.accepted_at ?? new Date().toISOString() };
+  await addQuoteThreadMessage({
+    quote: acceptedQuote,
+    body: `Quote accepted: ${quote.title}.`,
+    unreadAdmin: true,
+    unreadCustomer: false,
+    context: "acceptQuote",
+  });
+
   const invoice = await createInvoiceFromAcceptedQuote(
-    { ...quote, status: "accepted", accepted_at: quote.accepted_at ?? new Date().toISOString() },
+    acceptedQuote,
     access.userId
   );
 
@@ -559,7 +715,7 @@ export async function rejectQuote(id: string): Promise<void> {
 
   const { data: quote, error: quoteError } = await supabase
     .from("quotes")
-    .select("customer_id, status, valid_until")
+    .select("id, customer_id, title, author_id, status, valid_until")
     .eq("id", id)
     .single();
 
@@ -575,6 +731,14 @@ export async function rejectQuote(id: string): Promise<void> {
 
   if (error) throw new Error(sanitizeError(error));
 
+  await addQuoteThreadMessage({
+    quote: quote as Quote,
+    body: "Quote rejected by the customer.",
+    unreadAdmin: true,
+    unreadCustomer: false,
+    context: "rejectQuote",
+  });
+
   revalidatePath("/dashboard/quotes");
   revalidatePath(`/dashboard/customers/${quote.customer_id}`);
 }
@@ -585,7 +749,7 @@ export async function payInvoice(id: string): Promise<void> {
 
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
-    .select("customer_id, total")
+    .select("id, customer_id, quote_id, invoice_number, title, author_id, total")
     .eq("id", id)
     .single();
 
@@ -602,6 +766,20 @@ export async function payInvoice(id: string): Promise<void> {
     .eq("id", id);
 
   if (error) throw new Error(sanitizeError(error));
+
+  if (invoice.quote_id) {
+    await addQuoteThreadMessage({
+      quote: {
+        id: invoice.quote_id,
+        customer_id: invoice.customer_id,
+        title: invoice.title,
+        author_id: invoice.author_id,
+      },
+      body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been paid.`,
+      invoiceId: invoice.id,
+      context: "payInvoice",
+    });
+  }
 
   revalidatePath("/dashboard/invoices");
   revalidatePath(`/dashboard/customers/${invoice.customer_id}`);
@@ -677,27 +855,6 @@ export async function sendQuoteToCustomer(id: string): Promise<void> {
   const quote = await getQuote(id);
   if (!quote) throw new Error("Quote not found");
 
-  const { data: customer, error } = await supabase
-    .from("customers")
-    .select("name, email")
-    .eq("id", quote.customer_id)
-    .single();
-
-  if (error || !customer?.email) {
-    throw new Error("Customer email is required before sending a quote");
-  }
-
-  const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4567";
-  await sendDocumentEmail({
-    documentType: "quote",
-    recipientEmail: customer.email,
-    recipientName: customer.name,
-    title: quote.title,
-    total: quote.total,
-    currency: quote.currency,
-    pdfUrl: `${baseUrl}/api/pdf/quote/${quote.id}`,
-  });
-
   await updateQuote(id, { status: "sent" });
   revalidatePath("/dashboard/quotes");
 }
@@ -707,27 +864,6 @@ export async function sendInvoiceToCustomer(id: string): Promise<void> {
 
   const invoice = await getInvoice(id);
   if (!invoice) throw new Error("Invoice not found");
-
-  const { data: customer, error } = await supabase
-    .from("customers")
-    .select("name, email")
-    .eq("id", invoice.customer_id)
-    .single();
-
-  if (error || !customer?.email) {
-    throw new Error("Customer email is required before sending an invoice");
-  }
-
-  const baseUrl = process.env.APP_BASE_URL || process.env.NEXT_PUBLIC_APP_URL || "http://localhost:4567";
-  await sendDocumentEmail({
-    documentType: "invoice",
-    recipientEmail: customer.email,
-    recipientName: customer.name,
-    title: invoice.title,
-    total: invoice.total,
-    currency: invoice.currency,
-    pdfUrl: `${baseUrl}/api/pdf/invoice/${invoice.id}`,
-  });
 
   await updateInvoice(id, { status: "sent" });
   revalidatePath("/dashboard/invoices");

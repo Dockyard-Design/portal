@@ -26,7 +26,6 @@ export const projectSchema = z.object({
   title: z.string().min(1, "Title is required").max(100, "Title too long"),
   slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Only lowercase letters, numbers, and hyphens"),
   excerpt: z.string().max(200, "Excerpt too long"),
-  content: z.string().min(1, "Content is required"),
   status: z.enum(["draft", "published", "archived"]),
   is_public: z.boolean(),
   is_featured: z.boolean(),
@@ -60,7 +59,6 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
     title: initialData.title || "",
     slug: initialData.slug || "",
     excerpt: initialData.excerpt || "",
-    content: initialData.content || "",
     status: initialData.status || "draft",
     is_public: initialData.is_public ?? false,
     is_featured: initialData.is_featured ?? false,
@@ -85,7 +83,6 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
       title: "",
       slug: "",
       excerpt: "",
-      content: "",
       status: "draft",
       is_public: false,
       is_featured: false,
@@ -264,15 +261,6 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
             />
           </div>
 
-          <div className="space-y-2">
-            <Label className="text-sm font-semibold">Content <span className="text-muted-foreground font-normal">(Markdown)</span></Label>
-            <Textarea
-              {...register("content")}
-              placeholder="# Start writing here..."
-              className="bg-secondary/50 border-border/40 focus:border-primary/50 font-mono text-sm min-h-[180px]"
-            />
-            {errors.content && <p className="text-xs text-destructive font-medium">{errors.content.message}</p>}
-          </div>
         </div>
 
         {/* Right Column — Config & SEO */}

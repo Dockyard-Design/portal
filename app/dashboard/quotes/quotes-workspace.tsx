@@ -143,12 +143,6 @@ export function QuotesWorkspace({
     setPdfQuote(quote);
   };
 
-  const openCreateQuote = () => {
-    setSelectedQuote(null);
-    setQuoteModalMode("create");
-    setQuoteModalOpen(true);
-  };
-
   const openViewQuote = (quote: Quote) => {
     setSelectedQuote(quote);
     setQuoteModalMode("view");
@@ -198,9 +192,11 @@ export function QuotesWorkspace({
           </div>
         </div>
         {!isCustomerRole && (
-          <Button onClick={openCreateQuote}>
-            <Plus className="size-4 mr-1" />
-            Create Quote
+          <Button asChild>
+            <Link href={`/dashboard/quotes/new${selectedCustomerId ? `?customerId=${selectedCustomerId}` : ""}`}>
+              <Plus className="size-4 mr-1" />
+              Create Quote
+            </Link>
           </Button>
         )}
       </div>
@@ -350,7 +346,7 @@ export function QuotesWorkspace({
                                   disabled={sendingId === quote.id}
                                 >
                                   <Send className="size-4 mr-2" />
-                                  {sendingId === quote.id ? "Sending..." : "Send Email"}
+                                  {sendingId === quote.id ? "Sending..." : "Send Message"}
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive">

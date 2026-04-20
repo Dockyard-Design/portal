@@ -1103,7 +1103,7 @@ export function KanbanBoard({
                     })()}
                   </SelectValue>
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[320px]">
                   <SelectItem value="unassigned">
                     <div className="flex items-center gap-2">
                       <UserCircle className="size-4 text-muted-foreground" />

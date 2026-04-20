@@ -11,6 +11,8 @@ export interface MessageThread {
   last_message_at: string;
   unread_admin: boolean;
   unread_customer: boolean;
+  quote_id: string | null;
+  invoice_id: string | null;
 }
 
 export interface Message {

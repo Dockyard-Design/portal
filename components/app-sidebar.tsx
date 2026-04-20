@@ -160,6 +160,11 @@ const NAV_GROUPS: MenuGroup[] = [
         href: "/dashboard/expense-metrics",
         icon: Receipt,
       },
+      {
+        title: "Reports",
+        href: "/dashboard/reports",
+        icon: FileText,
+      },
     ],
   },
 ];

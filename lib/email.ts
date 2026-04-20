@@ -3,10 +3,13 @@ import type {
   CustomerWelcomeEmailInput,
   FormSubmissionEmailInput,
   SendEmailInput,
+  CustomerMessageEmailInput,
+  SupportMessageEmailInput,
 } from "@/types/email";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 const SUPPORT_EMAIL = "support@dockyard.design";
+const NO_REPLY_EMAIL = "no-reply@dockyard.design";
 
 function escapeHtml(value: string): string {
   return value
@@ -107,6 +110,57 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
         <p><strong>Total:</strong> ${escapeHtml(formattedTotal)}</p>
         <p><a href="${escapeHtml(input.pdfUrl)}">View or download the ${escapeHtml(label.toLowerCase())}</a></p>
         <p>Dockyard Design</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendCustomerMessageEmail(
+  input: CustomerMessageEmailInput
+): Promise<void> {
+  await sendEmail({
+    to: [input.recipientEmail],
+    from: NO_REPLY_EMAIL,
+    subject: `New portal message: ${input.subject}`,
+    text: [
+      `Hello ${input.recipientName},`,
+      "",
+      "You have a new message in your Dockyard portal.",
+      "",
+      input.body,
+      "",
+      "Dockyard Design",
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+        <p>Hello ${escapeHtml(input.recipientName)},</p>
+        <p>You have a new message in your Dockyard portal.</p>
+        <div style="white-space:pre-wrap;padding:12px;border-left:3px solid #111827;background:#f9fafb;">${escapeHtml(input.body)}</div>
+        <p>Dockyard Design</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendSupportMessageEmail(
+  input: SupportMessageEmailInput
+): Promise<void> {
+  await sendEmail({
+    to: [SUPPORT_EMAIL],
+    from: NO_REPLY_EMAIL,
+    subject: `Customer portal message: ${input.subject}`,
+    text: [
+      `Customer: ${input.customerName}`,
+      `Email: ${input.customerEmail || "Not provided"}`,
+      "",
+      input.body,
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+        <h1 style="font-size:20px;">Customer portal message</h1>
+        <p><strong>Customer:</strong> ${escapeHtml(input.customerName)}</p>
+        <p><strong>Email:</strong> ${escapeHtml(input.customerEmail || "Not provided")}</p>
+        <div style="white-space:pre-wrap;padding:12px;border-left:3px solid #111827;background:#f9fafb;">${escapeHtml(input.body)}</div>
       </div>
     `,
   });

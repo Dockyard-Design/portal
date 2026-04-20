@@ -31,7 +31,6 @@ CREATE TABLE projects (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   title TEXT NOT NULL,
   slug TEXT UNIQUE NOT NULL,
-  content TEXT,
   excerpt TEXT,
   is_public BOOLEAN DEFAULT FALSE,
   is_featured BOOLEAN NOT NULL DEFAULT FALSE,
@@ -429,7 +428,9 @@ CREATE TABLE message_threads (
   created_by TEXT NOT NULL,
   last_message_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   unread_admin BOOLEAN NOT NULL DEFAULT TRUE,
-  unread_customer BOOLEAN NOT NULL DEFAULT FALSE
+  unread_customer BOOLEAN NOT NULL DEFAULT FALSE,
+  quote_id UUID UNIQUE REFERENCES quotes(id) ON DELETE SET NULL,
+  invoice_id UUID REFERENCES invoices(id) ON DELETE SET NULL
 );
 
 CREATE TABLE messages (
@@ -443,6 +444,8 @@ CREATE TABLE messages (
 );
 
 CREATE INDEX idx_message_threads_customer ON message_threads(customer_id);
+CREATE INDEX idx_message_threads_quote ON message_threads(quote_id);
+CREATE INDEX idx_message_threads_invoice ON message_threads(invoice_id);
 CREATE INDEX idx_message_threads_status ON message_threads(status);
 CREATE INDEX idx_message_threads_last_message ON message_threads(last_message_at DESC);
 CREATE INDEX idx_messages_thread ON messages(thread_id);

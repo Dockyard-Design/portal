@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/api-keys";
 import { getCurrentUserAccess, requireUser } from "@/lib/authz";
+import { sendCustomerMessageEmail, sendSupportMessageEmail } from "@/lib/email";
 import type {
   Message,
   MessageThread,
@@ -17,6 +18,35 @@ const AUTO_REPLY =
 type ThreadRowWithCustomer = MessageThread & {
   customers: { name: string; company: string | null; email: string | null } | null;
 };
+
+
+async function sendMessageEmailNotification(input: {
+  thread: ThreadRowWithCustomer;
+  senderRole: "admin" | "customer" | "system";
+  body: string;
+}): Promise<void> {
+  const customerName =
+    input.thread.customers?.company || input.thread.customers?.name || "Customer";
+  const customerEmail = input.thread.customers?.email ?? null;
+
+  if (input.senderRole === "admin" || input.senderRole === "system") {
+    if (!customerEmail) return;
+    await sendCustomerMessageEmail({
+      recipientEmail: customerEmail,
+      recipientName: customerName,
+      subject: input.thread.subject,
+      body: input.body,
+    });
+    return;
+  }
+
+  await sendSupportMessageEmail({
+    customerName,
+    customerEmail,
+    subject: input.thread.subject,
+    body: input.body,
+  });
+}
 
 function formatThread(
   thread: ThreadRowWithCustomer,
@@ -177,6 +207,18 @@ export async function createMessageThread(input: {
     .order("created_at", { ascending: true });
   if (messageError) throw new Error("Failed to create message");
 
+  await Promise.all(
+    messages.map((messageInput) =>
+      sendMessageEmailNotification({
+        thread: thread as ThreadRowWithCustomer,
+        senderRole: messageInput.sender_role,
+        body: messageInput.body,
+      }).catch((emailError) => {
+        console.error("[createMessageThread] Email notification failed:", emailError);
+      })
+    )
+  );
+
   revalidatePath("/dashboard/messages");
   return formatThread(
     thread as ThreadRowWithCustomer,
@@ -217,6 +259,15 @@ export async function replyToThread(threadId: string, body: string): Promise<{
     .single();
 
   if (threadError || !thread) throw new Error("Failed to update thread");
+
+  await sendMessageEmailNotification({
+    thread: thread as ThreadRowWithCustomer,
+    senderRole: access.role,
+    body,
+  }).catch((emailError) => {
+    console.error("[replyToThread] Email notification failed:", emailError);
+  });
+
   revalidatePath("/dashboard/messages");
   return {
     message: (await addSenderNames([message as Message]))[0],
