@@ -47,7 +47,7 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
   const handleNextPage = () => setPage(p => Math.min(totalPages - 1, p + 1));
 
   const getAuthorDisplay = (authorId: string) => {
-    return authors[authorId] || `User ${authorId.slice(-8)}`;
+    return authors[authorId] || "Unknown author";
   };
 
   const handleCreate = async (values: ProjectFormValues) => {

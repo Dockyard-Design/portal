@@ -242,7 +242,7 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
           <View style={styles.rightSection}>
             <View style={styles.docTypeRow}>
               <Text style={styles.docType}>QUOTE</Text>
-              <Text style={styles.docNumber}>Ref: {quote.id.slice(0, 8).toUpperCase()}</Text>
+              <Text style={styles.docNumber}>{quote.title}</Text>
             </View>
             <View style={styles.statusBadge}>
               <Text style={styles.statusText}>{quote.status.toUpperCase()}</Text>

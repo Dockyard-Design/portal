@@ -16,10 +16,9 @@ export default async function ProjectsPage() {
   for (const id of authorIds) {
     try {
       const user = await clerk.users.getUser(id);
-      authors[id] = user.firstName || user.username || user.emailAddresses[0]?.emailAddress || `User ${id.slice(-8)}`;
+      authors[id] = user.firstName || user.username || user.emailAddresses[0]?.emailAddress || "Unknown author";
     } catch {
-      // For seeded data or users that don't exist, show shortened ID
-      authors[id] = `User ${id.slice(-8)}`;
+      authors[id] = "Unknown author";
     }
   }
   

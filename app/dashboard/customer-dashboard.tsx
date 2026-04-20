@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LayoutGrid } from "lucide-react";
+import { FileText, LayoutGrid, Receipt, WalletCards } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
   SelectContent,
@@ -44,6 +45,14 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
       return grouped;
     }, { ...EMPTY_TASKS_BY_STATUS });
   }, [data.customerCompany, data.customerName, selectedBoard]);
+  const totalTasks = STATUSES.reduce(
+    (total, status) => total + (selectedBoard?.tasks[status].length ?? 0),
+    0
+  );
+  const money = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "GBP",
+  });
 
   return (
     <div className="flex w-full flex-col gap-6">
@@ -62,7 +71,9 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
         {data.boards.length > 1 && (
           <Select value={selectedBoard?.id ?? ""} onValueChange={(value) => setSelectedBoardId(value ?? "")}>
             <SelectTrigger className="w-full lg:w-80">
-              <SelectValue placeholder="Select board" />
+              <SelectValue placeholder="Select board">
+                {selectedBoard?.name ?? "Select board"}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               {data.boards.map((board) => (
@@ -73,6 +84,33 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
             </SelectContent>
           </Select>
         )}
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-4">
+        <SummaryCard
+          title="Quotes"
+          value={data.stats.totalQuotes}
+          detail={`${data.stats.quotesAccepted} accepted, ${data.stats.quotesPending} pending`}
+          icon={FileText}
+        />
+        <SummaryCard
+          title="Invoices"
+          value={data.stats.totalInvoices}
+          detail={`${data.stats.invoicesPaid} paid, ${data.stats.invoicesOverdue} overdue`}
+          icon={Receipt}
+        />
+        <SummaryCard
+          title="Outstanding"
+          value={money.format(data.stats.outstandingBalance)}
+          detail="Balance due"
+          icon={WalletCards}
+        />
+        <SummaryCard
+          title="Kanban"
+          value={totalTasks}
+          detail={`${data.boards.length} board${data.boards.length === 1 ? "" : "s"}`}
+          icon={LayoutGrid}
+        />
       </div>
 
       {selectedBoard ? (
@@ -87,5 +125,30 @@ export function CustomerDashboard({ data }: { data: CustomerDashboardData }) {
         </div>
       )}
     </div>
+  );
+}
+
+function SummaryCard({
+  title,
+  value,
+  detail,
+  icon: Icon,
+}: {
+  title: string;
+  value: string | number;
+  detail: string;
+  icon: typeof LayoutGrid;
+}) {
+  return (
+    <Card className="border-border/40">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <Icon className="size-4 text-muted-foreground" />
+      </CardHeader>
+      <CardContent>
+        <div className="text-2xl font-semibold">{value}</div>
+        <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
+      </CardContent>
+    </Card>
   );
 }

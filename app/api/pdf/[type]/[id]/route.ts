@@ -9,10 +9,10 @@ export async function GET(
 
   await requireAdmin();
 
-  const { type, id } = await params;
+  const { type } = await params;
   
   // Return a simple placeholder PDF response
-  return new NextResponse("PDF placeholder for " + type + " " + id, {
+  return new NextResponse(`PDF placeholder unavailable for ${type}.`, {
     status: 200,
     headers: {
       "Content-Type": "text/plain",

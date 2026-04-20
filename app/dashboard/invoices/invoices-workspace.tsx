@@ -76,7 +76,6 @@ export function InvoicesWorkspace({
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch = 
       invoice.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (invoice.description ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (customers.find(c => c.id === invoice.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -181,7 +180,7 @@ export function InvoicesWorkspace({
             <div className="relative flex-1">
               <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
-                placeholder="Search by reference or invoice and name..."
+                placeholder="Search by invoice number, title, or customer name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"

@@ -310,14 +310,6 @@ export function ApiRequestsTable({ requests }: ApiRequestsTableProps) {
                   </div>
                 )}
 
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase">
-                  Request ID
-                </Label>
-                <code className="block text-xs font-mono text-muted-foreground mt-1">
-                  {selectedRequest.id}
-                </code>
-              </div>
             </div>
           )}
         </DialogContent>

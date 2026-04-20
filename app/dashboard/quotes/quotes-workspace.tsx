@@ -78,7 +78,6 @@ export function QuotesWorkspace({
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch = 
-      quote.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       quote.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (quote.description ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       (customers.find(c => c.id === quote.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -213,7 +212,7 @@ export function QuotesWorkspace({
             <div className="flex-1">
               <Label className="text-sm text-muted-foreground mb-2 block">Search</Label>
               <Input
-                placeholder="Search by reference or quote and name..."
+                placeholder="Search by quote or customer name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />

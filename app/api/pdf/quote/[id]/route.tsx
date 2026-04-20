@@ -44,11 +44,21 @@ export async function GET(
     return new NextResponse(Buffer.from(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="quote-${id.slice(0, 8)}.pdf"`,
+        "Content-Disposition": `inline; filename="quote-${slugify(quote.title)}.pdf"`,
       },
     });
   } catch (error) {
     console.error("Error generating quote PDF:", error);
     return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 });
   }
+}
+
+function slugify(value: string): string {
+  return (
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48) || "document"
+  );
 }
