@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -52,6 +52,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
+import { useKanbanStore } from "@/lib/store";
 import { QuoteModal } from "../../components/quote-modal-v2";
 import { InvoiceModal } from "../../components/invoice-modal-v2";
 import type { Customer } from "@/types/kanban";
@@ -74,6 +75,7 @@ export default function CustomerDetailClient({
 }: CustomerDetailClientProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
+  const { setSelectedCustomer } = useKanbanStore();
   const customerId = customer.id;
 
   const [activeTab, setActiveTab] = useState("overview");
@@ -87,10 +89,17 @@ export default function CustomerDetailClient({
   const [isSavingCustomer, setIsSavingCustomer] = useState(false);
   const [customerForm, setCustomerForm] = useState({
     name: customer.name,
+    firstName: customer.first_name ?? "",
+    lastName: customer.last_name ?? "",
+    phone: customer.phone ?? "",
     email: customer.email ?? "",
     company: customer.company ?? "",
     notes: customer.notes ?? "",
   });
+
+  useEffect(() => {
+    setSelectedCustomer(customerId);
+  }, [customerId, setSelectedCustomer]);
 
   const refreshData = () => {
     startTransition(() => {
@@ -163,6 +172,9 @@ export default function CustomerDetailClient({
   const openEditCustomer = () => {
     setCustomerForm({
       name: customer.name,
+      firstName: customer.first_name ?? "",
+      lastName: customer.last_name ?? "",
+      phone: customer.phone ?? "",
       email: customer.email ?? "",
       company: customer.company ?? "",
       notes: customer.notes ?? "",
@@ -179,6 +191,9 @@ export default function CustomerDetailClient({
       const { updateCustomer } = await import("@/app/actions/kanban");
       await updateCustomer(customer.id, {
         name: customerForm.name.trim(),
+        first_name: customerForm.firstName.trim() || null,
+        last_name: customerForm.lastName.trim() || null,
+        phone: customerForm.phone.trim() || null,
         email: customerForm.email.trim() || null,
         company: customerForm.company.trim() || null,
         notes: customerForm.notes.trim() || null,
@@ -543,6 +558,28 @@ export default function CustomerDetailClient({
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleUpdateCustomer} className="grid gap-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="edit-customer-first-name">First Name</Label>
+                <Input
+                  id="edit-customer-first-name"
+                  value={customerForm.firstName}
+                  onChange={(event) =>
+                    setCustomerForm((current) => ({ ...current, firstName: event.target.value }))
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="edit-customer-last-name">Last Name</Label>
+                <Input
+                  id="edit-customer-last-name"
+                  value={customerForm.lastName}
+                  onChange={(event) =>
+                    setCustomerForm((current) => ({ ...current, lastName: event.target.value }))
+                  }
+                />
+              </div>
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-customer-name">Name</Label>
               <Input
@@ -562,6 +599,17 @@ export default function CustomerDetailClient({
                 value={customerForm.email}
                 onChange={(event) =>
                   setCustomerForm((current) => ({ ...current, email: event.target.value }))
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-customer-phone">Phone Number</Label>
+              <Input
+                id="edit-customer-phone"
+                type="tel"
+                value={customerForm.phone}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, phone: event.target.value }))
                 }
               />
             </div>

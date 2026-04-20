@@ -44,6 +44,7 @@ import type { Invoice, Quote } from "@/types/agency";
 import type { UserRole } from "@/types/auth";
 import { payInvoice, sendInvoiceToCustomer } from "@/app/actions/agency";
 import { InvoiceModal } from "@/app/dashboard/components/invoice-modal-v2";
+import { PdfViewDialog } from "@/app/dashboard/components/pdf-view-dialog";
 import { toast } from "sonner";
 
 interface InvoicesClientProps {
@@ -68,14 +69,18 @@ export default function InvoicesClient({
   const [invoiceModalOpen, setInvoiceModalOpen] = useState(false);
   const [invoiceModalMode, setInvoiceModalMode] = useState<"edit" | "view">("view");
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [pdfInvoice, setPdfInvoice] = useState<Invoice | null>(null);
   const router = useRouter();
   const isCustomerRole = role === "customer";
 
   const filteredInvoices = invoices.filter((invoice) => {
     const matchesSearch = 
       invoice.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      invoice.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (invoice.description ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
       invoice.invoice_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (customers.find(c => c.id === invoice.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+      (customers.find(c => c.id === invoice.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (customers.find(c => c.id === invoice.customer_id)?.company ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || invoice.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -126,6 +131,10 @@ export default function InvoicesClient({
     window.open(`/api/pdf/invoice/${invoiceId}`, "_blank", "noopener,noreferrer");
   };
 
+  const openPdfModal = (invoice: Invoice) => {
+    setPdfInvoice(invoice);
+  };
+
   const openViewInvoice = (invoice: Invoice) => {
     setSelectedInvoice(invoice);
     setInvoiceModalMode("view");
@@ -172,7 +181,7 @@ export default function InvoicesClient({
             <div className="relative flex-1">
               <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
               <Input
-                placeholder="Search by number, title or customer..."
+                placeholder="Search by reference or invoice and name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -185,13 +194,13 @@ export default function InvoicesClient({
                   <SelectValue/>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="partial">Partial</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <SelectItem value="all">all</SelectItem>
+                  <SelectItem value="draft">draft</SelectItem>
+                  <SelectItem value="sent">sent</SelectItem>
+                  <SelectItem value="paid">paid</SelectItem>
+                  <SelectItem value="partial">partial</SelectItem>
+                  <SelectItem value="overdue">overdue</SelectItem>
+                  <SelectItem value="cancelled">cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -261,42 +270,39 @@ export default function InvoicesClient({
                         <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
                           <MoreVertical className="size-4" />
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-48">
-                          <DropdownMenuItem onClick={() => openViewInvoice(invoice)}>
+                        <DropdownMenuContent align="end" className="w-52">
+                          <DropdownMenuItem onClick={() => isCustomerRole ? openPdfModal(invoice) : openViewInvoice(invoice)}>
                             <Eye className="size-4 mr-2" />
-                            View Details
+                            View
                           </DropdownMenuItem>
-                          {!isCustomerRole && (
-                            <DropdownMenuItem onClick={() => openEditInvoice(invoice)}>
-                              <Edit className="size-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => openPdf(invoice.id)}>
-                            <Download className="size-4 mr-2" />
-                            Download PDF
-                          </DropdownMenuItem>
-                          {!isCustomerRole && (
-                            <DropdownMenuItem
-                              onClick={() => void handleSendInvoice(invoice.id)}
-                              disabled={sendingId === invoice.id}
-                            >
-                              <Send className="size-4 mr-2" />
-                              {sendingId === invoice.id ? "Sending..." : "Send Email"}
-                            </DropdownMenuItem>
-                          )}
-                          {isCustomerRole && invoice.status !== "paid" && invoice.status !== "cancelled" && (
-                            <DropdownMenuItem
-                              onClick={() => void handlePayInvoice(invoice.id)}
-                              disabled={payingId === invoice.id}
-                            >
-                              <CreditCard className="size-4 mr-2" />
-                              {payingId === invoice.id ? "Paying..." : "Pay Invoice"}
-                            </DropdownMenuItem>
-                          )}
-                          {!isCustomerRole && (
+                          {isCustomerRole ? (
+                            invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                              <DropdownMenuItem
+                                onClick={() => void handlePayInvoice(invoice.id)}
+                                disabled={payingId === invoice.id}
+                              >
+                                <CreditCard className="size-4 mr-2" />
+                                {payingId === invoice.id ? "Paying..." : "Pay"}
+                              </DropdownMenuItem>
+                            )
+                          ) : (
                             <>
+                              <DropdownMenuItem onClick={() => openEditInvoice(invoice)}>
+                                <Edit className="size-4 mr-2" />
+                                Edit
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => openPdf(invoice.id)}>
+                                <Download className="size-4 mr-2" />
+                                Download PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => void handleSendInvoice(invoice.id)}
+                                disabled={sendingId === invoice.id}
+                              >
+                                <Send className="size-4 mr-2" />
+                                {sendingId === invoice.id ? "Sending..." : "Send Email"}
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem className="text-destructive">
                                 <Trash2 className="size-4 mr-2" />
@@ -324,6 +330,14 @@ export default function InvoicesClient({
         onOpenChange={setInvoiceModalOpen}
         onSuccess={refreshData}
         role={role}
+      />
+      <PdfViewDialog
+        open={Boolean(pdfInvoice)}
+        onOpenChange={(open) => {
+          if (!open) setPdfInvoice(null);
+        }}
+        title={pdfInvoice?.invoice_number ?? "Invoice PDF"}
+        pdfUrl={pdfInvoice ? `/api/pdf/invoice/${pdfInvoice.id}` : null}
       />
     </div>
   );

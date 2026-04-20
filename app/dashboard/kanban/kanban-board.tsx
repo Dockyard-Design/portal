@@ -191,7 +191,9 @@ interface TaskFormState {
 }
 
 interface CustomerFormState {
-  name: string;
+  first_name: string;
+  last_name: string;
+  phone: string;
   email: string;
   company: string;
   notes: string;
@@ -254,7 +256,9 @@ export function KanbanBoard({
   });
 
   const [customerForm, setCustomerForm] = useState<CustomerFormState>({
-    name: "",
+    first_name: "",
+    last_name: "",
+    phone: "",
     email: "",
     company: "",
     notes: "",
@@ -305,10 +309,6 @@ export function KanbanBoard({
   async function handleSaveTask(e: React.FormEvent): Promise<void> {
     e.preventDefault();
     if (!selectedBoard?.id) return;
-    if (!taskForm.due_date) {
-      toast.error("Select a due date before saving the task");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -318,6 +318,7 @@ export function KanbanBoard({
         await updateTask(editingTask.id, {
           ...taskForm,
           assigned_to: assignedToValue,
+          due_date: taskForm.due_date || null,
         });
         toast.success("Task updated");
       } else {
@@ -325,6 +326,7 @@ export function KanbanBoard({
           ...taskForm,
           board_id: selectedBoard.id,
           assigned_to: assignedToValue,
+          due_date: taskForm.due_date || null,
         };
         await createTask(taskInput);
         toast.success("Task created");
@@ -376,7 +378,14 @@ export function KanbanBoard({
       const customer = await createCustomer(customerInput);
       toast.success("Customer created");
       setIsCustomerDialogOpen(false);
-      setCustomerForm({ name: "", email: "", company: "", notes: "" });
+      setCustomerForm({
+        first_name: "",
+        last_name: "",
+        phone: "",
+        email: "",
+        company: "",
+        notes: "",
+      });
       handleCustomerChange(customer.id);
     } catch (error: unknown) {
       const message =
@@ -1164,17 +1173,16 @@ export function KanbanBoard({
               <Label>Due Date</Label>
               <Popover>
                 <PopoverTrigger
-                  aria-invalid={!taskForm.due_date}
                   className={cn(
                     "w-full justify-start text-left font-normal flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground",
-                    !taskForm.due_date && "border-destructive text-muted-foreground"
+                    !taskForm.due_date && "text-muted-foreground"
                   )}
                 >
                   <CalendarIcon className="h-4 w-4" />
                   {taskForm.due_date ? (
                     format(parseISO(taskForm.due_date), "PPP")
                   ) : (
-                    <span>Pick a date</span>
+                    <span>No due date</span>
                   )}
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0" align="start">
@@ -1191,9 +1199,6 @@ export function KanbanBoard({
                   />
                 </PopoverContent>
               </Popover>
-              {!taskForm.due_date && (
-                <p className="text-xs text-destructive">A due date is required.</p>
-              )}
             </div>
 
             <div className="flex justify-end gap-3">
@@ -1204,7 +1209,7 @@ export function KanbanBoard({
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSubmitting || !taskForm.due_date}>
+              <Button type="submit" disabled={isSubmitting}>
                 {editingTask ? "Update Task" : "Create Task"}
               </Button>
             </div>
@@ -1227,14 +1232,27 @@ export function KanbanBoard({
 
           <form onSubmit={handleCreateCustomer} className="space-y-4 mt-4">
             <div className="space-y-2">
-              <Label htmlFor="c-name">Name</Label>
+              <Label htmlFor="c-first-name">First Name</Label>
               <Input
-                id="c-name"
-                value={customerForm.name}
+                id="c-first-name"
+                value={customerForm.first_name}
                 onChange={(e) =>
-                  setCustomerForm({ ...customerForm, name: e.target.value })
+                  setCustomerForm({ ...customerForm, first_name: e.target.value })
                 }
-                placeholder="Customer name..."
+                placeholder="First name..."
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="c-last-name">Last Name</Label>
+              <Input
+                id="c-last-name"
+                value={customerForm.last_name}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, last_name: e.target.value })
+                }
+                placeholder="Last name..."
                 required
               />
             </div>
@@ -1249,6 +1267,20 @@ export function KanbanBoard({
                   setCustomerForm({ ...customerForm, email: e.target.value })
                 }
                 placeholder="email@example.com"
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="c-phone">Phone Number</Label>
+              <Input
+                id="c-phone"
+                type="tel"
+                value={customerForm.phone}
+                onChange={(e) =>
+                  setCustomerForm({ ...customerForm, phone: e.target.value })
+                }
+                placeholder="+44 20 0000 0000"
               />
             </div>
 
@@ -1261,6 +1293,7 @@ export function KanbanBoard({
                   setCustomerForm({ ...customerForm, company: e.target.value })
                 }
                 placeholder="Company name..."
+                required
               />
             </div>
 

@@ -10,16 +10,13 @@ import {
   getContactSubmissions,
 } from "@/app/actions/contact";
 import { getKanbanMetrics } from "@/app/actions/kanban-metrics";
-import { getAgencyMetrics } from "@/app/actions/agency-metrics";
-import { getExpenseMetrics } from "@/app/actions/expense-metrics";
 import { getCustomers } from "@/app/actions/kanban";
 import { getCurrentUserAccess } from "@/lib/authz";
 import { getMyCustomerDashboard } from "@/app/actions/customer-dashboard";
 import { KanbanMetrics } from "./kanban-metrics";
-import { AgencyMetrics } from "./agency-metrics";
-import { ExpenseMetrics } from "./expense-metrics";
 import { CustomerDashboard } from "./customer-dashboard";
 import { CustomerFocusPanel } from "./customer-focus-panel";
+import { DashboardOverviewClient } from "./dashboard-overview-client";
 
 export default async function DashboardPage() {
   const access = await getCurrentUserAccess();
@@ -34,8 +31,6 @@ export default async function DashboardPage() {
     contactSummary,
     kanbanMetrics,
     contactSubmissions,
-    agencyMetrics,
-    expenseMetrics,
     customers,
   ] = await Promise.all([
     getProjects(),
@@ -52,57 +47,15 @@ export default async function DashboardPage() {
       totalTasks: 0,
     })),
     getContactSubmissions({ archived: false }).catch(() => []),
-    getAgencyMetrics().catch(() => ({
-      quotes: {
-        total: 0,
-        draft: 0,
-        sent: 0,
-        accepted: 0,
-        rejected: 0,
-        expired: 0,
-        totalValue: 0,
-        acceptedValue: 0,
-      },
-      invoices: {
-        total: 0,
-        draft: 0,
-        sent: 0,
-        paid: 0,
-        partial: 0,
-        overdue: 0,
-        cancelled: 0,
-        totalValue: 0,
-        paidValue: 0,
-        outstandingValue: 0,
-        overdueValue: 0,
-      },
-      monthlyData: [],
-    })),
-    getExpenseMetrics().catch(() => ({
-      totalExpenses: 0,
-      totalAmount: 0,
-      currentMonthAmount: 0,
-      previousMonthAmount: 0,
-      byCategory: [],
-      monthlyTrend: [],
-      taxDeductibleAmount: 0,
-      recurringAmount: 0,
-    })),
     getCustomers().catch(() => []),
   ]);
 
   const newSubmissions = contactSubmissions.filter((s) => s.status === "new");
 
   return (
-    <div className="flex flex-col gap-8 max-w-7xl mx-auto">
-      <CustomerFocusPanel customers={customers} />
-
-      {/* Agency Metrics */}
-      <AgencyMetrics metrics={agencyMetrics} />
-
-      {/* Expense Metrics */}
-      <ExpenseMetrics metrics={expenseMetrics} />
-
+    <DashboardOverviewClient customers={customers}>
+      <div className="flex w-full flex-col gap-8">
+        <CustomerFocusPanel customers={customers} />
       {/* Kanban Metrics */}
       <div className="flex items-center gap-2">
         <LayoutGrid className="size-5 text-primary" />
@@ -210,6 +163,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
-    </div>
+      </div>
+    </DashboardOverviewClient>
   );
 }

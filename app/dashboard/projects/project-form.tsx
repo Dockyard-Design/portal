@@ -29,6 +29,7 @@ export const projectSchema = z.object({
   content: z.string().min(1, "Content is required"),
   status: z.enum(["draft", "published", "archived"]),
   is_public: z.boolean(),
+  is_featured: z.boolean(),
   is_indexable: z.boolean(),
   seo_title: z.string().max(70, "SEO title too long"),
   seo_description: z.string().max(160, "SEO description too long"),
@@ -62,6 +63,7 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
     content: initialData.content || "",
     status: initialData.status || "draft",
     is_public: initialData.is_public ?? false,
+    is_featured: initialData.is_featured ?? false,
     is_indexable: initialData.is_indexable ?? true,
     seo_title: initialData.seo_title || "",
     seo_description: initialData.seo_description || "",
@@ -86,6 +88,7 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
       content: "",
       status: "draft",
       is_public: false,
+      is_featured: false,
       is_indexable: true,
       seo_title: "",
       seo_description: "",
@@ -107,6 +110,7 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
   const seoTitle = useWatch({ control, name: "seo_title" });
   const seoDesc = useWatch({ control, name: "seo_description" });
   const isPublic = useWatch({ control, name: "is_public" });
+  const isFeatured = useWatch({ control, name: "is_featured" });
   const isIndexable = useWatch({ control, name: "is_indexable" });
   const featuredImageUrl = useWatch({ control, name: "featured_image_url" });
   const briefText = useWatch({ control, name: "brief_text" });
@@ -302,6 +306,17 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
               <Switch
                 checked={isPublic}
                 onCheckedChange={(v) => setValue("is_public", v)}
+              />
+            </div>
+
+            <div className="flex items-center justify-between p-4 rounded-xl bg-background/50 border border-border/40">
+              <div>
+                <Label className="text-sm font-medium">Featured</Label>
+                <p className="text-xs text-muted-foreground mt-0.5">Make this the single featured project</p>
+              </div>
+              <Switch
+                checked={isFeatured}
+                onCheckedChange={(v) => setValue("is_featured", v)}
               />
             </div>
 

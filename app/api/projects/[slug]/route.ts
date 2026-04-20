@@ -10,6 +10,7 @@ const PROJECT_SELECT = [
   "content",
   "status",
   "is_public",
+  "is_featured",
   "is_indexable",
   "seo_title",
   "seo_description",

@@ -1,5 +1,6 @@
 import type {
   DocumentEmailInput,
+  CustomerWelcomeEmailInput,
   FormSubmissionEmailInput,
   SendEmailInput,
 } from "@/types/email";
@@ -105,6 +106,37 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
         <p>Your ${escapeHtml(input.documentType)} <strong>${escapeHtml(input.title)}</strong> is ready.</p>
         <p><strong>Total:</strong> ${escapeHtml(formattedTotal)}</p>
         <p><a href="${escapeHtml(input.pdfUrl)}">View or download the ${escapeHtml(label.toLowerCase())}</a></p>
+        <p>Dockyard Design</p>
+      </div>
+    `,
+  });
+}
+
+export async function sendCustomerWelcomeEmail(
+  input: CustomerWelcomeEmailInput
+): Promise<void> {
+  await sendEmail({
+    to: [input.recipientEmail],
+    from: SUPPORT_EMAIL,
+    subject: `Your Dockyard portal account for ${input.companyName}`,
+    text: [
+      `Hello ${input.recipientName},`,
+      "",
+      `Your Dockyard portal account for ${input.companyName} is ready.`,
+      `Sign in: ${input.signInUrl}`,
+      `Temporary password: ${input.password}`,
+      "",
+      "You will be asked to change this password after your first sign-in.",
+      "",
+      "Dockyard Design",
+    ].join("\n"),
+    html: `
+      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
+        <p>Hello ${escapeHtml(input.recipientName)},</p>
+        <p>Your Dockyard portal account for <strong>${escapeHtml(input.companyName)}</strong> is ready.</p>
+        <p><strong>Sign in:</strong> <a href="${escapeHtml(input.signInUrl)}">${escapeHtml(input.signInUrl)}</a></p>
+        <p><strong>Temporary password:</strong> ${escapeHtml(input.password)}</p>
+        <p>You will be asked to change this password after your first sign-in.</p>
         <p>Dockyard Design</p>
       </div>
     `,

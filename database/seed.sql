@@ -4,12 +4,12 @@
 -- 1. Seed Projects/Posts
 -- Note: author_id should ideally match a real User ID from Clerk in your environment.
 -- Using 'seed-author-id' as a placeholder.
-INSERT INTO projects (title, slug, content, excerpt, is_public, is_indexable, status, author_id, seo_title, seo_description)
+INSERT INTO projects (title, slug, content, excerpt, is_public, is_featured, is_indexable, status, author_id, seo_title, seo_description)
 VALUES
-('Getting Started with Next.js', 'getting-started-nextjs', 'Full content for getting started with Next.js. This is a comprehensive guide to building modern web applications.', 'Learn the basics of Next.js and start building today.', true, true, 'published', 'seed-author-id', 'Next.js Guide', 'Learn how to get started with Next.js'),
-('Advanced PostgreSQL Techniques', 'advanced-postgresql', 'Deep dive into PostgreSQL performance tuning, indexing strategies, and atomic operations.', 'Master the art of database optimization with these advanced tips.', true, true, 'published', 'seed-author-id', 'Advanced Postgres', 'Expert techniques for PostgreSQL'),
-('The Future of AI in Engineering', 'future-ai-engineering', 'Exploring how LLMs and AI agents are transforming the software development lifecycle.', 'How AI is changing the way we write and maintain code.', true, true, 'published', 'seed-author-id', 'AI in Engineering', 'The impact of AI on software engineering'),
-('Draft Post: Coming Soon', 'coming-soon', 'This content is still under construction.', 'A sneak peek at what is coming next.', false, false, 'draft', 'seed-author-id', NULL, NULL);
+('Getting Started with Next.js', 'getting-started-nextjs', 'Full content for getting started with Next.js. This is a comprehensive guide to building modern web applications.', 'Learn the basics of Next.js and start building today.', true, true, true, 'published', 'seed-author-id', 'Next.js Guide', 'Learn how to get started with Next.js'),
+('Advanced PostgreSQL Techniques', 'advanced-postgresql', 'Deep dive into PostgreSQL performance tuning, indexing strategies, and atomic operations.', 'Master the art of database optimization with these advanced tips.', true, false, true, 'published', 'seed-author-id', 'Advanced Postgres', 'Expert techniques for PostgreSQL'),
+('The Future of AI in Engineering', 'future-ai-engineering', 'Exploring how LLMs and AI agents are transforming the software development lifecycle.', 'How AI is changing the way we write and maintain code.', true, false, true, 'published', 'seed-author-id', 'AI in Engineering', 'The impact of AI on software engineering'),
+('Draft Post: Coming Soon', 'coming-soon', 'This content is still under construction.', 'A sneak peek at what is coming next.', false, false, false, 'draft', 'seed-author-id', NULL, NULL);
 
 -- 2. Seed Contact Form Submissions
 INSERT INTO contact_submissions (name, email, message, status, archived)
@@ -28,13 +28,13 @@ VALUES
 
 -- 4. Seed Customers for Kanban
 -- Using fixed UUIDs for consistent seeding
-INSERT INTO customers (id, name, email, company, notes)
+INSERT INTO customers (id, name, first_name, last_name, phone, email, company, notes)
 VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Acme Corporation', 'contact@acme.com', 'Acme Corp', 'Large enterprise client, priority support'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Demo Customer A', 'demo-a@example.com', 'Demo Corp A', 'Small business with ongoing project'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'Demo Customer B', 'demo-b@example.com', 'Demo Corp B', 'Technology startup'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'TechStart Inc', 'hello@techstart.io', 'TechStart', 'Startup with rapid development needs'),
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Global Solutions', 'info@globalsolutions.com', 'Global Solutions Ltd', 'International client with multiple projects');
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a10', 'Acme Corporation', 'Avery', 'Cooper', '+44 20 0000 0100', 'contact@acme.com', 'Acme Corp', 'Large enterprise client, priority support'),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Demo Customer A', 'Dana', 'Avery', '+44 20 0000 0101', 'demo-a@example.com', 'Demo Corp A', 'Small business with ongoing project'),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', 'Demo Customer B', 'Morgan', 'Blake', '+44 20 0000 0102', 'demo-b@example.com', 'Demo Corp B', 'Technology startup'),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', 'TechStart Inc', 'Taylor', 'Reed', '+44 20 0000 0103', 'hello@techstart.io', 'TechStart', 'Startup with rapid development needs'),
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', 'Global Solutions', 'Jordan', 'Miles', '+44 20 0000 0104', 'info@globalsolutions.com', 'Global Solutions Ltd', 'International client with multiple projects');
 
 -- 5. Seed Kanban Boards (multiple boards per customer)
 INSERT INTO kanban_boards (id, customer_id, name, description, is_default, author_id)

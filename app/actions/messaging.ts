@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { clerkClient } from "@clerk/nextjs/server";
 import { supabaseAdmin } from "@/lib/api-keys";
 import { getCurrentUserAccess, requireUser } from "@/lib/authz";
 import type {
@@ -14,7 +15,7 @@ const AUTO_REPLY =
   "Thanks for your message. A member of the Dockyard team will respond within 24 hours.";
 
 type ThreadRowWithCustomer = MessageThread & {
-  customers: { name: string; email: string | null } | null;
+  customers: { name: string; company: string | null; email: string | null } | null;
 };
 
 function formatThread(
@@ -23,10 +24,45 @@ function formatThread(
 ): MessageThreadWithMessages {
   return {
     ...thread,
-    customer_name: thread.customers?.name ?? "Unknown customer",
+    customer_name:
+      thread.customers?.company || thread.customers?.name || "Unknown customer",
     customer_email: thread.customers?.email ?? null,
     messages,
   };
+}
+
+async function addSenderNames(messages: Message[]): Promise<Message[]> {
+  const adminSenderIds = [
+    ...new Set(
+      messages
+        .filter((message) => message.sender_role === "admin")
+        .map((message) => message.sender_id)
+    ),
+  ];
+
+  if (adminSenderIds.length === 0) return messages;
+
+  const clerk = await clerkClient();
+  const entries = await Promise.all(
+    adminSenderIds.map(async (senderId) => {
+      try {
+        const user = await clerk.users.getUser(senderId);
+        const name = [user.firstName, user.lastName].filter(Boolean).join(" ");
+        return [senderId, name || user.username || "Dockyard"] as const;
+      } catch {
+        return [senderId, "Dockyard"] as const;
+      }
+    })
+  );
+  const names = new Map(entries);
+
+  return messages.map((message) => ({
+    ...message,
+    sender_name:
+      message.sender_role === "admin"
+        ? names.get(message.sender_id) ?? "Dockyard"
+        : null,
+  }));
 }
 
 export async function getMessageThreads(): Promise<MessageThreadWithMessages[]> {
@@ -34,7 +70,7 @@ export async function getMessageThreads(): Promise<MessageThreadWithMessages[]> 
 
   let threadQuery = supabaseAdmin
     .from("message_threads")
-    .select("*, customers(name, email)")
+    .select("*, customers(name, company, email)")
     .order("last_message_at", { ascending: false });
 
   if (access.role === "customer") {
@@ -57,7 +93,7 @@ export async function getMessageThreads(): Promise<MessageThreadWithMessages[]> 
 
   if (messagesResult.error) throw new Error("Failed to load messages");
 
-  const messages = (messagesResult.data || []) as Message[];
+  const messages = await addSenderNames((messagesResult.data || []) as Message[]);
 
   return threads.map((thread) =>
     formatThread(
@@ -106,7 +142,7 @@ export async function createMessageThread(input: {
       unread_admin: access.role === "customer",
       unread_customer: access.role === "admin",
     })
-    .select("*, customers(name, email)")
+    .select("*, customers(name, company, email)")
     .single();
 
   if (threadError || !thread) throw new Error("Failed to create thread");
@@ -142,7 +178,10 @@ export async function createMessageThread(input: {
   if (messageError) throw new Error("Failed to create message");
 
   revalidatePath("/dashboard/messages");
-  return formatThread(thread as ThreadRowWithCustomer, (createdMessages || []) as Message[]);
+  return formatThread(
+    thread as ThreadRowWithCustomer,
+    await addSenderNames((createdMessages || []) as Message[])
+  );
 }
 
 export async function replyToThread(threadId: string, body: string): Promise<{
@@ -174,13 +213,13 @@ export async function replyToThread(threadId: string, body: string): Promise<{
       unread_customer: access.role === "admin",
     })
     .eq("id", threadId)
-    .select("*, customers(name, email)")
+    .select("*, customers(name, company, email)")
     .single();
 
   if (threadError || !thread) throw new Error("Failed to update thread");
   revalidatePath("/dashboard/messages");
   return {
-    message: message as Message,
+    message: (await addSenderNames([message as Message]))[0],
     thread: formatThread(thread as ThreadRowWithCustomer),
   };
 }

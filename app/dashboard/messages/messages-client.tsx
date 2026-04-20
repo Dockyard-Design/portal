@@ -116,10 +116,11 @@ function getInitials(name: string) {
 
 function getSenderLabel(
   senderRole: "admin" | "customer" | "system",
-  customerName: string
+  customerName: string,
+  senderName?: string | null
 ) {
   if (senderRole === "system") return "Auto-reply";
-  if (senderRole === "admin") return "Dockyard";
+  if (senderRole === "admin") return senderName || "Dockyard";
   return customerName;
 }
 
@@ -655,7 +656,8 @@ export function MessagesClient({
                             <span className="font-medium">
                               {getSenderLabel(
                                 message.sender_role,
-                                selectedThread.customer_name
+                                selectedThread.customer_name,
+                                message.sender_name
                               )}
                             </span>
                             <span>{formatDateTime(message.created_at)}</span>
@@ -797,7 +799,8 @@ export function MessagesClient({
                       {latestMessage
                         ? getSenderLabel(
                             latestMessage.sender_role,
-                            selectedThread.customer_name
+                            selectedThread.customer_name,
+                            latestMessage.sender_name
                           )
                         : "None"}
                     </p>

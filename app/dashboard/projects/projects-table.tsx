@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Plus, ChevronLeft, ChevronRight, Globe, Lock, ExternalLink, Pencil } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Globe, Lock, ExternalLink, Pencil, Star } from "lucide-react";
 import Link from "next/link";
 import { DeleteProjectButton } from "./delete-button";
 import { ProjectForm, type ProjectFormValues } from "./project-form";
@@ -80,7 +80,7 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
   };
 
   return (
-    <div className="flex flex-col gap-6 max-w-7xl mx-auto">
+    <div className="flex w-full flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -122,6 +122,12 @@ export function ProjectsTable({ projects, authors }: ProjectsTableProps) {
                   <TableCell>
                     <div className="flex flex-col">
                       <span className="font-medium truncate max-w-[280px]">{project.title || "Untitled"}</span>
+                      {project.is_featured && (
+                        <span className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary">
+                          <Star className="size-3" />
+                          Featured
+                        </span>
+                      )}
                       <span className="text-xs text-muted-foreground">
                         Updated {new Date(project.updated_at).toLocaleDateString()}
                       </span>

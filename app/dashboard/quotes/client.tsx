@@ -49,6 +49,7 @@ import type { Quote } from "@/types/agency";
 import type { UserRole } from "@/types/auth";
 import { acceptQuote, rejectQuote, sendQuoteToCustomer } from "@/app/actions/agency";
 import { QuoteModal } from "@/app/dashboard/components/quote-modal-v2";
+import { PdfViewDialog } from "@/app/dashboard/components/pdf-view-dialog";
 import { toast } from "sonner";
 
 interface QuotesClientProps {
@@ -71,13 +72,17 @@ export default function QuotesClient({
   const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [quoteModalMode, setQuoteModalMode] = useState<"create" | "edit" | "view">("create");
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null);
+  const [pdfQuote, setPdfQuote] = useState<Quote | null>(null);
   const router = useRouter();
   const isCustomerRole = role === "customer";
 
   const filteredQuotes = quotes.filter((quote) => {
     const matchesSearch = 
+      quote.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
       quote.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (customers.find(c => c.id === quote.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase());
+      (quote.description ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (customers.find(c => c.id === quote.customer_id)?.name ?? "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (customers.find(c => c.id === quote.customer_id)?.company ?? "").toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === "all" || quote.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -133,6 +138,10 @@ export default function QuotesClient({
 
   const openPdf = (quoteId: string) => {
     window.open(`/api/pdf/quote/${quoteId}`, "_blank", "noopener,noreferrer");
+  };
+
+  const openPdfModal = (quote: Quote) => {
+    setPdfQuote(quote);
   };
 
   const openCreateQuote = () => {
@@ -204,7 +213,7 @@ export default function QuotesClient({
             <div className="flex-1">
               <Label className="text-sm text-muted-foreground mb-2 block">Search</Label>
               <Input
-                placeholder="Search by title or customer..."
+                placeholder="Search by reference or quote and name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
@@ -216,12 +225,12 @@ export default function QuotesClient({
                   <SelectValue/>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="accepted">Accepted</SelectItem>
-                  <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="expired">Expired</SelectItem>
+                  <SelectItem value="all">all</SelectItem>
+                  <SelectItem value="draft">draft</SelectItem>
+                  <SelectItem value="sent">sent</SelectItem>
+                  <SelectItem value="accepted">accepted</SelectItem>
+                  <SelectItem value="rejected">rejected</SelectItem>
+                  <SelectItem value="expired">expired</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -305,51 +314,45 @@ export default function QuotesClient({
                           <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
                             <MoreVertical className="size-4" />
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => openViewQuote(quote)}>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem onClick={() => isCustomerRole ? openPdfModal(quote) : openViewQuote(quote)}>
                               <Eye className="size-4 mr-2" />
                               View
                             </DropdownMenuItem>
-                            {!isCustomerRole && (
-                              <DropdownMenuItem onClick={() => openEditQuote(quote)}>
-                                <FileText className="size-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => openPdf(quote.id)}>
-                              <Download className="size-4 mr-2" />
-                              Download PDF
-                            </DropdownMenuItem>
-                            {!isCustomerRole && (
-                              <DropdownMenuItem
-                                onClick={() => void handleSendQuote(quote.id)}
-                                disabled={sendingId === quote.id}
-                              >
-                                <Send className="size-4 mr-2" />
-                                {sendingId === quote.id ? "Sending..." : "Send Email"}
-                              </DropdownMenuItem>
-                            )}
-                            {isCustomerRole && quote.status === "sent" && canCustomerAcceptQuote(quote) && (
+                            {isCustomerRole ? (
                               <>
-                                <DropdownMenuSeparator />
                                 <DropdownMenuItem
                                   onClick={() => void handleAcceptQuote(quote.id)}
-                                  disabled={actionId === quote.id}
+                                  disabled={actionId === quote.id || !canCustomerAcceptQuote(quote)}
                                 >
                                   <CheckCircle className="size-4 mr-2" />
-                                  Accept Quote
+                                  Accept
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => void handleRejectQuote(quote.id)}
-                                  disabled={actionId === quote.id}
+                                  disabled={actionId === quote.id || !canCustomerAcceptQuote(quote)}
                                 >
                                   <X className="size-4 mr-2" />
-                                  Reject Quote
+                                  Reject
                                 </DropdownMenuItem>
                               </>
-                            )}
-                            {!isCustomerRole && (
+                            ) : (
                               <>
+                                <DropdownMenuItem onClick={() => openEditQuote(quote)}>
+                                  <FileText className="size-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => openPdf(quote.id)}>
+                                  <Download className="size-4 mr-2" />
+                                  Download PDF
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => void handleSendQuote(quote.id)}
+                                  disabled={sendingId === quote.id}
+                                >
+                                  <Send className="size-4 mr-2" />
+                                  {sendingId === quote.id ? "Sending..." : "Send Email"}
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive">
                                   <Trash2 className="size-4 mr-2" />
@@ -377,6 +380,14 @@ export default function QuotesClient({
         onOpenChange={setQuoteModalOpen}
         onSuccess={refreshData}
         role={role}
+      />
+      <PdfViewDialog
+        open={Boolean(pdfQuote)}
+        onOpenChange={(open) => {
+          if (!open) setPdfQuote(null);
+        }}
+        title={pdfQuote?.title ?? "Quote PDF"}
+        pdfUrl={pdfQuote ? `/api/pdf/quote/${pdfQuote.id}` : null}
       />
     </div>
   );

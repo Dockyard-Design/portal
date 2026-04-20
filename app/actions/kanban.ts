@@ -2,8 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
+import { customAlphabet } from "nanoid";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import { requireAdmin } from "@/lib/authz";
+import { sendCustomerWelcomeEmail } from "@/lib/email";
 import type { CustomerUserMetadata } from "@/types/auth";
 import type { 
   Customer, 
@@ -26,6 +28,10 @@ const KNOWN_ERRORS: Record<string, string> = {
 };
 
 const ADMIN_ROLES = new Set(["admin", "owner"]);
+const generateTemporaryPassword = customAlphabet(
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*",
+  16,
+);
 
 function getAdminUserIds(): Set<string> {
   return new Set(
@@ -146,13 +152,69 @@ export async function getCustomer(id: string): Promise<Customer | null> {
 export async function createCustomer(customer: CreateCustomerInput): Promise<Customer> {
   await requireAdmin();
 
+  const firstName = customer.first_name?.trim() || null;
+  const lastName = customer.last_name?.trim() || null;
+  const company = customer.company?.trim() || null;
+  const email = customer.email?.trim() || null;
+  const name =
+    customer.name?.trim() ||
+    company ||
+    [firstName, lastName].filter(Boolean).join(" ").trim();
+
+  if (!name) {
+    throw new Error("Customer name or company name is required.");
+  }
+
   const { data, error } = await supabase
     .from("customers")
-    .insert(customer)
+    .insert({
+      name,
+      first_name: firstName,
+      last_name: lastName,
+      phone: customer.phone?.trim() || null,
+      email,
+      company,
+      notes: customer.notes?.trim() || null,
+    })
     .select()
     .single();
 
   if (error) throw new Error(sanitizeError(error));
+
+  if (email) {
+    const temporaryPassword = generateTemporaryPassword();
+    const metadata: CustomerUserMetadata = {
+      role: "customer",
+      roles: ["customer"],
+      admin: false,
+      customerId: data.id,
+      initialPasswordChangeRequired: true,
+      firstLoginAt: null,
+    };
+    const clerk = await clerkClient();
+
+    await clerk.users.createUser({
+      emailAddress: [email],
+      firstName: firstName ?? undefined,
+      lastName: lastName ?? undefined,
+      password: temporaryPassword,
+      publicMetadata: metadata,
+      privateMetadata: metadata,
+    });
+
+    const baseUrl =
+      process.env.APP_BASE_URL ||
+      process.env.NEXT_PUBLIC_APP_URL ||
+      "http://localhost:4567";
+    await sendCustomerWelcomeEmail({
+      recipientEmail: email,
+      recipientName: [firstName, lastName].filter(Boolean).join(" ") || name,
+      companyName: company || name,
+      password: temporaryPassword,
+      signInUrl: `${baseUrl}/sign-in`,
+    });
+  }
+
   revalidatePath("/dashboard/kanban");
   revalidatePath("/dashboard/customers");
   return data as Customer;
@@ -350,10 +412,6 @@ export async function getTask(id: string): Promise<Task | null> {
 export async function createTask(task: CreateTaskInput): Promise<Task> {
   const userId = await requireAdmin();
 
-  if (!task.due_date) {
-    throw new Error("Tasks require a due date.");
-  }
-
   await assertAdminAssignee(task.assigned_to);
 
   // Get max position for the status column
@@ -386,10 +444,6 @@ export async function createTask(task: CreateTaskInput): Promise<Task> {
 
 export async function updateTask(id: string, updates: UpdateTaskInput): Promise<Task> {
   await requireAdmin();
-
-  if ("due_date" in updates && !updates.due_date) {
-    throw new Error("Tasks require a due date.");
-  }
 
   await assertAdminAssignee(updates.assigned_to);
 

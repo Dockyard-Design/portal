@@ -8,12 +8,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import { Breadcrumbs } from "@/components/breadcrumbs";
 import { getUnreadMessageCount } from "@/app/actions/messaging";
+import { getUnreadContactSubmissionCount } from "@/app/actions/contact";
 import { getCurrentUserAccess } from "@/lib/authz";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const [access, unreadMessageCount] = await Promise.all([
+  const [access, unreadMessageCount, unreadContactSubmissionCount] = await Promise.all([
     getCurrentUserAccess(),
     getUnreadMessageCount().catch(() => 0),
+    getUnreadContactSubmissionCount().catch(() => 0),
   ]);
 
   return (
@@ -21,6 +23,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <SidebarProvider>
         <AppSidebar
           initialUnreadMessageCount={unreadMessageCount}
+          initialUnreadContactSubmissionCount={unreadContactSubmissionCount}
           role={access.role}
         />
         <SidebarInset>

@@ -10,6 +10,7 @@ export interface Project {
   content: string;
   status: ProjectStatus;
   is_public: boolean;
+  is_featured: boolean;
   is_indexable: boolean;
   seo_title: string;
   seo_description: string;

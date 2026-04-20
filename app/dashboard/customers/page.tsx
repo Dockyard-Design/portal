@@ -54,7 +54,9 @@ export default function CustomersPage() {
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
   const [customerForm, setCustomerForm] = useState({
-    name: "",
+    firstName: "",
+    lastName: "",
+    phone: "",
     email: "",
     company: "",
     notes: "",
@@ -110,19 +112,35 @@ export default function CustomersPage() {
 
   const handleCreateCustomer = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!customerForm.name.trim()) return;
+    if (
+      !customerForm.firstName.trim() ||
+      !customerForm.lastName.trim() ||
+      !customerForm.email.trim() ||
+      !customerForm.company.trim()
+    ) {
+      return;
+    }
 
     setIsCreatingCustomer(true);
     try {
       const { createCustomer } = await import("@/app/actions/kanban");
       const customer = await createCustomer({
-        name: customerForm.name.trim(),
+        first_name: customerForm.firstName.trim(),
+        last_name: customerForm.lastName.trim(),
+        phone: customerForm.phone.trim() || undefined,
         email: customerForm.email.trim() || undefined,
-        company: customerForm.company.trim() || undefined,
+        company: customerForm.company.trim(),
         notes: customerForm.notes.trim() || undefined,
       });
 
-      setCustomerForm({ name: "", email: "", company: "", notes: "" });
+      setCustomerForm({
+        firstName: "",
+        lastName: "",
+        phone: "",
+        email: "",
+        company: "",
+        notes: "",
+      });
       setIsCustomerDialogOpen(false);
       setSelectedCustomer(customer.id);
       window.dispatchEvent(new CustomEvent("customers:changed"));
@@ -313,17 +331,31 @@ export default function CustomersPage() {
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreateCustomer} className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="customer-name">Name</Label>
-              <Input
-                id="customer-name"
-                value={customerForm.name}
-                onChange={(event) =>
-                  setCustomerForm((current) => ({ ...current, name: event.target.value }))
-                }
-                placeholder="Customer name"
-                required
-              />
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Label htmlFor="customer-first-name">First Name</Label>
+                <Input
+                  id="customer-first-name"
+                  value={customerForm.firstName}
+                  onChange={(event) =>
+                    setCustomerForm((current) => ({ ...current, firstName: event.target.value }))
+                  }
+                  placeholder="First name"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="customer-last-name">Last Name</Label>
+                <Input
+                  id="customer-last-name"
+                  value={customerForm.lastName}
+                  onChange={(event) =>
+                    setCustomerForm((current) => ({ ...current, lastName: event.target.value }))
+                  }
+                  placeholder="Last name"
+                  required
+                />
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="customer-email">Email</Label>
@@ -335,6 +367,19 @@ export default function CustomersPage() {
                   setCustomerForm((current) => ({ ...current, email: event.target.value }))
                 }
                 placeholder="client@example.com"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="customer-phone">Phone Number</Label>
+              <Input
+                id="customer-phone"
+                type="tel"
+                value={customerForm.phone}
+                onChange={(event) =>
+                  setCustomerForm((current) => ({ ...current, phone: event.target.value }))
+                }
+                placeholder="+44 20 0000 0000"
               />
             </div>
             <div className="grid gap-2">
@@ -346,6 +391,7 @@ export default function CustomersPage() {
                   setCustomerForm((current) => ({ ...current, company: event.target.value }))
                 }
                 placeholder="Company name"
+                required
               />
             </div>
             <div className="grid gap-2">
@@ -369,7 +415,16 @@ export default function CustomersPage() {
               >
                 Cancel
               </Button>
-              <Button type="submit" disabled={isCreatingCustomer || !customerForm.name.trim()}>
+              <Button
+                type="submit"
+                disabled={
+                  isCreatingCustomer ||
+                  !customerForm.firstName.trim() ||
+                  !customerForm.lastName.trim() ||
+                  !customerForm.email.trim() ||
+                  !customerForm.company.trim()
+                }
+              >
                 {isCreatingCustomer ? "Creating..." : "Create Customer"}
               </Button>
             </DialogFooter>

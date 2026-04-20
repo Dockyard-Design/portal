@@ -144,6 +144,9 @@ export interface CustomerWithRelations {
   created_at: string;
   updated_at: string;
   name: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
   email: string | null;
   company: string | null;
   notes: string | null;

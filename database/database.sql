@@ -34,6 +34,7 @@ CREATE TABLE projects (
   content TEXT,
   excerpt TEXT,
   is_public BOOLEAN DEFAULT FALSE,
+  is_featured BOOLEAN NOT NULL DEFAULT FALSE,
   is_indexable BOOLEAN DEFAULT TRUE,
   status TEXT DEFAULT 'draft' CHECK (status IN ('draft', 'published', 'archived')),
 
@@ -81,6 +82,7 @@ CREATE TABLE settings (
 -- Indexes for performance
 CREATE INDEX idx_projects_slug ON projects(slug);
 CREATE INDEX idx_projects_status ON projects(status);
+CREATE UNIQUE INDEX idx_projects_single_featured ON projects(is_featured) WHERE is_featured;
 CREATE INDEX idx_api_keys_prefix ON api_keys(key_prefix);
 
 -- Initial Settings
@@ -195,6 +197,9 @@ CREATE TABLE customers (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   name TEXT NOT NULL,
+  first_name TEXT,
+  last_name TEXT,
+  phone TEXT,
   email TEXT,
   company TEXT,
   notes TEXT

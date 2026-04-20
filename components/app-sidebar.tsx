@@ -81,6 +81,8 @@ import { useKanbanStore, useSidebarStore } from "@/lib/store";
 import { wipeDatabase } from "@/app/actions/dev-wipe";
 import { getBoards, getCustomers } from "@/app/actions/kanban";
 import { getUnreadMessageCount } from "@/app/actions/messaging";
+import { getUnreadContactSubmissionCount } from "@/app/actions/contact";
+import { recordFirstCustomerLogin } from "@/app/actions/users";
 import { toast } from "sonner";
 import type { UserRole } from "@/types/auth";
 import type { Customer } from "@/types/kanban";
@@ -148,6 +150,16 @@ const NAV_GROUPS: MenuGroup[] = [
         href: "/dashboard/expenses",
         icon: Receipt,
       },
+      {
+        title: "Agency Metrics",
+        href: "/dashboard/agency-metrics",
+        icon: LayoutDashboard,
+      },
+      {
+        title: "Expense Metrics",
+        href: "/dashboard/expense-metrics",
+        icon: Receipt,
+      },
     ],
   },
 ];
@@ -167,36 +179,56 @@ const NAV_SETTINGS: SingleMenuItem[] = [
 
 const ALLOWED_WIPE_EMAIL = "fredericomelogarcia@outlook.com";
 
-function getCustomerNavGroup(selectedCustomerId: string | null): MenuGroup {
-  const items: SubMenuItem[] = [];
+function getCustomerLabel(customer: Customer | undefined): string {
+  return customer?.company || customer?.name || "Selected customer";
+}
 
-  if (selectedCustomerId) {
-    items.push({
-      title: "Details",
-      href: `/dashboard/customers/${selectedCustomerId}`,
-      icon: Building,
-      items: [
-        {
-          title: "Quotes",
-          href: `/dashboard/quotes?customerId=${selectedCustomerId}`,
-          icon: Receipt,
-        },
-        {
-          title: "Invoices",
-          href: `/dashboard/invoices?customerId=${selectedCustomerId}`,
-          icon: FileText,
-        },
-        {
-          title: "Kanban Board",
-          href: "/dashboard/kanban",
-          icon: KanbanSquare,
-        },
-      ],
-    });
+function getCustomerNavGroup(
+  selectedCustomerId: string | null,
+  selectedCustomer: Customer | undefined,
+  boards: Array<{ id: string; name: string; is_default: boolean }>,
+): MenuGroup | SingleMenuItem {
+  if (!selectedCustomerId) {
+    return {
+      title: "Customers",
+      href: "/dashboard/customers",
+      icon: Briefcase,
+    };
   }
 
+  const items: SubMenuItem[] = [];
+
+  items.push({
+    title: "Details",
+    href: `/dashboard/customers/${selectedCustomerId}`,
+    icon: Building,
+    items: [
+      {
+        title: "Quotes",
+        href: `/dashboard/quotes?customerId=${selectedCustomerId}`,
+        icon: Receipt,
+      },
+      {
+        title: "Invoices",
+        href: `/dashboard/invoices?customerId=${selectedCustomerId}`,
+        icon: FileText,
+      },
+      {
+        title: "Kanban Board",
+        href: "/dashboard/kanban",
+        icon: KanbanSquare,
+        items: boards.map((board) => ({
+          title: board.name,
+          href: "/dashboard/kanban",
+          icon: KanbanSquare,
+          boardId: board.id,
+        })),
+      },
+    ],
+  });
+
   return {
-    title: selectedCustomerId ? `${selectedCustomerId}` : "Customers",
+    title: getCustomerLabel(selectedCustomer),
     icon: Briefcase,
     items,
   };
@@ -208,9 +240,11 @@ function getRoutePath(href: string): string {
 
 export default function AppSidebar({
   initialUnreadMessageCount,
+  initialUnreadContactSubmissionCount,
   role,
 }: {
   initialUnreadMessageCount: number;
+  initialUnreadContactSubmissionCount: number;
   role: UserRole;
 }) {
   const pathname = usePathname();
@@ -227,10 +261,17 @@ export default function AppSidebar({
   const [showWipeDialog, setShowWipeDialog] = useState(false);
   const [wipePassword, setWipePassword] = useState("");
   const [customers, setCustomers] = useState<Customer[]>([]);
+  const [selectedCustomerBoards, setSelectedCustomerBoards] = useState<
+    Array<{ id: string; name: string; is_default: boolean }>
+  >([]);
   const [customerPickerOpen, setCustomerPickerOpen] = useState(false);
   const [unreadMessageCount, setUnreadMessageCount] = useState(
     initialUnreadMessageCount,
   );
+  const [unreadContactSubmissionCount, setUnreadContactSubmissionCount] = useState(
+    initialUnreadContactSubmissionCount,
+  );
+  const [showPasswordChangePrompt, setShowPasswordChangePrompt] = useState(false);
   const isCustomerRole = role === "customer";
   const isSubMenuItemActive = useCallback(
     (item: SubMenuItem) =>
@@ -246,6 +287,23 @@ export default function AppSidebar({
     !isCustomerRole &&
     isLoaded &&
     user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL;
+
+  useEffect(() => {
+    if (!isLoaded || !user || !isCustomerRole) return;
+
+    const metadata = user.publicMetadata as {
+      initialPasswordChangeRequired?: unknown;
+      firstLoginAt?: unknown;
+    };
+
+    if (metadata.initialPasswordChangeRequired === true) {
+      setShowPasswordChangePrompt(true);
+    }
+
+    if (!metadata.firstLoginAt) {
+      recordFirstCustomerLogin().catch(() => {});
+    }
+  }, [isCustomerRole, isLoaded, user]);
 
   const handleWipe = async () => {
     const result = await wipeDatabase(wipePassword);
@@ -264,7 +322,19 @@ export default function AppSidebar({
   useEffect(() => {
     if (isCustomerRole) return;
 
-    [getCustomerNavGroup(selectedCustomerId), ...NAV_GROUPS].forEach(
+    const selectedCustomer = customers.find(
+      (customer) => customer.id === selectedCustomerId,
+    );
+    const customerNavGroup = getCustomerNavGroup(
+      selectedCustomerId,
+      selectedCustomer,
+      selectedCustomerBoards,
+    );
+    const groupsToExpand = "items" in customerNavGroup
+      ? [customerNavGroup, ...NAV_GROUPS]
+      : NAV_GROUPS;
+
+    groupsToExpand.forEach(
       (group) => {
         const isGroupActive = group.items.some((item) =>
           isSubMenuItemActive(item),
@@ -274,7 +344,7 @@ export default function AppSidebar({
         }
       },
     );
-  }, [isCustomerRole, isSubMenuItemActive, setGroupOpen, selectedCustomerId]);
+  }, [customers, isCustomerRole, isSubMenuItemActive, selectedCustomerBoards, setGroupOpen, selectedCustomerId]);
 
   const refreshUnreadMessageCount = useCallback(() => {
     getUnreadMessageCount()
@@ -291,6 +361,34 @@ export default function AppSidebar({
   useEffect(() => {
     refreshUnreadMessageCount();
   }, [pathname, refreshUnreadMessageCount]);
+
+  const refreshUnreadContactSubmissionCount = useCallback(() => {
+    if (isCustomerRole) return;
+    getUnreadContactSubmissionCount()
+      .then(setUnreadContactSubmissionCount)
+      .catch(() => {
+        setUnreadContactSubmissionCount(0);
+      });
+  }, [isCustomerRole]);
+
+  useEffect(() => {
+    setUnreadContactSubmissionCount(initialUnreadContactSubmissionCount);
+  }, [initialUnreadContactSubmissionCount]);
+
+  useEffect(() => {
+    refreshUnreadContactSubmissionCount();
+  }, [pathname, refreshUnreadContactSubmissionCount]);
+
+  useEffect(() => {
+    if (isCustomerRole) return;
+    window.addEventListener("focus", refreshUnreadContactSubmissionCount);
+    window.addEventListener("contact-submissions:changed", refreshUnreadContactSubmissionCount);
+
+    return () => {
+      window.removeEventListener("focus", refreshUnreadContactSubmissionCount);
+      window.removeEventListener("contact-submissions:changed", refreshUnreadContactSubmissionCount);
+    };
+  }, [isCustomerRole, refreshUnreadContactSubmissionCount]);
 
   useEffect(() => {
     window.addEventListener("focus", refreshUnreadMessageCount);
@@ -347,6 +445,7 @@ export default function AppSidebar({
     getBoards(selectedCustomerId)
       .then((data) => {
         if (cancelled) return;
+        setSelectedCustomerBoards(data);
         if (
           data.length > 0 &&
           !data.some((board) => board.id === selectedBoardId)
@@ -365,12 +464,28 @@ export default function AppSidebar({
     };
   }, [isCustomerRole, selectedCustomerId, selectedBoardId, setSelectedBoard]);
 
+  useEffect(() => {
+    if (!selectedCustomerId) {
+      setSelectedCustomerBoards([]);
+    }
+  }, [selectedCustomerId]);
+
   const selectedCustomer = customers.find(
     (customer) => customer.id === selectedCustomerId,
   );
+  const customerNavGroup = getCustomerNavGroup(
+    selectedCustomerId,
+    selectedCustomer,
+    selectedCustomerBoards,
+  );
   const navGroups = isCustomerRole
     ? []
-    : [getCustomerNavGroup(selectedCustomerId), ...NAV_GROUPS];
+    : "items" in customerNavGroup
+      ? [customerNavGroup, ...NAV_GROUPS]
+      : NAV_GROUPS;
+  const customerLink = !isCustomerRole && "href" in customerNavGroup
+    ? customerNavGroup
+    : null;
   const messageBadgeCount = unreadMessageCount;
 
   return (
@@ -400,8 +515,8 @@ export default function AppSidebar({
                       className="h-9 min-w-0 flex-1 justify-start overflow-hidden bg-background px-3 text-left text-sm font-medium"
                     >
                       <Building className="mr-2 size-4 shrink-0 text-muted-foreground" />
-                      <span className="truncate">
-                        {selectedCustomer?.name ?? "All customers"}
+                  <span className="truncate">
+                        {selectedCustomer ? getCustomerLabel(selectedCustomer) : "All customers"}
                       </span>
                     </Button>
                   }
@@ -468,7 +583,7 @@ export default function AppSidebar({
             </div>
             {selectedCustomer && (
               <p className="truncate text-xs text-muted-foreground">
-                Focused on {selectedCustomer.name}
+                Focused on {getCustomerLabel(selectedCustomer)}
               </p>
             )}
           </div>
@@ -502,6 +617,35 @@ export default function AppSidebar({
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
+
+            {customerLink && (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={pathname === customerLink.href}
+                  className={cn(
+                    "transition-all duration-200 rounded-lg h-10 px-3",
+                    pathname === customerLink.href
+                      ? "bg-primary/10 hover:bg-primary/20"
+                      : "text-muted-foreground hover:text-foreground hover:bg-secondary",
+                  )}
+                >
+                  <Link
+                    href={customerLink.href}
+                    className="flex w-full items-center gap-3"
+                  >
+                    <customerLink.icon
+                      className={cn(
+                        "size-4",
+                        pathname === customerLink.href && "text-primary",
+                      )}
+                    />
+                    <span className="min-w-0 flex-1 truncate font-medium">
+                      {customerLink.title}
+                    </span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
 
             {isCustomerRole && (
               <>
@@ -604,6 +748,16 @@ export default function AppSidebar({
                       <span className="font-medium flex-1 text-left">
                         {group.title}
                       </span>
+                      {group.title === "Dockyard" && unreadContactSubmissionCount > 0 && (
+                        <span
+                          aria-label={`${unreadContactSubmissionCount} unread contact submissions`}
+                          className="inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold leading-none text-primary-foreground"
+                        >
+                          {unreadContactSubmissionCount > 99
+                            ? "99+"
+                            : unreadContactSubmissionCount}
+                        </span>
+                      )}
                       <ChevronRight className="size-4 transition-transform group-data-[state=open]/collapsible:rotate-90" />
                     </CollapsibleTrigger>
                   </SidebarMenuItem>
@@ -639,6 +793,17 @@ export default function AppSidebar({
                                     )}
                                   />
                                   <span>{item.title}</span>
+                                  {item.href === "/dashboard/contact" &&
+                                    unreadContactSubmissionCount > 0 && (
+                                      <span
+                                        aria-label={`${unreadContactSubmissionCount} unread contact submissions`}
+                                        className="ml-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold leading-none text-primary-foreground"
+                                      >
+                                        {unreadContactSubmissionCount > 99
+                                          ? "99+"
+                                          : unreadContactSubmissionCount}
+                                      </span>
+                                    )}
                                 </Link>
                               }
                             />
@@ -662,10 +827,15 @@ export default function AppSidebar({
                                             : "text-muted-foreground hover:text-foreground hover:bg-secondary",
                                         )}
                                         render={
-                                          <Link
-                                            href={nestedItem.href}
-                                            className="flex items-center gap-2"
-                                          >
+                                           <Link
+                                             href={nestedItem.href}
+                                             className="flex items-center gap-2"
+                                             onClick={() => {
+                                               if (nestedItem.boardId) {
+                                                 setSelectedBoard(nestedItem.boardId);
+                                               }
+                                             }}
+                                           >
                                             <nestedItem.icon
                                               className={cn(
                                                 "size-4",
@@ -831,6 +1001,30 @@ export default function AppSidebar({
           </AlertDialogContent>
         </AlertDialog>
       </div>
+      <AlertDialog
+        open={showPasswordChangePrompt}
+        onOpenChange={setShowPasswordChangePrompt}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Change your temporary password</AlertDialogTitle>
+            <AlertDialogDescription>
+              This account was created with a temporary password. Open your
+              account settings and set a new password before continuing.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction
+              onClick={() => {
+                openUserProfile();
+                setShowPasswordChangePrompt(false);
+              }}
+            >
+              Open Account Settings
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <SidebarRail />
     </Sidebar>
   );

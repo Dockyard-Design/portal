@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { clerkClient } from "@clerk/nextjs/server";
 import type { User } from "@clerk/nextjs/server";
-import { requireAdmin } from "@/lib/authz";
+import { requireAdmin, requireUser } from "@/lib/authz";
 import type { UserRole, CustomerUserMetadata } from "@/types/auth";
 
 interface ClerkErrorLike {
@@ -245,4 +245,26 @@ export async function resetUserPassword(
   } catch (error) {
     throw new Error(getUserActionErrorMessage(error));
   }
+}
+
+export async function recordFirstCustomerLogin(): Promise<void> {
+  const userId = await requireUser();
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const metadata = {
+    ...(user.privateMetadata as CustomerUserMetadata),
+    ...(user.publicMetadata as CustomerUserMetadata),
+  };
+
+  if (metadata.role !== "customer" || metadata.firstLoginAt) return;
+
+  const nextMetadata: CustomerUserMetadata = {
+    ...metadata,
+    firstLoginAt: new Date().toISOString(),
+  };
+
+  await client.users.updateUser(userId, {
+    publicMetadata: nextMetadata,
+    privateMetadata: nextMetadata,
+  });
 }

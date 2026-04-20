@@ -53,6 +53,13 @@ export async function createProject(
 ): Promise<Project> {
   const userId = await requireAdmin();
 
+  if (project.is_featured) {
+    await supabase
+      .from("projects")
+      .update({ is_featured: false })
+      .eq("is_featured", true);
+  }
+
   const { data, error } = await supabase
     .from("projects")
     .insert({
@@ -86,6 +93,14 @@ export async function updateProject(
   updates: Partial<ProjectUpdate>
 ): Promise<Project> {
   await requireAdmin();
+
+  if (updates.is_featured) {
+    await supabase
+      .from("projects")
+      .update({ is_featured: false })
+      .neq("id", id)
+      .eq("is_featured", true);
+  }
 
   // author_id is excluded from ProjectUpdate so it can't be changed (#19)
   const { data, error } = await supabase

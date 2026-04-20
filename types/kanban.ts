@@ -15,6 +15,9 @@ export interface Customer {
   created_at: string;
   updated_at: string;
   name: string;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
   email: string | null;
   company: string | null;
   notes: string | null;
@@ -54,7 +57,10 @@ export interface TasksByStatus {
 }
 
 export interface CreateCustomerInput {
-  name: string;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+  phone?: string;
   email?: string;
   company?: string;
   notes?: string;
@@ -62,6 +68,9 @@ export interface CreateCustomerInput {
 
 export interface UpdateCustomerInput {
   name?: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  phone?: string | null;
   email?: string | null;
   company?: string | null;
   notes?: string | null;
@@ -87,7 +96,7 @@ export interface CreateTaskInput {
   description?: string;
   status?: TaskStatus;
   priority?: TaskPriority;
-  due_date: string;
+  due_date?: string | null;
 }
 
 export interface UpdateTaskInput {

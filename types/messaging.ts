@@ -19,6 +19,7 @@ export interface Message {
   thread_id: string;
   sender_id: string;
   sender_role: "admin" | "customer" | "system";
+  sender_name?: string | null;
   body: string;
   read_at: string | null;
 }

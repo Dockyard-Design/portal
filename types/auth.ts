@@ -5,4 +5,6 @@ export interface CustomerUserMetadata extends Record<string, unknown> {
   roles?: UserRole[];
   admin?: boolean;
   customerId?: string;
+  initialPasswordChangeRequired?: boolean;
+  firstLoginAt?: string | null;
 }

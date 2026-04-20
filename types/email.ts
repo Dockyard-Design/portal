@@ -28,3 +28,11 @@ export interface DocumentEmailInput {
   currency: string;
   pdfUrl: string;
 }
+
+export interface CustomerWelcomeEmailInput {
+  recipientEmail: string;
+  recipientName: string;
+  companyName: string;
+  password: string;
+  signInUrl: string;
+}

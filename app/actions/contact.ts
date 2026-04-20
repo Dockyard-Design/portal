@@ -26,6 +26,23 @@ export async function getContactSummary(): Promise<ContactSummary> {
   return summary;
 }
 
+export async function getUnreadContactSubmissionCount(): Promise<number> {
+  await requireAdmin();
+
+  const { count, error } = await supabaseAdmin
+    .from("contact_submissions")
+    .select("*", { count: "exact", head: true })
+    .eq("status", "new")
+    .eq("archived", false);
+
+  if (error) {
+    console.error("[getUnreadContactSubmissionCount] Database error:", error);
+    return 0;
+  }
+
+  return count || 0;
+}
+
 export async function getContactSubmissions(filters: { archived?: boolean } = {}) {
   await requireAdmin();
 
