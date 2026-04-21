@@ -277,7 +277,7 @@ CREATE TABLE quotes (
   tax_rate DECIMAL(5, 2) DEFAULT 0,
   tax_amount DECIMAL(12, 2) DEFAULT 0,
   total DECIMAL(12, 2) NOT NULL DEFAULT 0,
-  currency TEXT DEFAULT 'USD',
+  currency TEXT DEFAULT 'GBP',
   status TEXT NOT NULL DEFAULT 'draft' 
     CHECK (status IN ('draft', 'sent', 'accepted', 'rejected', 'expired')),
   valid_until TIMESTAMP WITH TIME ZONE,
@@ -313,7 +313,7 @@ CREATE TABLE invoices (
   total DECIMAL(12, 2) NOT NULL DEFAULT 0,
   amount_paid DECIMAL(12, 2) DEFAULT 0,
   balance_due DECIMAL(12, 2) DEFAULT 0,
-  currency TEXT DEFAULT 'USD',
+  currency TEXT DEFAULT 'GBP',
   status TEXT NOT NULL DEFAULT 'draft'
     CHECK (status IN ('draft', 'sent', 'paid', 'partial', 'overdue', 'cancelled')),
   issue_date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

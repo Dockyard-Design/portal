@@ -40,6 +40,8 @@ const DEFAULT_QUOTE_TERMS =
     "The customer is responsible for checking factual content, legal copy, compliance obligations, and approvals before launch or publication.",
   ].join("\n\n");
 
+const DEFAULT_DOCUMENT_CURRENCY = "GBP";
+
 function sanitizeError(error: { code?: string; message: string }): string {
   if (error.code && KNOWN_ERRORS[error.code]) {
     return KNOWN_ERRORS[error.code];
@@ -287,6 +289,7 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
       tax_rate: input.tax_rate || 0,
       tax_amount,
       total,
+      currency: DEFAULT_DOCUMENT_CURRENCY,
       valid_until: input.valid_until || getDefaultQuoteExpiryDate(),
       notes: input.notes || null,
       terms: getQuoteTerms(input.terms),
@@ -480,6 +483,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
       tax_rate: input.tax_rate || 0,
       tax_amount,
       total,
+      currency: DEFAULT_DOCUMENT_CURRENCY,
       balance_due: total,
       due_date: input.due_date || getDefaultInvoiceDueDate(),
       notes: input.notes || null,
@@ -685,7 +689,7 @@ async function createInvoiceFromAcceptedQuote(
       total: quote.total,
       amount_paid: 0,
       balance_due: quote.total,
-      currency: quote.currency,
+      currency: quote.currency || DEFAULT_DOCUMENT_CURRENCY,
       status: "sent",
       sent_at: new Date().toISOString(),
       due_date: getDefaultInvoiceDueDate(),
