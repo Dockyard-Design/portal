@@ -17,7 +17,7 @@ export async function GET(request: Request) {
       headers: {
         Authorization: `Bearer ${stripeSecretKey}`,
       },
-    }
+    },
   );
 
   if (response.ok) {
@@ -26,7 +26,8 @@ export async function GET(request: Request) {
       metadata?: { invoice_id?: string; target_paid?: string };
       client_reference_id?: string | null;
     };
-    const invoiceId = session.metadata?.invoice_id || session.client_reference_id || null;
+    const invoiceId =
+      session.metadata?.invoice_id || session.client_reference_id || null;
 
     if (session.payment_status === "paid" && invoiceId) {
       const { data: invoice } = await supabaseAdmin
@@ -35,7 +36,11 @@ export async function GET(request: Request) {
         .eq("id", invoiceId)
         .single();
 
-      if (invoice && invoice.status !== "paid" && invoice.status !== "cancelled") {
+      if (
+        invoice &&
+        invoice.status !== "paid" &&
+        invoice.status !== "cancelled"
+      ) {
         const plan = getInvoicePaymentPlan(invoice);
         const parsedTargetPaid = session.metadata?.target_paid
           ? Number(session.metadata.target_paid)
@@ -44,7 +49,10 @@ export async function GET(request: Request) {
           ? parsedTargetPaid
           : plan.nextTargetPaid;
         const amountPaid = roundCurrency(
-          Math.max(plan.amountPaid, Math.min(plan.total, Math.max(0, targetPaid)))
+          Math.max(
+            plan.amountPaid,
+            Math.min(plan.total, Math.max(0, targetPaid)),
+          ),
         );
         const balanceDue = roundCurrency(plan.total - amountPaid);
         const paidInFull = balanceDue <= 0;

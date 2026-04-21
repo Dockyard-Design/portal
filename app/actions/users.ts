@@ -28,7 +28,11 @@ function getUserActionErrorMessage(error: unknown): string {
     case "form_email_address_exists":
       return "A user with that email address already exists.";
     case "form_param_format_invalid":
-      return firstError.longMessage || firstError.message || "One of the user fields is invalid.";
+      return (
+        firstError.longMessage ||
+        firstError.message ||
+        "One of the user fields is invalid."
+      );
     default:
       return (
         firstError?.longMessage ||
@@ -79,7 +83,8 @@ function serializeUser(user: User): SimpleUser {
     lastSignInAt: user.lastSignInAt,
     createdAt: user.createdAt,
     role,
-    customerId: typeof metadata.customerId === "string" ? metadata.customerId : null,
+    customerId:
+      typeof metadata.customerId === "string" ? metadata.customerId : null,
   };
 }
 
@@ -143,7 +148,7 @@ export async function updateUser(
     primaryEmailAddressID?: string;
     role?: UserRole;
     customerId?: string | null;
-  }
+  },
 ): Promise<SimpleUser> {
   await requireAdmin();
 
@@ -170,7 +175,10 @@ export async function updateUser(
         role: params.role,
         roles: [params.role],
         admin: params.role === "admin",
-        customerId: params.role === "customer" ? params.customerId ?? undefined : undefined,
+        customerId:
+          params.role === "customer"
+            ? (params.customerId ?? undefined)
+            : undefined,
       };
 
       updateParams.publicMetadata = metadata;
@@ -229,7 +237,7 @@ export async function unlockUser(userId: string): Promise<SimpleUser> {
 
 export async function resetUserPassword(
   userId: string,
-  newPassword: string
+  newPassword: string,
 ): Promise<SimpleUser> {
   await requireAdmin();
 

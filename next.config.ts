@@ -30,7 +30,7 @@ const securityHeaders = [
   },
 ];
 module.exports = {
-  allowedDevOrigins: ["frederico.tail06989e.ts.net"],
+  allowedDevOrigins: ["frederico.tailfac618.ts.net"],
 };
 
 const nextConfig: NextConfig = {
