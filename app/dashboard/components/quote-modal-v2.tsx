@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { SPLIT_PAYMENT_TERMS } from "@/lib/invoice-payments";
 import type { Quote } from "@/types/agency";
 import type { UserRole } from "@/types/auth";
 import type { Customer } from "@/types/kanban";
@@ -86,7 +87,7 @@ function getDefaultValues(
     description: "",
     taxRate: 20,
     notes: "",
-    terms: "This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance.",
+    terms: SPLIT_PAYMENT_TERMS,
     items: [{ description: "", quantity: 1, unit_price: 0 }],
   };
 }
@@ -538,7 +539,7 @@ export function QuoteModal({
 
                   return (
                     <div key={field.id} className="rounded-xl border border-border/70 bg-muted/20 p-4">
-                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_110px_140px_140px_auto] lg:items-start">
+                      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_130px_150px_140px_auto] lg:items-start">
                         <div className="grid gap-2">
                           <Label htmlFor={`quote-item-description-${index}`}>Description</Label>
                           <Textarea
@@ -553,7 +554,7 @@ export function QuoteModal({
                         </div>
 
                         <div className="grid gap-2">
-                          <Label htmlFor={`quote-item-quantity-${index}`}>Qty</Label>
+                          <Label htmlFor={`quote-item-quantity-${index}`}>Quantity / units</Label>
                           <Input
                             id={`quote-item-quantity-${index}`}
                             type="number"
@@ -568,15 +569,19 @@ export function QuoteModal({
 
                         <div className="grid gap-2">
                           <Label htmlFor={`quote-item-price-${index}`}>Unit price</Label>
-                          <Input
-                            id={`quote-item-price-${index}`}
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            aria-invalid={Boolean(itemError?.unit_price)}
-                            disabled={isViewOnly}
-                            {...register(`items.${index}.unit_price`)}
-                          />
+                          <div className="relative">
+                            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
+                            <Input
+                              id={`quote-item-price-${index}`}
+                              className="pl-7"
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              aria-invalid={Boolean(itemError?.unit_price)}
+                              disabled={isViewOnly}
+                              {...register(`items.${index}.unit_price`)}
+                            />
+                          </div>
                           <FieldError message={itemError?.unit_price?.message} />
                         </div>
 
@@ -614,7 +619,7 @@ export function QuoteModal({
                     id="quote-terms"
                     disabled={isViewOnly}
                     rows={4}
-                    placeholder="This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance."
+                    placeholder={SPLIT_PAYMENT_TERMS}
                     {...register("terms")}
                   />
                 </div>

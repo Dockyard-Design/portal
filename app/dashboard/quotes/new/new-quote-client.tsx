@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { SPLIT_PAYMENT_TERMS } from "@/lib/invoice-payments";
 import type { Customer } from "@/types/kanban";
 
 type DraftItem = {
@@ -33,7 +34,7 @@ export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClient
   const [description, setDescription] = useState("");
   const [taxRate, setTaxRate] = useState(20);
   const [notes, setNotes] = useState("");
-  const [terms, setTerms] = useState("This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance.");
+  const [terms, setTerms] = useState(SPLIT_PAYMENT_TERMS);
   const [items, setItems] = useState<DraftItem[]>([{ description: "", quantity: 1, unit_price: 0 }]);
 
   const subtotal = useMemo(
@@ -134,10 +135,50 @@ export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClient
               </div>
               <div className="flex flex-col gap-3">
                 {items.map((item, index) => (
-                  <div key={index} className="grid gap-3 rounded-lg border border-border/60 p-3 md:grid-cols-[minmax(0,1fr)_110px_130px_40px]">
-                    <Input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} placeholder="Description" />
-                    <Input type="number" min="0" step="0.01" value={item.quantity} onChange={(event) => updateItem(index, { quantity: Number(event.target.value) })} />
-                    <Input type="number" min="0" step="0.01" value={item.unit_price} onChange={(event) => updateItem(index, { unit_price: Number(event.target.value) })} />
+                  <div key={index} className="grid gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_120px_150px_130px_40px] md:items-end">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor={`new-quote-item-description-${index}`}>Description</Label>
+                      <Input
+                        id={`new-quote-item-description-${index}`}
+                        value={item.description}
+                        onChange={(event) => updateItem(index, { description: event.target.value })}
+                        placeholder="Discovery workshop"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor={`new-quote-item-quantity-${index}`}>Quantity / units</Label>
+                      <Input
+                        id={`new-quote-item-quantity-${index}`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={item.quantity}
+                        onChange={(event) => updateItem(index, { quantity: Number(event.target.value) })}
+                        placeholder="1"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor={`new-quote-item-price-${index}`}>Unit price</Label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
+                        <Input
+                          id={`new-quote-item-price-${index}`}
+                          className="pl-7"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(event) => updateItem(index, { unit_price: Number(event.target.value) })}
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Line total</Label>
+                      <div className="flex h-9 items-center rounded-md border border-dashed border-border bg-background px-3 text-sm font-medium">
+                        £{(item.quantity * item.unit_price).toLocaleString()}
+                      </div>
+                    </div>
                     <Button type="button" variant="ghost" size="icon" disabled={items.length === 1} onClick={() => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
                       <Trash2 className="size-4" />
                     </Button>

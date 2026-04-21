@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -37,14 +39,17 @@ import {
   Trash2,
   Edit,
   CreditCard,
+  CheckCircle,
+  ArrowLeft,
 } from "lucide-react";
 import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Invoice, Quote } from "@/types/agency";
 import type { UserRole } from "@/types/auth";
-import { payInvoice, sendInvoiceToCustomer } from "@/app/actions/agency";
+import { createInvoiceCheckoutSession, payInvoice, sendInvoiceToCustomer } from "@/app/actions/agency";
 import { InvoiceModal } from "@/app/dashboard/components/invoice-modal-v2";
 import { PdfViewDialog } from "@/app/dashboard/components/pdf-view-dialog";
+import { getInvoicePaymentPlan, getInvoicePaymentStageLabel } from "@/lib/invoice-payments";
 import { toast } from "sonner";
 
 export interface InvoicesWorkspaceProps {
@@ -113,14 +118,32 @@ export function InvoicesWorkspace({
   };
 
   const handlePayInvoice = async (invoiceId: string) => {
-    alert("Payment placeholder: this will be replaced with a real payment flow.");
     setPayingId(invoiceId);
     try {
-      await payInvoice(invoiceId);
-      toast.success("Invoice marked as paid");
+      const checkoutUrl = await createInvoiceCheckoutSession(invoiceId);
+      window.location.href = checkoutUrl;
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to start payment");
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const handleRecordManualPayment = async (
+    invoice: Invoice,
+    paymentMode: "next" | "full"
+  ) => {
+    setPayingId(invoice.id);
+    try {
+      await payInvoice(invoice.id, paymentMode === "full" ? invoice.total : undefined);
+      toast.success(
+        paymentMode === "full"
+          ? "Invoice marked as paid in full"
+          : "Invoice payment recorded"
+      );
       router.refresh();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to pay invoice");
+      toast.error(error instanceof Error ? error.message : "Failed to record payment");
     } finally {
       setPayingId(null);
     }
@@ -155,19 +178,23 @@ export function InvoicesWorkspace({
     : null;
 
   return (
-    <div className="w-full min-h-screen p-6 space-y-6">
+    <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Receipt className="size-8 text-primary" />
+          <Button variant="outline" size="icon" asChild>
+            <Link href="/dashboard">
+              <ArrowLeft className="size-4" />
+            </Link>
+          </Button>
           <div>
-            <h1 className="text-3xl font-semibold">Invoices</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-semibold">Invoices</h1>
+            <p className="text-sm text-muted-foreground">
               {selectedCustomer
-                ? `${filteredInvoices.length} invoices for ${selectedCustomer.name}`
+                ? `Invoices for ${selectedCustomer.name}`
                 : isCustomerRole
-                ? `${filteredInvoices.length} invoices available to view or pay`
-                : `${filteredInvoices.length} invoices`}
+                ? "Review invoices and pay securely"
+                : "Manage invoices and payments"}
             </p>
           </div>
         </div>
@@ -177,13 +204,12 @@ export function InvoicesWorkspace({
       <Card>
         <CardContent className="p-4">
           <div className="flex flex-col md:flex-row gap-4">
-            <div className="relative flex-1">
-              <Receipt className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <div className="flex-1">
+              <Label className="text-sm text-muted-foreground mb-2 block">Search</Label>
               <Input
                 placeholder="Search by invoice number, title, or customer name..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
               />
             </div>
             <div className="w-full md:w-48">
@@ -209,10 +235,10 @@ export function InvoicesWorkspace({
 
       {/* Invoices Table */}
       <Card>
-        <CardHeader className="pb-4">
-          <CardTitle>All Invoices</CardTitle>
+        <CardHeader>
+          <CardTitle>All Invoices ({filteredInvoices.length})</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent>
           {filteredInvoices.length === 0 ? (
             <div className="p-12 text-center">
               <div className="size-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
@@ -237,83 +263,112 @@ export function InvoicesWorkspace({
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredInvoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
-                    <TableCell>
-                      <span className="font-medium">{invoice.invoice_number}</span>
-                    </TableCell>
-                    {!isCustomerRole && (
+                {filteredInvoices.map((invoice) => {
+                  const paymentPlan = getInvoicePaymentPlan(invoice);
+                  const nextPaymentLabel = getInvoicePaymentStageLabel(paymentPlan.nextStage);
+
+                  return (
+                    <TableRow key={invoice.id}>
                       <TableCell>
-                        {getCustomerName(invoice.customer_id)}
+                        <span className="font-medium">{invoice.invoice_number}</span>
                       </TableCell>
-                    )}
-                    <TableCell>
-                      <span className="text-sm">{invoice.title}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={getStatusColor(invoice.status)}>
-                        {invoice.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {invoice.due_date 
-                        ? format(new Date(invoice.due_date), "MMM d, yyyy")
-                        : "—"
-                      }
-                    </TableCell>
-                    <TableCell className="text-right font-semibold">
-                      £{invoice.total.toLocaleString()}
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
-                          <MoreVertical className="size-4" />
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-52">
-                          <DropdownMenuItem onClick={() => isCustomerRole ? openPdfModal(invoice) : openViewInvoice(invoice)}>
-                            <Eye className="size-4 mr-2" />
-                            View
-                          </DropdownMenuItem>
-                          {isCustomerRole ? (
-                            invoice.status !== "paid" && invoice.status !== "cancelled" && (
-                              <DropdownMenuItem
-                                onClick={() => void handlePayInvoice(invoice.id)}
-                                disabled={payingId === invoice.id}
-                              >
-                                <CreditCard className="size-4 mr-2" />
-                                {payingId === invoice.id ? "Paying..." : "Pay"}
-                              </DropdownMenuItem>
-                            )
-                          ) : (
-                            <>
-                              <DropdownMenuItem onClick={() => openEditInvoice(invoice)}>
-                                <Edit className="size-4 mr-2" />
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => openPdf(invoice.id)}>
-                                <Download className="size-4 mr-2" />
-                                Download PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => void handleSendInvoice(invoice.id)}
-                                disabled={sendingId === invoice.id}
-                              >
-                                <Send className="size-4 mr-2" />
-                                {sendingId === invoice.id ? "Sending..." : "Send Email"}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-destructive">
-                                <Trash2 className="size-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      {!isCustomerRole && (
+                        <TableCell>
+                          {getCustomerName(invoice.customer_id)}
+                        </TableCell>
+                      )}
+                      <TableCell>
+                        <span className="text-sm">{invoice.title}</span>
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={getStatusColor(invoice.status)}>
+                          {invoice.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {invoice.due_date
+                          ? format(new Date(invoice.due_date), "MMM d, yyyy")
+                          : "—"
+                        }
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="font-semibold">£{invoice.total.toLocaleString()}</div>
+                        {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                          <div className="text-xs font-normal text-muted-foreground">
+                            Next: £{paymentPlan.nextPaymentAmount.toLocaleString()}
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
+                            <MoreVertical className="size-4" />
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuItem onClick={() => isCustomerRole ? openPdfModal(invoice) : openViewInvoice(invoice)}>
+                              <Eye className="size-4 mr-2" />
+                              View
+                            </DropdownMenuItem>
+                            {isCustomerRole ? (
+                              invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                                <DropdownMenuItem
+                                  onClick={() => void handlePayInvoice(invoice.id)}
+                                  disabled={payingId === invoice.id}
+                                >
+                                  <CreditCard className="size-4 mr-2" />
+                                  {payingId === invoice.id ? "Opening..." : `Pay ${nextPaymentLabel}`}
+                                </DropdownMenuItem>
+                              )
+                            ) : (
+                              <>
+                                <DropdownMenuItem onClick={() => openEditInvoice(invoice)}>
+                                  <Edit className="size-4 mr-2" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem onClick={() => openPdf(invoice.id)}>
+                                  <Download className="size-4 mr-2" />
+                                  Download PDF
+                                </DropdownMenuItem>
+                                {invoice.status !== "paid" && invoice.status !== "cancelled" && (
+                                  <>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => void handleRecordManualPayment(invoice, "next")}
+                                      disabled={payingId === invoice.id}
+                                    >
+                                      <CreditCard className="size-4 mr-2" />
+                                      Record Next Payment
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => void handleRecordManualPayment(invoice, "full")}
+                                      disabled={payingId === invoice.id}
+                                    >
+                                      <CheckCircle className="size-4 mr-2" />
+                                      Mark Paid In Full
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
+                                <DropdownMenuItem
+                                  onClick={() => void handleSendInvoice(invoice.id)}
+                                  disabled={sendingId === invoice.id}
+                                >
+                                  <Send className="size-4 mr-2" />
+                                  {sendingId === invoice.id ? "Sending..." : "Send Email"}
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem className="text-destructive">
+                                  <Trash2 className="size-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           )}

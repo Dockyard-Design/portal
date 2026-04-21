@@ -229,6 +229,10 @@ interface QuotePDFProps {
   logoBase64?: string | null;
 }
 
+function getQuoteReference(quote: Quote): string {
+  return `QTE-${quote.id.slice(0, 8).toUpperCase()}`;
+}
+
 export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
   return (
     <Document>
@@ -242,7 +246,7 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
           <View style={styles.rightSection}>
             <View style={styles.docTypeRow}>
               <Text style={styles.docType}>QUOTE</Text>
-              <Text style={styles.docNumber}>{quote.title}</Text>
+              <Text style={styles.docNumber}>{getQuoteReference(quote)}</Text>
             </View>
             <View style={styles.statusBadge}>
               <Text style={styles.statusText}>{quote.status.toUpperCase()}</Text>
@@ -265,6 +269,10 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
 
           <View style={styles.column}>
             <Text style={styles.sectionTitle}>Quote Details</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Quote #:</Text>
+              <Text style={styles.infoValue}>{getQuoteReference(quote)}</Text>
+            </View>
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Date:</Text>
               <Text style={styles.infoValue}>

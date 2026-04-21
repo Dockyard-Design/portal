@@ -6,24 +6,29 @@ import type {
   CustomerMessageEmailInput,
   SupportMessageEmailInput,
 } from "@/types/email";
+import {
+  getFormSubmissionEmailHtml,
+  getDocumentEmailHtml,
+  getCustomerMessageEmailHtml,
+  getSupportMessageEmailHtml,
+  getCustomerWelcomeEmailHtml,
+} from "@/emails";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 const SUPPORT_EMAIL = "support@dockyard.design";
 const NO_REPLY_EMAIL = "no-reply@dockyard.design";
 
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 function formatDetailValue(value: string | number | boolean | null | undefined): string {
   if (value === null || value === undefined || value === "") return "Not provided";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
+}
+
+function getTextVersion(input: Record<string, unknown>): string {
+  const entries = Object.entries(input).map(
+    ([key, value]) => `${key}: ${formatDetailValue(value as string | number | boolean | null | undefined)}`
+  );
+  return entries.join("\n");
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<void> {
@@ -53,33 +58,18 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 }
 
 export async function sendFormSubmissionEmail(input: FormSubmissionEmailInput): Promise<void> {
-  const rows = Object.entries(input.details)
-    .map(([key, value]) => {
-      const label = key
-        .replaceAll("_", " ")
-        .replace(/\b\w/g, (char) => char.toUpperCase());
-      return `<tr><th align="left" style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(label)}</th><td style="padding:8px;border-bottom:1px solid #e5e7eb;">${escapeHtml(formatDetailValue(value))}</td></tr>`;
-    })
-    .join("");
-
-  const text = [
-    `${input.formName} submission`,
-    `Submitted at: ${input.submittedAt}`,
-    ...Object.entries(input.details).map(([key, value]) => `${key}: ${formatDetailValue(value)}`),
-  ].join("\n");
+  const html = await getFormSubmissionEmailHtml({
+    formName: input.formName,
+    submittedAt: input.submittedAt,
+    details: input.details,
+  });
 
   await sendEmail({
     to: [SUPPORT_EMAIL],
     from: SUPPORT_EMAIL,
     subject: `${input.formName} submission`,
-    text,
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
-        <h1 style="font-size:20px;">${escapeHtml(input.formName)} submission</h1>
-        <p>Submitted at ${escapeHtml(input.submittedAt)}.</p>
-        <table cellspacing="0" cellpadding="0" style="border-collapse:collapse;width:100%;max-width:720px;">${rows}</table>
-      </div>
-    `,
+    text: `${input.formName} submission\nSubmitted at: ${input.submittedAt}\n${getTextVersion(input.details)}`,
+    html,
   });
 }
 
@@ -89,6 +79,15 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
     style: "currency",
     currency: input.currency || "GBP",
   }).format(input.total);
+
+  const html = await getDocumentEmailHtml({
+    documentType: input.documentType,
+    title: input.title,
+    recipientName: input.recipientName,
+    total: input.total,
+    currency: input.currency,
+    pdfUrl: input.pdfUrl,
+  });
 
   await sendEmail({
     to: [input.recipientEmail],
@@ -103,21 +102,19 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
       "",
       "Dockyard Design",
     ].join("\n"),
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
-        <p>Hello ${escapeHtml(input.recipientName)},</p>
-        <p>Your ${escapeHtml(input.documentType)} <strong>${escapeHtml(input.title)}</strong> is ready.</p>
-        <p><strong>Total:</strong> ${escapeHtml(formattedTotal)}</p>
-        <p><a href="${escapeHtml(input.pdfUrl)}">View or download the ${escapeHtml(label.toLowerCase())}</a></p>
-        <p>Dockyard Design</p>
-      </div>
-    `,
+    html,
   });
 }
 
 export async function sendCustomerMessageEmail(
   input: CustomerMessageEmailInput
 ): Promise<void> {
+  const html = await getCustomerMessageEmailHtml({
+    recipientName: input.recipientName,
+    subject: input.subject,
+    body: input.body,
+  });
+
   await sendEmail({
     to: [input.recipientEmail],
     from: NO_REPLY_EMAIL,
@@ -131,20 +128,20 @@ export async function sendCustomerMessageEmail(
       "",
       "Dockyard Design",
     ].join("\n"),
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
-        <p>Hello ${escapeHtml(input.recipientName)},</p>
-        <p>You have a new message in your Dockyard portal.</p>
-        <div style="white-space:pre-wrap;padding:12px;border-left:3px solid #111827;background:#f9fafb;">${escapeHtml(input.body)}</div>
-        <p>Dockyard Design</p>
-      </div>
-    `,
+    html,
   });
 }
 
 export async function sendSupportMessageEmail(
   input: SupportMessageEmailInput
 ): Promise<void> {
+  const html = await getSupportMessageEmailHtml({
+    customerName: input.customerName,
+    customerEmail: input.customerEmail,
+    subject: input.subject,
+    body: input.body,
+  });
+
   await sendEmail({
     to: [SUPPORT_EMAIL],
     from: NO_REPLY_EMAIL,
@@ -155,20 +152,20 @@ export async function sendSupportMessageEmail(
       "",
       input.body,
     ].join("\n"),
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
-        <h1 style="font-size:20px;">Customer portal message</h1>
-        <p><strong>Customer:</strong> ${escapeHtml(input.customerName)}</p>
-        <p><strong>Email:</strong> ${escapeHtml(input.customerEmail || "Not provided")}</p>
-        <div style="white-space:pre-wrap;padding:12px;border-left:3px solid #111827;background:#f9fafb;">${escapeHtml(input.body)}</div>
-      </div>
-    `,
+    html,
   });
 }
 
 export async function sendCustomerWelcomeEmail(
   input: CustomerWelcomeEmailInput
 ): Promise<void> {
+  const html = await getCustomerWelcomeEmailHtml({
+    recipientName: input.recipientName,
+    companyName: input.companyName,
+    signInUrl: input.signInUrl,
+    password: input.password,
+  });
+
   await sendEmail({
     to: [input.recipientEmail],
     from: SUPPORT_EMAIL,
@@ -184,15 +181,6 @@ export async function sendCustomerWelcomeEmail(
       "",
       "Dockyard Design",
     ].join("\n"),
-    html: `
-      <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;">
-        <p>Hello ${escapeHtml(input.recipientName)},</p>
-        <p>Your Dockyard portal account for <strong>${escapeHtml(input.companyName)}</strong> is ready.</p>
-        <p><strong>Sign in:</strong> <a href="${escapeHtml(input.signInUrl)}">${escapeHtml(input.signInUrl)}</a></p>
-        <p><strong>Temporary password:</strong> ${escapeHtml(input.password)}</p>
-        <p>You will be asked to change this password after your first sign-in.</p>
-        <p>Dockyard Design</p>
-      </div>
-    `,
+    html,
   });
 }

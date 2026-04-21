@@ -6,6 +6,7 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { Logo } from "./logo";
+import { getInvoicePaymentPlan, getInvoicePaymentStageLabel } from "@/lib/invoice-payments";
 import type { Invoice, InvoiceItem } from "@/types/agency";
 import type { Customer } from "@/types/kanban";
 
@@ -213,6 +214,42 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 12,
   },
+  paymentSchedule: {
+    marginTop: 14,
+    borderWidth: 1,
+    borderColor: "#000000",
+  },
+  scheduleHeader: {
+    padding: "7 10",
+    borderBottomWidth: 1,
+    borderBottomColor: "#000000",
+    backgroundColor: "#F0F0F0",
+  },
+  scheduleTitle: {
+    fontSize: 9,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+  },
+  scheduleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: "7 10",
+    borderBottomWidth: 0.5,
+    borderBottomColor: "#CCCCCC",
+  },
+  scheduleRowLast: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    padding: "7 10",
+  },
+  scheduleLabel: {
+    fontSize: 9,
+    color: "#333333",
+  },
+  scheduleValue: {
+    fontSize: 9,
+    fontWeight: "bold",
+  },
   termsSection: {
     marginTop: 15,
     padding: 12,
@@ -252,6 +289,8 @@ interface InvoicePDFProps {
 
 export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
   const balanceDue = invoice.balance_due || 0;
+  const paymentPlan = getInvoicePaymentPlan(invoice);
+  const nextPaymentLabel = getInvoicePaymentStageLabel(paymentPlan.nextStage);
 
   return (
     <Document>
@@ -357,6 +396,27 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
             <View style={styles.balanceDue}>
               <Text style={styles.balanceDueLabel}>BALANCE DUE:</Text>
               <Text style={styles.balanceDueValue}>£{balanceDue.toFixed(2)}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Payment Schedule */}
+        <View style={styles.paymentSchedule}>
+          <View style={styles.scheduleHeader}>
+            <Text style={styles.scheduleTitle}>Payment Schedule</Text>
+          </View>
+          <View style={styles.scheduleRow}>
+            <Text style={styles.scheduleLabel}>Start of works payment due {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString("en-GB") : "on acceptance"}</Text>
+            <Text style={styles.scheduleValue}>£{paymentPlan.startPaymentAmount.toFixed(2)}</Text>
+          </View>
+          <View style={styles.scheduleRow}>
+            <Text style={styles.scheduleLabel}>Completion payment due before final handover</Text>
+            <Text style={styles.scheduleValue}>£{paymentPlan.finalPaymentAmount.toFixed(2)}</Text>
+          </View>
+          {invoice.status !== "paid" && paymentPlan.nextPaymentAmount > 0 && (
+            <View style={styles.scheduleRowLast}>
+              <Text style={styles.scheduleLabel}>Next payment: {nextPaymentLabel}</Text>
+              <Text style={styles.scheduleValue}>£{paymentPlan.nextPaymentAmount.toFixed(2)}</Text>
             </View>
           )}
         </View>

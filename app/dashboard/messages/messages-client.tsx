@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   CheckCheck,
+  FileText,
   Inbox,
   MailPlus,
   MessageSquareText,
@@ -18,6 +19,7 @@ import {
   Send,
   UserRound,
 } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import {
   createMessageThread,
@@ -199,6 +201,19 @@ export function MessagesClient({
   const selectedUnread = selectedThread ? getUnread(selectedThread) : false;
   const latestMessage = selectedThread?.messages.at(-1);
   const selectedMessageCount = selectedThread?.messages.length ?? 0;
+  const selectedDocumentLink = selectedThread?.invoice_id
+    ? {
+        label: "View Invoice",
+        href: `/dashboard/invoices?invoiceId=${selectedThread.invoice_id}`,
+        pdfHref: `/api/pdf/invoice/${selectedThread.invoice_id}`,
+      }
+    : selectedThread?.quote_id
+      ? {
+          label: "View Quote",
+          href: `/dashboard/quotes?quoteId=${selectedThread.quote_id}`,
+          pdfHref: `/api/pdf/quote/${selectedThread.quote_id}`,
+        }
+      : null;
 
   useEffect(() => {
     const messageList = messageListRef.current;
@@ -206,6 +221,25 @@ export function MessagesClient({
 
     messageList.scrollTop = messageList.scrollHeight;
   }, [selectedThread?.id, selectedMessageCount]);
+
+  useEffect(() => {
+    if (!selectedThread || !selectedUnread) return;
+
+    setLocalThreads((currentThreads) =>
+      currentThreads.map((thread) =>
+        thread.id === selectedThread.id
+          ? role === "admin"
+            ? { ...thread, unread_admin: false }
+            : { ...thread, unread_customer: false }
+          : thread
+      )
+    );
+    notifyMessagesChanged();
+
+    markThreadRead(selectedThread.id).catch((error) => {
+      toast.error(error instanceof Error ? error.message : "Failed to mark thread read");
+    });
+  }, [role, selectedThread, selectedUnread]);
 
   const notifyMessagesChanged = () => {
     window.dispatchEvent(new CustomEvent("messages:changed"));
@@ -578,6 +612,14 @@ export function MessagesClient({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {selectedDocumentLink && (
+                      <Button variant="default" size="sm" asChild>
+                        <Link href={selectedDocumentLink.href}>
+                          <FileText data-icon="inline-start" />
+                          {selectedDocumentLink.label}
+                        </Link>
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -779,6 +821,28 @@ export function MessagesClient({
                 </div>
 
                 <Separator />
+
+                {selectedDocumentLink && (
+                  <>
+                    <div className="flex flex-col gap-2 rounded-lg border border-border/50 bg-background/35 p-3">
+                      <p className="text-sm font-medium">Linked document</p>
+                      <div className="flex flex-col gap-2">
+                        <Button asChild>
+                          <Link href={selectedDocumentLink.href}>
+                            <FileText data-icon="inline-start" />
+                            {selectedDocumentLink.label}
+                          </Link>
+                        </Button>
+                        <Button variant="outline" asChild>
+                          <a href={selectedDocumentLink.pdfHref} target="_blank" rel="noopener noreferrer">
+                            Open PDF
+                          </a>
+                        </Button>
+                      </div>
+                    </div>
+                    <Separator />
+                  </>
+                )}
 
                 <div className="flex flex-col gap-3 text-sm">
                   <div>

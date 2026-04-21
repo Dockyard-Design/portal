@@ -3,7 +3,6 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { QuotePDF } from "@/app/components/pdf/quote-template";
 import { getQuote } from "@/app/actions/agency";
 import { getCustomer } from "@/app/actions/kanban";
-import { requireAdmin } from "@/lib/authz";
 import fs from "fs/promises";
 import path from "path";
 
@@ -13,8 +12,6 @@ export async function GET(
 ) {
   try {
     void request;
-
-    await requireAdmin();
 
     const { id } = await params;
     
@@ -49,6 +46,12 @@ export async function GET(
     });
   } catch (error) {
     console.error("Error generating quote PDF:", error);
+    if (error instanceof Error && error.message === "Unauthorized") {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    if (error instanceof Error && error.message === "Forbidden") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
     return NextResponse.json({ error: "Failed to generate PDF" }, { status: 500 });
   }
 }

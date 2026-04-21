@@ -141,7 +141,7 @@ export function EditUserDialog({ user, customers, open, onOpenChange }: EditUser
                   <SelectContent>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                        {customer.company || customer.name || customer.email || "Unnamed customer"}
                       </SelectItem>
                     ))}
                   </SelectContent>

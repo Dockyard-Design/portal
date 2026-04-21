@@ -18,20 +18,24 @@ Implement the following features:
 
 ### 1. List of bugs and updates.
 
-- Need custom settings page, as using clerks stops me from updating "first_login" on database when the user actually changed their password for the first time.
-- All emails need custom templates.
-- Dockyard needs to receive emails when quotes/invoices get updated not just the customer.
-- Creating a quote sends an email when quote is only in draft mode and it shouldnt. We should send the quote manually.
-- Inside the messaging system we should have a button to View quotes/invoices
-- View quotes/invoices doesn't work as its not displaying the pdfs and the modal is scuffed.
-- Quotes page looks good, invoice page should look the same, scuffed at the moment.
-- Messaging Centre/Contact submission needs to mark stuff has read when we go into it, but without refreshing page.
-- Performance issue when marking multiple contact submission stuff as read or deleting.
-- Vercel blob has issues uploading images for projects.
-- I have no way to create categories for expenses.
-- Need to merge Reports and both metrics page.
-- I want to be able to download yearly report for expenses and earnings as pdf.
-- I want to be able to download monthly report for expenses and earnings as pdf.
+- Need custom settings page, as using clerks stops me from updating "first_login" on database when the user actually changed their password for the first time. x
+- All emails need custom templates, create a folder for these so its easier to edit. x
+- Dockyard needs to receive emails when quotes/invoices get updated not just the customer. x
+- Creating a quote sends an email when quote is only in draft mode and it shouldnt. We should send the quote manually. x
+- Inside the messaging system, when sending a quote/invoice we should also send a button to View quotes/invoices. x
+- View quotes/invoices doesn't work as its not displaying the pdfs and the modal is scuffed. x
+- Quotes page looks good, invoice page should look the same, scuffed at the moment. x
+- Messaging Centre/Contact submission needs to mark stuff has read when we go into it, but without refreshing page. x
+- Performance issue when marking multiple contact submission stuff as read or deleting. x
+- Vercel blob has issues uploading images for projects. x
+- I have no way to create categories for expenses. x
+- Need to merge Reports and both metrics page. x
+- I want to be able to download yearly report for expenses and earnings as pdf. x
+- I want to be able to download monthly report for expenses and earnings as pdf. x
+- Implement stripe x
+- Quotes need to generate unique id and display it on pdf and not the name of the quote top right. x
+- Need to write a proper terms and conditions for quotes & invoices (will be the same text). x
+- User management screen edit modal shows ids and not names. x
 
 ### 2. Full check
 

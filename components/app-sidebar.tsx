@@ -16,6 +16,7 @@ import {
   Users,
   Receipt,
   FileText,
+  Settings,
   Trash2,
   AlertTriangle,
   X,
@@ -75,14 +76,13 @@ import {
 } from "@/components/ui/popover";
 import { useUser, useClerk } from "@clerk/nextjs";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useKanbanStore, useSidebarStore } from "@/lib/store";
 import { wipeDatabase } from "@/app/actions/dev-wipe";
 import { getBoards, getCustomers } from "@/app/actions/kanban";
 import { getUnreadMessageCount } from "@/app/actions/messaging";
 import { getUnreadContactSubmissionCount } from "@/app/actions/contact";
-import { recordFirstCustomerLogin } from "@/app/actions/users";
 import { toast } from "sonner";
 import type { UserRole } from "@/types/auth";
 import type { Customer } from "@/types/kanban";
@@ -151,19 +151,9 @@ const NAV_GROUPS: MenuGroup[] = [
         icon: Receipt,
       },
       {
-        title: "Agency Metrics",
-        href: "/dashboard/agency-metrics",
-        icon: LayoutDashboard,
-      },
-      {
-        title: "Expense Metrics",
-        href: "/dashboard/expense-metrics",
-        icon: Receipt,
-      },
-      {
         title: "Reports",
         href: "/dashboard/reports",
-        icon: FileText,
+        icon: LayoutDashboard,
       },
     ],
   },
@@ -253,8 +243,9 @@ export default function AppSidebar({
   role: UserRole;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { isLoaded, user } = useUser();
-  const { openUserProfile, signOut } = useClerk();
+  const { signOut } = useClerk();
   const { openGroups, setGroupOpen } = useSidebarStore();
   const {
     selectedCustomerId,
@@ -305,9 +296,6 @@ export default function AppSidebar({
       setShowPasswordChangePrompt(true);
     }
 
-    if (!metadata.firstLoginAt) {
-      recordFirstCustomerLogin().catch(() => {});
-    }
   }, [isCustomerRole, isLoaded, user]);
 
   const handleWipe = async () => {
@@ -947,12 +935,9 @@ export default function AppSidebar({
             }
           />
           <DropdownMenuContent side="top" align="start" className="w-56">
-            <DropdownMenuItem
-              onClick={() => openUserProfile()}
-              className="gap-2"
-            >
-              <User className="size-4" />
-              Account
+            <DropdownMenuItem className="gap-2" onClick={() => router.push("/dashboard/settings")}>
+              <Settings className="size-4" />
+              Settings
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -1037,11 +1022,11 @@ export default function AppSidebar({
           <AlertDialogFooter>
             <AlertDialogAction
               onClick={() => {
-                openUserProfile();
+                window.location.href = "/dashboard/settings";
                 setShowPasswordChangePrompt(false);
               }}
             >
-              Open Account Settings
+              Open Settings
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

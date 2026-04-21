@@ -153,6 +153,9 @@ export function ProjectForm({ initialData, onSubmit, isPending, onCancel }: Proj
         if (current.length >= 4) return;
         setValue(fieldName, [...current, result.url], { shouldValidate: true, shouldDirty: true });
       }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Image upload failed";
+      form.setError(fieldName, { message });
     } finally {
       setUploadingField(null);
     }

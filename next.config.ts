@@ -29,6 +29,9 @@ const securityHeaders = [
     ].join("; "),
   },
 ];
+module.exports = {
+  allowedDevOrigins: ["frederico.tail06989e.ts.net"],
+};
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,

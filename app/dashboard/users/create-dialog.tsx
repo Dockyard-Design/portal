@@ -150,7 +150,7 @@ export function CreateUserDialog({ customers }: { customers: Customer[] }) {
                   <SelectContent>
                     {customers.map((customer) => (
                       <SelectItem key={customer.id} value={customer.id}>
-                        {customer.name}
+                        {customer.company || customer.name || customer.email || "Unnamed customer"}
                       </SelectItem>
                     ))}
                   </SelectContent>

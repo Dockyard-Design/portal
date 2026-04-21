@@ -39,9 +39,12 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import {
   deleteSubmission,
+  deleteSubmissions,
   getContactSubmissions,
   toggleArchiveSubmission,
+  toggleArchiveSubmissions,
   updateSubmissionStatus,
+  updateSubmissionStatuses,
 } from "@/app/actions/contact";
 import type { ContactStatus, ContactSubmission } from "@/types/contact";
 
@@ -177,58 +180,125 @@ export default function ContactInbox() {
   };
 
   const updateOneStatus = async (id: string, status: ContactStatus, archived = false) => {
+    const currentSubmission = allSubmissions.find((submission) => submission.id === id);
+
     try {
+      if (status === "closed" && currentSubmission) {
+        setActiveSubmissions((items) => items.filter((item) => item.id !== id));
+        setArchivedSubmissions((items) => [
+          { ...currentSubmission, status, archived: true },
+          ...items.filter((item) => item.id !== id),
+        ]);
+      } else if (archived && currentSubmission) {
+        setArchivedSubmissions((items) => items.filter((item) => item.id !== id));
+        setActiveSubmissions((items) => [
+          { ...currentSubmission, status, archived: false },
+          ...items.filter((item) => item.id !== id),
+        ]);
+      } else {
+        setActiveSubmissions((items) =>
+          items.map((item) => item.id === id ? { ...item, status } : item)
+        );
+        setArchivedSubmissions((items) =>
+          items.map((item) => item.id === id ? { ...item, status } : item)
+        );
+      }
       if (archived) await toggleArchiveSubmission(id, false);
       if (status === "closed") await toggleArchiveSubmission(id, true);
       await updateSubmissionStatus(id, status);
       toast.success(status === "closed" ? "Archived and closed" : `Marked as ${status}`);
-      await fetchSubmissions();
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
     } catch {
       toast.error("Failed to update submission");
+      await fetchSubmissions();
     }
   };
 
   const archiveOne = async (submission: ContactSubmission) => {
     try {
       const shouldArchive = !submission.archived;
+      setActiveSubmissions((items) =>
+        shouldArchive
+          ? items.filter((item) => item.id !== submission.id)
+          : items.map((item) => item.id === submission.id ? { ...item, archived: false } : item)
+      );
+      setArchivedSubmissions((items) =>
+        shouldArchive
+          ? [{ ...submission, status: "closed", archived: true }, ...items]
+          : items.filter((item) => item.id !== submission.id)
+      );
       if (shouldArchive) await updateSubmissionStatus(submission.id, "closed");
       await toggleArchiveSubmission(submission.id, shouldArchive);
       toast.success(shouldArchive ? "Archived" : "Moved to inbox");
-      await fetchSubmissions();
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
     } catch {
       toast.error("Failed to update archive status");
+      await fetchSubmissions();
     }
   };
 
   const bulkUpdate = async (status: ContactStatus) => {
+    const ids = [...selectedIds];
+    const idSet = new Set(ids);
     try {
-      const ids = [...selectedIds];
-      await Promise.all(
-        ids.map(async (id) => {
-          if (status === "closed") await toggleArchiveSubmission(id, true);
-          await updateSubmissionStatus(id, status);
-        })
+      setActiveSubmissions((items) =>
+        status === "closed"
+          ? items.filter((item) => !idSet.has(item.id))
+          : items.map((item) => idSet.has(item.id) ? { ...item, status } : item)
       );
+      if (status === "closed") {
+        const archivedItems = activeSubmissions
+          .filter((item) => idSet.has(item.id))
+          .map((item) => ({ ...item, status, archived: true }));
+        setArchivedSubmissions((items) => [...archivedItems, ...items]);
+        await toggleArchiveSubmissions(ids, true);
+      }
+      await updateSubmissionStatuses(ids, status);
+      setSelectedIds(new Set());
       toast.success(`${ids.length} submissions updated`);
-      await fetchSubmissions();
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
     } catch {
       toast.error("Failed to update selected submissions");
+      await fetchSubmissions();
     }
   };
 
   const bulkUnarchive = async () => {
+    const ids = [...selectedIds];
+    const idSet = new Set(ids);
     try {
-      const ids = [...selectedIds];
-      await Promise.all(
-        ids.map(async (id) => {
-          await toggleArchiveSubmission(id, false);
-          await updateSubmissionStatus(id, "read");
-        })
-      );
+      const restored = archivedSubmissions
+        .filter((item) => idSet.has(item.id))
+        .map((item) => ({ ...item, status: "read" as ContactStatus, archived: false }));
+      setArchivedSubmissions((items) => items.filter((item) => !idSet.has(item.id)));
+      setActiveSubmissions((items) => [...restored, ...items]);
+      setSelectedIds(new Set());
+      await Promise.all([
+        toggleArchiveSubmissions(ids, false),
+        updateSubmissionStatuses(ids, "read"),
+      ]);
       toast.success(`${ids.length} submissions moved to inbox`);
-      await fetchSubmissions();
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
     } catch {
       toast.error("Failed to unarchive selected submissions");
+      await fetchSubmissions();
+    }
+  };
+
+  const markSelectedVisibleRead = async () => {
+    const ids = [...selectedIds];
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    try {
+      setActiveSubmissions((items) =>
+        items.map((item) => idSet.has(item.id) ? { ...item, status: "read" as ContactStatus } : item)
+      );
+      await updateSubmissionStatuses(ids, "read");
+      setSelectedIds(new Set());
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
+    } catch {
+      toast.error("Failed to mark selected submissions read");
+      await fetchSubmissions();
     }
   };
 
@@ -245,9 +315,10 @@ export default function ContactInbox() {
     setActiveSubmissions(markReadLocally);
     try {
       await updateSubmissionStatus(submission.id, "read");
-      await fetchSubmissions();
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
     } catch {
       toast.error("Failed to mark submission as read");
+      await fetchSubmissions();
     }
   };
 
@@ -257,13 +328,19 @@ export default function ContactInbox() {
   };
 
   const confirmDelete = async () => {
+    const ids = deleteTarget === "bulk" ? [...selectedIds] : [deleteTarget];
+    const idSet = new Set(ids);
     try {
-      const ids = deleteTarget === "bulk" ? [...selectedIds] : [deleteTarget];
-      await Promise.all(ids.map((id) => deleteSubmission(id)));
+      setActiveSubmissions((items) => items.filter((item) => !idSet.has(item.id)));
+      setArchivedSubmissions((items) => items.filter((item) => !idSet.has(item.id)));
+      setSelectedIds(new Set());
+      if (ids.length === 1) await deleteSubmission(ids[0]);
+      else await deleteSubmissions(ids);
       toast.success(`${ids.length} submission${ids.length === 1 ? "" : "s"} deleted`);
-      await fetchSubmissions();
+      window.dispatchEvent(new CustomEvent("contact-submissions:changed"));
     } catch {
       toast.error("Failed to delete submission");
+      await fetchSubmissions();
     } finally {
       setDeleteDialogOpen(false);
     }
@@ -326,7 +403,7 @@ export default function ContactInbox() {
               <>
                 <span className="text-sm font-medium">{selectedCount} selected</span>
                 <div className="ml-auto flex items-center gap-1">
-                  <Button variant="ghost" size="icon" onClick={() => void bulkUpdate("read")}>
+                  <Button variant="ghost" size="icon" onClick={() => void markSelectedVisibleRead()}>
                     <CheckCircle2 className="size-4" />
                   </Button>
                   {folder === "archived" ? (

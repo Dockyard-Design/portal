@@ -3,7 +3,15 @@
 import { revalidatePath } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import { getCurrentUserAccess, requireAdmin } from "@/lib/authz";
-import { sendCustomerMessageEmail } from "@/lib/email";
+import { sendCustomerMessageEmail, sendSupportMessageEmail } from "@/lib/email";
+import {
+  DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS,
+  SPLIT_PAYMENT_TERMS,
+  getDefaultInvoiceDueDate,
+  getInvoicePaymentPlan,
+  getInvoicePaymentStageLabel,
+  roundCurrency,
+} from "@/lib/invoice-payments";
 import type {
   Quote,
   Invoice,
@@ -21,7 +29,16 @@ const KNOWN_ERRORS: Record<string, string> = {
 };
 
 const DEFAULT_QUOTE_TERMS =
-  "This quote is valid for 14 days from creation. Payment is due within 30 days of acceptance.";
+  [
+    "This document is issued by Dockyard Design and is valid for 14 days from the date of issue unless otherwise stated.",
+    "Prices are shown in GBP and exclude any third-party costs, subscriptions, licences, hosting, stock assets, advertising spend, or payment processing fees unless they are explicitly listed as line items.",
+    "Work begins after written acceptance and the start-of-works payment has cleared. Project timelines depend on timely client feedback, asset delivery, and approval at each agreed milestone.",
+    "Changes outside the agreed scope may be quoted separately or billed at Dockyard Design's prevailing day rate before the extra work begins.",
+    SPLIT_PAYMENT_TERMS,
+    "Late payments may pause active work and access to deliverables until the account is brought up to date.",
+    "All intellectual property created by Dockyard Design transfers to the customer only after the related invoice has been paid in full. Dockyard Design may retain portfolio rights unless agreed otherwise in writing.",
+    "The customer is responsible for checking factual content, legal copy, compliance obligations, and approvals before launch or publication.",
+  ].join("\n\n");
 
 function sanitizeError(error: { code?: string; message: string }): string {
   if (error.code && KNOWN_ERRORS[error.code]) {
@@ -58,15 +75,29 @@ function getQuoteTerms(inputTerms?: string): string {
   const terms = inputTerms?.trim();
   if (!terms) return DEFAULT_QUOTE_TERMS;
 
-  if (terms.toLowerCase().includes("14 days")) {
+  const normalizedTerms = terms.toLowerCase();
+  const hasCoreTerms =
+    normalizedTerms.includes("dockyard design") &&
+    normalizedTerms.includes("intellectual property");
+  const hasSplitPaymentTerms =
+    normalizedTerms.includes("50%") ||
+    normalizedTerms.includes("two equal") ||
+    normalizedTerms.includes("two halves") ||
+    (normalizedTerms.includes("start of works") && normalizedTerms.includes("completion"));
+
+  if (hasCoreTerms && hasSplitPaymentTerms) {
     return terms;
+  }
+
+  if (normalizedTerms.includes("this quote is valid for 14 days from creation")) {
+    return DEFAULT_QUOTE_TERMS;
   }
 
   return `${DEFAULT_QUOTE_TERMS}\n\n${terms}`;
 }
 
-function getQuoteReference(quote: Pick<Quote, "id" | "title">): string {
-  return quote.title || `Quote ${quote.id.slice(0, 8)}`;
+function getQuoteReference(quote: Pick<Quote, "id">): string {
+  return `QTE-${quote.id.slice(0, 8).toUpperCase()}`;
 }
 
 function getInvoiceReference(invoice: Pick<Invoice, "invoice_number" | "title">): string {
@@ -87,23 +118,38 @@ function getThreadCustomer(thread: QuoteThreadRow): QuoteThreadCustomer | null {
   return thread.customers;
 }
 
-async function sendCustomerThreadEmail(
+async function sendQuoteThreadEmails(
   thread: QuoteThreadRow,
   body: string,
-  context: string
+  context: string,
+  recipients: { customer: boolean; support: boolean }
 ): Promise<void> {
   const customer = getThreadCustomer(thread);
-  const email = customer?.email;
-  if (!email) return;
+  const customerName = customer?.company || customer?.name || "Customer";
+  const customerEmail = customer?.email ?? null;
 
-  await sendCustomerMessageEmail({
-    recipientEmail: email,
-    recipientName: customer?.company || customer?.name || "Customer",
-    subject: thread.subject,
-    body,
-  }).catch((emailError) => {
-    console.error(`[${context}] Customer message email failed:`, emailError);
-  });
+  await Promise.all([
+    recipients.customer && customerEmail
+      ? sendCustomerMessageEmail({
+          recipientEmail: customerEmail,
+          recipientName: customerName,
+          subject: thread.subject,
+          body,
+        }).catch((emailError) => {
+          console.error(`[${context}] Customer message email failed:`, emailError);
+        })
+      : Promise.resolve(),
+    recipients.support
+      ? sendSupportMessageEmail({
+          customerName,
+          customerEmail,
+          subject: thread.subject,
+          body,
+        }).catch((emailError) => {
+          console.error(`[${context}] Support message email failed:`, emailError);
+        })
+      : Promise.resolve(),
+  ]);
 }
 
 async function getOrCreateQuoteThread(
@@ -123,7 +169,7 @@ async function getOrCreateQuoteThread(
     .insert({
       customer_id: quote.customer_id,
       quote_id: quote.id,
-      subject: `Quote: ${getQuoteReference(quote)}`,
+      subject: `Quote ${getQuoteReference(quote)}: ${quote.title}`,
       created_by: quote.author_id,
       unread_admin: false,
       unread_customer: true,
@@ -140,6 +186,8 @@ async function addQuoteThreadMessage(input: {
   body: string;
   unreadAdmin?: boolean;
   unreadCustomer?: boolean;
+  notifyCustomer?: boolean;
+  notifySupport?: boolean;
   invoiceId?: string | null;
   context: string;
 }): Promise<void> {
@@ -171,7 +219,10 @@ async function addQuoteThreadMessage(input: {
     .eq("id", thread.id);
 
   if (threadError) throw new Error(sanitizeError(threadError));
-  await sendCustomerThreadEmail(thread, input.body, input.context);
+  await sendQuoteThreadEmails(thread, input.body, input.context, {
+    customer: input.notifyCustomer ?? input.unreadCustomer ?? true,
+    support: input.notifySupport ?? false,
+  });
 }
 
 // Quotes
@@ -265,6 +316,8 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
   await addQuoteThreadMessage({
     quote: quote as Quote,
     body: `A new quote has been created: ${quote.title}. Total: ${new Intl.NumberFormat("en-GB", { style: "currency", currency: quote.currency || "GBP" }).format(total)}.`,
+    unreadCustomer: false,
+    notifyCustomer: false,
     context: "createQuote",
   });
 
@@ -353,6 +406,7 @@ export async function updateQuote(
     body,
     unreadAdmin: false,
     unreadCustomer: true,
+    notifySupport: true,
     context: "updateQuote",
   });
 
@@ -427,10 +481,10 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
       tax_amount,
       total,
       balance_due: total,
-      due_date: input.due_date || null,
+      due_date: input.due_date || getDefaultInvoiceDueDate(),
       notes: input.notes || null,
-      terms: input.terms || null,
-      payment_instructions: input.payment_instructions || null,
+      terms: getQuoteTerms(input.terms),
+      payment_instructions: input.payment_instructions || DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS,
       author_id: userId,
     })
     .select()
@@ -464,6 +518,7 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
       },
       body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been created for quote ${invoice.title}.`,
       invoiceId: invoice.id,
+      notifySupport: true,
       context: "createInvoice",
     });
   }
@@ -480,7 +535,7 @@ export async function updateInvoice(
 
   const { data: currentInvoice } = await supabase
     .from("invoices")
-    .select("id, customer_id, quote_id, invoice_number, title, author_id, status")
+    .select("id, customer_id, quote_id, invoice_number, title, author_id, status, amount_paid")
     .eq("id", id)
     .single();
 
@@ -491,9 +546,10 @@ export async function updateInvoice(
   if (input.tax_rate !== undefined) updateData.tax_rate = input.tax_rate;
   if (input.due_date !== undefined) updateData.due_date = input.due_date;
   if (input.notes !== undefined) updateData.notes = input.notes;
-  if (input.terms !== undefined) updateData.terms = input.terms;
+  if (input.terms !== undefined) updateData.terms = getQuoteTerms(input.terms ?? undefined);
   if (input.payment_instructions !== undefined) {
-    updateData.payment_instructions = input.payment_instructions;
+    updateData.payment_instructions =
+      input.payment_instructions || DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS;
   }
   if (input.status !== undefined) {
     updateData.status = input.status;
@@ -520,8 +576,9 @@ export async function updateInvoice(
     updateData.tax_amount = tax_amount;
     updateData.total = total;
     
-    const amountPaid = input.amount_paid !== undefined ? input.amount_paid : 0;
-    updateData.balance_due = total - amountPaid;
+    const amountPaid =
+      input.amount_paid !== undefined ? input.amount_paid : currentInvoice?.amount_paid || 0;
+    updateData.balance_due = roundCurrency(total - amountPaid);
   }
 
   if (input.amount_paid !== undefined) {
@@ -532,7 +589,7 @@ export async function updateInvoice(
       .single();
     
     const total = current?.total || 0;
-    updateData.balance_due = total - input.amount_paid;
+    updateData.balance_due = roundCurrency(total - input.amount_paid);
     updateData.amount_paid = input.amount_paid;
   }
 
@@ -572,6 +629,7 @@ export async function updateInvoice(
       },
       body: `Invoice ${getInvoiceReference(updatedInvoice)} status changed to ${updatedInvoice.status}.`,
       invoiceId: updatedInvoice.id,
+      notifySupport: true,
       context: "updateInvoice",
     });
   }
@@ -630,9 +688,10 @@ async function createInvoiceFromAcceptedQuote(
       currency: quote.currency,
       status: "sent",
       sent_at: new Date().toISOString(),
+      due_date: getDefaultInvoiceDueDate(),
       notes: quote.notes,
-      terms: quote.terms,
-      payment_instructions: "Payment can be completed from the customer invoice screen.",
+      terms: getQuoteTerms(quote.terms ?? undefined),
+      payment_instructions: DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS,
       author_id: authorId,
     })
     .select()
@@ -661,6 +720,7 @@ async function createInvoiceFromAcceptedQuote(
     quote,
     body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been created from the accepted quote.`,
     invoiceId: invoice.id,
+    notifySupport: true,
     context: "createInvoiceFromAcceptedQuote",
   });
 
@@ -695,6 +755,7 @@ export async function acceptQuote(id: string): Promise<Invoice> {
     body: `Quote accepted: ${quote.title}.`,
     unreadAdmin: true,
     unreadCustomer: false,
+    notifySupport: true,
     context: "acceptQuote",
   });
 
@@ -736,6 +797,7 @@ export async function rejectQuote(id: string): Promise<void> {
     body: "Quote rejected by the customer.",
     unreadAdmin: true,
     unreadCustomer: false,
+    notifySupport: true,
     context: "rejectQuote",
   });
 
@@ -743,25 +805,36 @@ export async function rejectQuote(id: string): Promise<void> {
   revalidatePath(`/dashboard/customers/${quote.customer_id}`);
 }
 
-export async function payInvoice(id: string): Promise<void> {
-  const access = await getCurrentUserAccess();
-  await assertCustomerDocumentAccess("invoices", id, access.role, access.customerId);
+export async function payInvoice(id: string, targetPaid?: number): Promise<void> {
+  await requireAdmin();
 
   const { data: invoice, error: invoiceError } = await supabase
     .from("invoices")
-    .select("id, customer_id, quote_id, invoice_number, title, author_id, total")
+    .select("id, customer_id, quote_id, invoice_number, title, author_id, total, amount_paid, balance_due, status")
     .eq("id", id)
     .single();
 
   if (invoiceError || !invoice) throw new Error("Invoice not found");
+  if (invoice.status === "paid" || invoice.status === "cancelled") return;
+
+  const currentPlan = getInvoicePaymentPlan(invoice);
+  const requestedTargetPaid =
+    targetPaid !== undefined && Number.isFinite(targetPaid)
+      ? roundCurrency(Math.max(0, Math.min(currentPlan.total, targetPaid)))
+      : currentPlan.nextTargetPaid;
+  const amountPaid = roundCurrency(
+    Math.max(currentPlan.amountPaid, requestedTargetPaid)
+  );
+  const balanceDue = roundCurrency(currentPlan.total - amountPaid);
+  const paidInFull = balanceDue <= 0;
 
   const { error } = await supabase
     .from("invoices")
     .update({
-      status: "paid",
-      amount_paid: invoice.total,
-      balance_due: 0,
-      paid_at: new Date().toISOString(),
+      status: paidInFull ? "paid" : "partial",
+      amount_paid: amountPaid,
+      balance_due: balanceDue,
+      paid_at: paidInFull ? new Date().toISOString() : null,
     })
     .eq("id", id);
 
@@ -775,8 +848,11 @@ export async function payInvoice(id: string): Promise<void> {
         title: invoice.title,
         author_id: invoice.author_id,
       },
-      body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been paid.`,
+      body: paidInFull
+        ? `Invoice ${getInvoiceReference(invoice as Invoice)} has been paid in full.`
+        : `Invoice ${getInvoiceReference(invoice as Invoice)} start-of-works payment has been paid. Remaining balance: £${balanceDue.toFixed(2)}.`,
       invoiceId: invoice.id,
+      notifySupport: true,
       context: "payInvoice",
     });
   }
@@ -867,4 +943,76 @@ export async function sendInvoiceToCustomer(id: string): Promise<void> {
 
   await updateInvoice(id, { status: "sent" });
   revalidatePath("/dashboard/invoices");
+}
+
+function getAppBaseUrl(): string {
+  return (
+    process.env.APP_BASE_URL ||
+    (process.env.VERCEL_PROJECT_PRODUCTION_URL
+      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+      : "") ||
+    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
+    "http://localhost:4567"
+  );
+}
+
+export async function createInvoiceCheckoutSession(id: string): Promise<string> {
+  const access = await getCurrentUserAccess();
+  await assertCustomerDocumentAccess("invoices", id, access.role, access.customerId);
+
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    throw new Error("Missing STRIPE_SECRET_KEY environment variable");
+  }
+
+  const invoice = await getInvoice(id);
+  if (!invoice) throw new Error("Invoice not found");
+  if (invoice.status === "paid" || invoice.status === "cancelled") {
+    throw new Error("This invoice is not payable");
+  }
+
+  const paymentPlan = getInvoicePaymentPlan(invoice);
+  if (paymentPlan.nextPaymentAmount <= 0 || paymentPlan.nextStage === "paid") {
+    throw new Error("This invoice has no balance due");
+  }
+
+  const baseUrl = getAppBaseUrl();
+  const body = new URLSearchParams();
+  body.set("mode", "payment");
+  body.set("success_url", `${baseUrl}/api/stripe/checkout/success?session_id={CHECKOUT_SESSION_ID}`);
+  body.set("cancel_url", `${baseUrl}/dashboard/invoices`);
+  body.set("client_reference_id", invoice.id);
+  body.set("metadata[invoice_id]", invoice.id);
+  body.set("metadata[payment_stage]", paymentPlan.nextStage);
+  body.set("metadata[payment_amount]", String(paymentPlan.nextPaymentAmount));
+  body.set("metadata[target_paid]", String(paymentPlan.nextTargetPaid));
+  body.set("line_items[0][quantity]", "1");
+  body.set("line_items[0][price_data][currency]", (invoice.currency || "GBP").toLowerCase());
+  body.set("line_items[0][price_data][unit_amount]", String(Math.round(paymentPlan.nextPaymentAmount * 100)));
+  body.set(
+    "line_items[0][price_data][product_data][name]",
+    `${getInvoicePaymentStageLabel(paymentPlan.nextStage)} - ${getInvoiceReference(invoice)}`
+  );
+  if (invoice.description) {
+    body.set(
+      "line_items[0][price_data][product_data][description]",
+      `${invoice.description}\n\n${getInvoicePaymentStageLabel(paymentPlan.nextStage)} of £${paymentPlan.nextPaymentAmount.toFixed(2)}.`
+    );
+  }
+
+  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${stripeSecretKey}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body,
+  });
+
+  const result = (await response.json()) as { url?: string; error?: { message?: string } };
+  if (!response.ok || !result.url) {
+    throw new Error(result.error?.message || "Failed to create Stripe Checkout session");
+  }
+
+  return result.url;
 }

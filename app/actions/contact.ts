@@ -77,6 +77,25 @@ export async function updateSubmissionStatus(id: string, status: ContactStatus) 
   revalidatePath("/dashboard");
 }
 
+export async function updateSubmissionStatuses(ids: string[], status: ContactStatus) {
+  await requireAdmin();
+
+  if (ids.length === 0) return;
+
+  const { error } = await supabaseAdmin
+    .from("contact_submissions")
+    .update({ status })
+    .in("id", ids);
+
+  if (error) {
+    console.error("[updateSubmissionStatuses] Database error:", error);
+    throw new Error("Failed to update submission statuses");
+  }
+
+  revalidatePath("/dashboard/contact");
+  revalidatePath("/dashboard");
+}
+
 export async function toggleArchiveSubmission(id: string, archived: boolean) {
   await requireAdmin();
 
@@ -87,6 +106,25 @@ export async function toggleArchiveSubmission(id: string, archived: boolean) {
 
   if (error) {
     console.error("[toggleArchiveSubmission] Database error:", error);
+    throw new Error("Failed to update archive status");
+  }
+
+  revalidatePath("/dashboard/contact");
+  revalidatePath("/dashboard");
+}
+
+export async function toggleArchiveSubmissions(ids: string[], archived: boolean) {
+  await requireAdmin();
+
+  if (ids.length === 0) return;
+
+  const { error } = await supabaseAdmin
+    .from("contact_submissions")
+    .update({ archived })
+    .in("id", ids);
+
+  if (error) {
+    console.error("[toggleArchiveSubmissions] Database error:", error);
     throw new Error("Failed to update archive status");
   }
 
@@ -105,6 +143,25 @@ export async function deleteSubmission(id: string) {
   if (error) {
     console.error("[deleteSubmission] Database error:", error);
     throw new Error("Failed to delete submission");
+  }
+
+  revalidatePath("/dashboard/contact");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteSubmissions(ids: string[]) {
+  await requireAdmin();
+
+  if (ids.length === 0) return;
+
+  const { error } = await supabaseAdmin
+    .from("contact_submissions")
+    .delete()
+    .in("id", ids);
+
+  if (error) {
+    console.error("[deleteSubmissions] Database error:", error);
+    throw new Error("Failed to delete submissions");
   }
 
   revalidatePath("/dashboard/contact");

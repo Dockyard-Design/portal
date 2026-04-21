@@ -24,8 +24,9 @@ export function PdfViewDialog({
 }: PdfViewDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="h-[92vh] w-[96vw] max-w-5xl p-0">
-        <DialogHeader className="flex flex-row items-center justify-between border-b px-5 py-4">
+      <DialogContent className="flex h-[92vh] w-[96vw] max-w-6xl flex-col overflow-hidden p-0">
+        <DialogHeader className="shrink-0 border-b px-5 py-4">
+          <div className="flex items-center justify-between gap-4 pr-8">
           <DialogTitle className="truncate text-base">{title}</DialogTitle>
           {pdfUrl && (
             <Button variant="outline" size="sm" asChild>
@@ -35,15 +36,16 @@ export function PdfViewDialog({
               </a>
             </Button>
           )}
+          </div>
         </DialogHeader>
         {pdfUrl ? (
           <iframe
             title={title}
             src={pdfUrl}
-            className="h-full min-h-0 w-full flex-1"
+            className="min-h-0 flex-1 border-0 bg-muted"
           />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+          <div className="flex min-h-0 flex-1 items-center justify-center text-sm text-muted-foreground">
             Select a document to preview.
           </div>
         )}

@@ -23,6 +23,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS,
+  SPLIT_PAYMENT_TERMS,
+  getDefaultInvoiceDueDate,
+  getInvoicePaymentPlan,
+  getInvoicePaymentStageLabel,
+} from "@/lib/invoice-payments";
 import { cn } from "@/lib/utils";
 import type { Invoice, Quote } from "@/types/agency";
 import type { UserRole } from "@/types/auth";
@@ -96,10 +103,10 @@ function getDefaultValues(
     title: "",
     description: "",
     taxRate: 20,
-    dueDate: undefined,
+    dueDate: parseISO(getDefaultInvoiceDueDate()),
     notes: "",
-    terms: "Payment due within 30 days.",
-    paymentInstructions: "Bank transfer preferred.",
+    terms: SPLIT_PAYMENT_TERMS,
+    paymentInstructions: DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS,
     items: [{ description: "", quantity: 1, unit_price: 0 }],
   };
 }
@@ -271,6 +278,7 @@ export function InvoiceModal({
   );
   const taxAmount = subtotal * (taxRate / 100);
   const total = subtotal + taxAmount;
+  const livePaymentPlan = getInvoicePaymentPlan({ total, amount_paid: invoice?.amount_paid ?? 0 });
 
   const handleGeneratePdf = () => {
     if (!invoice) return;
@@ -337,25 +345,36 @@ export function InvoiceModal({
     if (!invoice) return;
     try {
       if (role === "customer") {
-        alert("Payment placeholder: this will be replaced with a real payment flow.");
+        const { createInvoiceCheckoutSession } = await import("@/app/actions/agency");
+        window.location.href = await createInvoiceCheckoutSession(invoice.id);
+        return;
+      } else {
         const { payInvoice } = await import("@/app/actions/agency");
         await payInvoice(invoice.id);
-      } else {
-        const { updateInvoice } = await import("@/app/actions/agency");
-        await updateInvoice(invoice.id, {
-          status: "paid",
-          amount_paid: invoice.total,
-        });
       }
-      toast.success("Invoice marked as paid");
+      toast.success("Invoice payment recorded");
       onSuccess?.();
     } catch {
       toast.error("Failed to update invoice");
     }
   };
 
+  const handleMarkPaidInFull = async () => {
+    if (!invoice) return;
+    try {
+      const { payInvoice } = await import("@/app/actions/agency");
+      await payInvoice(invoice.id, invoice.total);
+      toast.success("Invoice marked as paid in full");
+      onSuccess?.();
+    } catch {
+      toast.error("Failed to mark invoice as paid");
+    }
+  };
+
   if (isCustomerView && invoice) {
     const viewLinkedQuote = quotes.find((entry) => entry.id === invoice.quote_id) ?? null;
+    const paymentPlan = getInvoicePaymentPlan(invoice);
+    const nextPaymentLabel = getInvoicePaymentStageLabel(paymentPlan.nextStage);
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -375,7 +394,7 @@ export function InvoiceModal({
                 {invoice.status !== "paid" && invoice.status !== "cancelled" && (
                   <Button size="sm" onClick={handleMarkPaid}>
                     <CheckCircle className="mr-2 size-4" />
-                    Pay Invoice
+                    Pay {nextPaymentLabel}
                   </Button>
                 )}
               </div>
@@ -442,7 +461,7 @@ export function InvoiceModal({
                 <CardHeader>
                   <CardTitle className="text-base">Amount Due</CardTitle>
                   <CardDescription>
-                    {invoice.due_date ? `Due ${format(parseISO(invoice.due_date), "MMM d, yyyy")}` : "No due date set"}
+                    {invoice.due_date ? `Start payment due ${format(parseISO(invoice.due_date), "MMM d, yyyy")}` : "Start payment due immediately"}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -456,8 +475,23 @@ export function InvoiceModal({
                   </div>
                   <div className="border-t border-border/70 pt-3">
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Balance</span>
-                      <span className="text-xl font-semibold">£{invoice.balance_due.toLocaleString()}</span>
+                      <span className="text-sm text-muted-foreground">Next payment</span>
+                      <span className="text-xl font-semibold">£{paymentPlan.nextPaymentAmount.toLocaleString()}</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{nextPaymentLabel}</p>
+                  </div>
+                  <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Start of works</span>
+                      <span>£{paymentPlan.startPaymentAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="mt-2 flex justify-between">
+                      <span className="text-muted-foreground">Completion</span>
+                      <span>£{paymentPlan.finalPaymentAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="mt-2 flex justify-between border-t border-border/70 pt-2">
+                      <span className="text-muted-foreground">Balance</span>
+                      <span>£{paymentPlan.balanceDue.toLocaleString()}</span>
                     </div>
                   </div>
                 </CardContent>
@@ -500,10 +534,16 @@ export function InvoiceModal({
                 </Button>
               )}
               {mode === "view" && invoice && invoice.status !== "paid" && invoice.status !== "cancelled" && (
-                <Button size="sm" onClick={handleMarkPaid}>
-                  <CheckCircle className="mr-2 size-4" />
-                  Mark Paid
-                </Button>
+                <>
+                  <Button variant="outline" size="sm" onClick={handleMarkPaid}>
+                    <CheckCircle className="mr-2 size-4" />
+                    Record Next Payment
+                  </Button>
+                  <Button size="sm" onClick={handleMarkPaidInFull}>
+                    <CheckCircle className="mr-2 size-4" />
+                    Mark Paid In Full
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -752,7 +792,7 @@ export function InvoiceModal({
                     id="invoice-terms"
                     disabled={isViewOnly}
                     rows={4}
-                    placeholder="Payment due within 30 days."
+                    placeholder={SPLIT_PAYMENT_TERMS}
                     {...register("terms")}
                   />
                 </div>
@@ -763,7 +803,7 @@ export function InvoiceModal({
                     id="invoice-payment-instructions"
                     disabled={isViewOnly}
                     rows={4}
-                    placeholder="Bank transfer preferred."
+                    placeholder={DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS}
                     {...register("paymentInstructions")}
                   />
                 </div>
@@ -825,6 +865,16 @@ export function InvoiceModal({
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Grand total</span>
                       <span className="text-xl font-semibold">£{total.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 border-t border-border/70 pt-4 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Start of works 50%</span>
+                      <span>£{livePaymentPlan.startPaymentAmount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Completion 50%</span>
+                      <span>£{livePaymentPlan.finalPaymentAmount.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>

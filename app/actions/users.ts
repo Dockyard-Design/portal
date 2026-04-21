@@ -247,6 +247,29 @@ export async function resetUserPassword(
   }
 }
 
+export async function completeInitialPasswordChange(): Promise<void> {
+  const userId = await requireUser();
+  const client = await clerkClient();
+  const user = await client.users.getUser(userId);
+  const metadata = {
+    ...(user.privateMetadata as CustomerUserMetadata),
+    ...(user.publicMetadata as CustomerUserMetadata),
+  };
+
+  const nextMetadata: CustomerUserMetadata = {
+    ...metadata,
+    initialPasswordChangeRequired: false,
+    firstLoginAt: new Date().toISOString(),
+  };
+
+  await client.users.updateUser(userId, {
+    publicMetadata: nextMetadata,
+    privateMetadata: nextMetadata,
+  });
+
+  revalidatePath("/dashboard/settings");
+}
+
 export async function recordFirstCustomerLogin(): Promise<void> {
   const userId = await requireUser();
   const client = await clerkClient();
@@ -257,6 +280,7 @@ export async function recordFirstCustomerLogin(): Promise<void> {
   };
 
   if (metadata.role !== "customer" || metadata.firstLoginAt) return;
+  if (metadata.initialPasswordChangeRequired === true) return;
 
   const nextMetadata: CustomerUserMetadata = {
     ...metadata,

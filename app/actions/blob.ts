@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/authz";
 import type { BlobUploadResult } from "@/types/blob";
 
 const BLOB_API_BASE = "https://blob.vercel-storage.com";
-const MAX_IMAGE_BYTES = 6 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
 function sanitizeFilename(filename: string): string {
   return filename
@@ -34,7 +34,7 @@ export async function uploadImageToBlob(formData: FormData): Promise<BlobUploadR
   }
 
   if (fileValue.size > MAX_IMAGE_BYTES) {
-    throw new Error("Image must be 6MB or smaller");
+    throw new Error("Image must be 4MB or smaller");
   }
 
   const folder = typeof folderValue === "string" && folderValue.trim()

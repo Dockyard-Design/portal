@@ -119,10 +119,13 @@ describe("release hardening guardrails", () => {
 
     expect(agency).not.toContain("sendDocumentEmail");
     expect(agency).not.toContain("sendFormSubmissionEmail");
+    expect(agency).toContain("sendSupportMessageEmail");
     expect(agency).toContain("getOrCreateQuoteThread");
     expect(agency).toContain("addQuoteThreadMessage");
     expect(agency).toContain('quote_id: quote.id');
     expect(agency).toContain("threadUpdate.invoice_id = input.invoiceId");
+    expect(agency).toContain("notifyCustomer: false");
+    expect(agency).toContain("notifySupport: true");
     expect(agency).toContain("Quote accepted");
     expect(agency).toContain("Quote rejected");
     expect(agency).toContain("has been paid");

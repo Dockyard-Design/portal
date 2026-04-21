@@ -194,6 +194,7 @@ export default function ExpensesPage() {
   
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [addModalOpen, setAddModalOpen] = useState(false);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -210,6 +211,12 @@ export default function ExpensesPage() {
     tax_deductible: false,
     is_recurring: false,
     recurring_frequency: "monthly" as RecurringFrequency,
+  });
+  const [categoryForm, setCategoryForm] = useState({
+    name: "",
+    color: "bg-blue-500",
+    icon: "Receipt",
+    description: "",
   });
 
   const loadData = useCallback(async () => {
@@ -282,6 +289,37 @@ export default function ExpensesPage() {
       recurring_frequency: "monthly",
     });
     setAddModalOpen(true);
+  };
+
+  const handleCreateCategory = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!categoryForm.name.trim()) {
+      toast.error("Category name is required");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { createExpenseCategory } = await import("@/app/actions/expenses");
+      const category = await createExpenseCategory({
+        name: categoryForm.name.trim(),
+        color: categoryForm.color,
+        icon: categoryForm.icon,
+        description: categoryForm.description.trim() || undefined,
+      });
+      setCategories((current) =>
+        [...current, category].sort((a, b) => a.name.localeCompare(b.name))
+      );
+      setFormData((current) => ({ ...current, category_id: category.id }));
+      setCategoryFilter(category.id);
+      setCategoryForm({ name: "", color: "bg-blue-500", icon: "Receipt", description: "" });
+      setCategoryModalOpen(false);
+      toast.success("Category created");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to create category");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleEdit = (expense: Expense) => {
@@ -410,10 +448,16 @@ export default function ExpensesPage() {
             </p>
           </div>
         </div>
-        <Button onClick={handleAdd}>
-          <Plus className="size-4 mr-2" />
-          Add Expense
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => setCategoryModalOpen(true)}>
+            <Tag className="size-4 mr-2" />
+            New Category
+          </Button>
+          <Button onClick={handleAdd}>
+            <Plus className="size-4 mr-2" />
+            Add Expense
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -786,6 +830,75 @@ export default function ExpensesPage() {
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={() => setAddModalOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={saving}>{saving ? "Saving..." : "Add Expense"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={categoryModalOpen} onOpenChange={setCategoryModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Tag className="size-5" />
+              New Expense Category
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCreateCategory} className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="category-name">Name *</Label>
+              <Input
+                id="category-name"
+                value={categoryForm.name}
+                onChange={(event) =>
+                  setCategoryForm((current) => ({ ...current, name: event.target.value }))
+                }
+                placeholder="Software"
+                required
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Colour</Label>
+              <div className="grid grid-cols-6 gap-2">
+                {[
+                  "bg-blue-500",
+                  "bg-emerald-500",
+                  "bg-amber-500",
+                  "bg-rose-500",
+                  "bg-violet-500",
+                  "bg-slate-500",
+                ].map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    aria-label={color}
+                    onClick={() => setCategoryForm((current) => ({ ...current, color }))}
+                    className={cn(
+                      "size-9 rounded-md border",
+                      color,
+                      categoryForm.color === color && "ring-2 ring-ring ring-offset-2"
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="category-description">Description</Label>
+              <Textarea
+                id="category-description"
+                value={categoryForm.description}
+                onChange={(event) =>
+                  setCategoryForm((current) => ({ ...current, description: event.target.value }))
+                }
+                rows={3}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => setCategoryModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving}>
+                {saving ? "Saving..." : "Create Category"}
+              </Button>
             </div>
           </form>
         </DialogContent>
