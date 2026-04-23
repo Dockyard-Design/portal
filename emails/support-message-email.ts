@@ -9,6 +9,7 @@ import {
   escapeHtml,
   styles,
 } from "./base-template";
+import { emailTemplate } from "@/config/templates";
 
 interface SupportMessageEmailProps {
   customerName: string;
@@ -26,9 +27,9 @@ export function getSupportMessageEmailHtml({
   const content = `
     ${getEmailHeader()}
     ${getEmailHeading({
-      eyebrow: "Portal inquiry",
+      eyebrow: emailTemplate.supportMessage.eyebrow,
       title: subject,
-      body: "A customer has sent a new message from the portal.",
+      body: emailTemplate.supportMessage.body,
     })}
     ${getEmailPanel(`
       <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
@@ -46,7 +47,7 @@ export function getSupportMessageEmailHtml({
   `;
 
   return getEmailLayout({
-    previewText: `Customer message: ${subject}`,
+    previewText: emailTemplate.supportMessage.preview(subject),
     children: content,
   });
 }

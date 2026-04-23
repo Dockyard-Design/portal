@@ -4,12 +4,24 @@ import { useState } from "react";
 import { useSignIn } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { Eye, EyeOff, Loader2, ArrowLeft, Mail, Phone, ShieldCheck } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  Loader2,
+  ArrowLeft,
+  Mail,
+  Phone,
+  ShieldCheck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type VerificationStrategy = "email_code" | "phone_code" | "totp" | "backup_code";
+type VerificationStrategy =
+  | "email_code"
+  | "phone_code"
+  | "totp"
+  | "backup_code";
 
 export default function LandingPage() {
   const { signIn, fetchStatus } = useSignIn();
@@ -19,7 +31,8 @@ export default function LandingPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [code, setCode] = useState("");
-  const [verificationStrategy, setVerificationStrategy] = useState<VerificationStrategy | null>(null);
+  const [verificationStrategy, setVerificationStrategy] =
+    useState<VerificationStrategy | null>(null);
   const [errorMessage, setErrorMessage] = useState("");
   const [isFinalizing, setIsFinalizing] = useState(false);
 
@@ -30,7 +43,7 @@ export default function LandingPage() {
     return (
       <div className="relative min-h-screen bg-background text-foreground flex flex-col items-center justify-center px-6">
         <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-primary/5 rounded-full blur-[120px]" />
         </div>
         <Loader2 className="size-12 animate-spin text-primary" />
         <p className="mt-4 text-muted-foreground">Loading...</p>
@@ -60,7 +73,10 @@ export default function LandingPage() {
       });
 
       if (createResult.error) {
-        setErrorMessage(createResult.error.message || "Something went wrong. Please try again.");
+        setErrorMessage(
+          createResult.error.message ||
+            "Something went wrong. Please try again.",
+        );
         return;
       }
 
@@ -69,11 +85,16 @@ export default function LandingPage() {
         const finalizeResult = await signIn.finalize();
         if (finalizeResult.error) {
           setIsFinalizing(false);
-          setErrorMessage(finalizeResult.error.message || "Failed to finalize sign in.");
+          setErrorMessage(
+            finalizeResult.error.message || "Failed to finalize sign in.",
+          );
           return;
         }
         router.push("/dashboard");
-      } else if (signIn.status === "needs_client_trust" || signIn.status === "needs_second_factor") {
+      } else if (
+        signIn.status === "needs_client_trust" ||
+        signIn.status === "needs_second_factor"
+      ) {
         // Need MFA verification
         const factors = signIn.supportedSecondFactors;
         if (factors?.length) {
@@ -99,10 +120,14 @@ export default function LandingPage() {
           setErrorMessage("Verification required but no methods available.");
         }
       } else {
-        setErrorMessage(`Unexpected status: ${signIn.status}. Please try again.`);
+        setErrorMessage(
+          `Unexpected status: ${signIn.status}. Please try again.`,
+        );
       }
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "An unexpected error occurred");
+      setErrorMessage(
+        err instanceof Error ? err.message : "An unexpected error occurred",
+      );
     }
   };
 
@@ -137,12 +162,16 @@ export default function LandingPage() {
       const finalizeResult = await signIn.finalize();
       if (finalizeResult.error) {
         setIsFinalizing(false);
-        setErrorMessage(finalizeResult.error.message || "Failed to complete sign in.");
+        setErrorMessage(
+          finalizeResult.error.message || "Failed to complete sign in.",
+        );
         return;
       }
       router.push("/dashboard");
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : "Verification failed");
+      setErrorMessage(
+        err instanceof Error ? err.message : "Verification failed",
+      );
     }
   };
 
@@ -177,12 +206,19 @@ export default function LandingPage() {
           </div>
         )}
         <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-primary/5 rounded-full blur-[120px]" />
         </div>
 
         <div className="w-full max-w-md space-y-8 text-center">
           <div className="flex flex-row items-center justify-center pb-10">
-            <Image src="/logo.svg" alt="Dockyard" width={320} height={80} className="h-auto w-auto" loading="eager" />
+            <Image
+              src="/logo.svg"
+              alt="Dockyard"
+              width={320}
+              height={80}
+              className="h-auto w-auto"
+              loading="eager"
+            />
           </div>
 
           <div className="flex flex-col items-center gap-4">
@@ -196,13 +232,15 @@ export default function LandingPage() {
               )}
             </div>
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold tracking-tight">Verify Your Identity</h1>
+              <h1 className="text-2xl font-bold tracking-tight">
+                Verify Your Identity
+              </h1>
               <p className="text-muted-foreground text-sm">
                 {verificationStrategy === "email_code"
                   ? "Enter the verification code sent to your email."
                   : verificationStrategy === "phone_code"
-                  ? "Enter the verification code sent to your phone."
-                  : "Enter your verification code."}
+                    ? "Enter the verification code sent to your phone."
+                    : "Enter your verification code."}
               </p>
             </div>
           </div>
@@ -248,7 +286,8 @@ export default function LandingPage() {
           </form>
 
           <div className="flex flex-col gap-2 items-center">
-            {(verificationStrategy === "email_code" || verificationStrategy === "phone_code") && (
+            {(verificationStrategy === "email_code" ||
+              verificationStrategy === "phone_code") && (
               <button
                 type="button"
                 onClick={handleResend}
@@ -286,12 +325,19 @@ export default function LandingPage() {
         </div>
       )}
       <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 rounded-full blur-[120px]" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-primary/5 rounded-full blur-[120px]" />
       </div>
 
       <div className="w-full max-w-md space-y-8 text-center">
         <div className="flex flex-row items-center justify-center pb-20">
-          <Image src="/logo.svg" alt="Dockyard" width={320} height={80} className="h-auto w-auto" priority />
+          <Image
+            src="/logo.svg"
+            alt="Dockyard"
+            width={320}
+            height={80}
+            className="h-auto w-auto"
+            priority
+          />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 text-left">
@@ -330,7 +376,11 @@ export default function LandingPage() {
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
                 tabIndex={-1}
               >
-                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                {showPassword ? (
+                  <EyeOff className="size-4" />
+                ) : (
+                  <Eye className="size-4" />
+                )}
               </button>
             </div>
           </div>

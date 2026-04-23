@@ -6,6 +6,8 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { Logo } from "./logo";
+import { UK_PAYMENT_INSTRUCTIONS, roundCurrency } from "@/lib/invoice-payments";
+import { pdfTemplate } from "@/config/templates";
 import type { Quote, QuoteItem } from "@/types/agency";
 import type { Customer } from "@/types/kanban";
 
@@ -210,6 +212,61 @@ const styles = StyleSheet.create({
     color: "#333333",
     lineHeight: 1.5,
   },
+  instructionsHero: {
+    marginTop: 30,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: "#000000",
+  },
+  instructionsEyebrow: {
+    fontSize: 9,
+    color: "#666666",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  instructionsTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  instructionsGrid: {
+    marginTop: 24,
+    flexDirection: "row",
+    gap: 16,
+  },
+  instructionsCard: {
+    flex: 1,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#000000",
+    backgroundColor: "#FAFAFA",
+  },
+  instructionsCardTitle: {
+    fontSize: 10,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  instructionsAmount: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  instructionsTextBlock: {
+    marginTop: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#000000",
+  },
+  instructionsText: {
+    fontSize: 11,
+    lineHeight: 1.55,
+    color: "#222222",
+  },
+  instructionsSmallText: {
+    fontSize: 9,
+    lineHeight: 1.45,
+    color: "#444444",
+  },
   footer: {
     position: "absolute",
     bottom: 30,
@@ -234,6 +291,10 @@ function getQuoteReference(quote: Quote): string {
 }
 
 export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
+  const quoteReference = getQuoteReference(quote);
+  const startPaymentAmount = roundCurrency(quote.total / 2);
+  const completionPaymentAmount = roundCurrency(quote.total - startPaymentAmount);
+
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -245,8 +306,8 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
           
           <View style={styles.rightSection}>
             <View style={styles.docTypeRow}>
-              <Text style={styles.docType}>QUOTE</Text>
-              <Text style={styles.docNumber}>{getQuoteReference(quote)}</Text>
+              <Text style={styles.docType}>{pdfTemplate.quote.documentTitle}</Text>
+              <Text style={styles.docNumber}>{quoteReference}</Text>
             </View>
             <View style={styles.statusBadge}>
               <Text style={styles.statusText}>{quote.status.toUpperCase()}</Text>
@@ -257,7 +318,7 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
         {/* Info Section */}
         <View style={styles.twoColumn}>
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Bill To</Text>
+            <Text style={styles.sectionTitle}>{pdfTemplate.common.billTo}</Text>
             <Text style={styles.customerName}>{customer.name}</Text>
             {customer.company && (
               <Text style={styles.customerDetail}>{customer.company}</Text>
@@ -268,20 +329,20 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
           </View>
 
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Quote Details</Text>
+            <Text style={styles.sectionTitle}>{pdfTemplate.quote.detailsTitle}</Text>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Quote #:</Text>
-              <Text style={styles.infoValue}>{getQuoteReference(quote)}</Text>
+              <Text style={styles.infoLabel}>{pdfTemplate.quote.referenceLabel}</Text>
+              <Text style={styles.infoValue}>{quoteReference}</Text>
             </View>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Date:</Text>
+              <Text style={styles.infoLabel}>{pdfTemplate.quote.dateLabel}</Text>
               <Text style={styles.infoValue}>
                 {new Date(quote.created_at).toLocaleDateString("en-GB")}
               </Text>
             </View>
             {quote.valid_until && (
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Valid Until:</Text>
+                  <Text style={styles.infoLabel}>{pdfTemplate.quote.validUntilLabel}</Text>
                 <Text style={styles.infoValue}>
                   {new Date(quote.valid_until).toLocaleDateString("en-GB")}
                 </Text>
@@ -289,7 +350,7 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
             )}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Currency:</Text>
-              <Text style={styles.infoValue}>GBP (£)</Text>
+              <Text style={styles.infoValue}>{pdfTemplate.currencyLabel}</Text>
             </View>
           </View>
         </View>
@@ -297,20 +358,20 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
         {/* Description */}
         {quote.description && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionTitle}>{pdfTemplate.common.description}</Text>
             <Text style={{ color: "#333333" }}>{quote.description}</Text>
           </View>
         )}
 
         {/* Line Items */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Items</Text>
+          <Text style={styles.sectionTitle}>{pdfTemplate.common.items}</Text>
           <View style={styles.table}>
             <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, styles.descriptionCol]}>Description</Text>
-              <Text style={[styles.tableHeaderCell, styles.qtyCol]}>Qty</Text>
-              <Text style={[styles.tableHeaderCell, styles.priceCol]}>Unit Price</Text>
-              <Text style={[styles.tableHeaderCell, styles.totalCol]}>Total</Text>
+              <Text style={[styles.tableHeaderCell, styles.descriptionCol]}>{pdfTemplate.common.table.description}</Text>
+              <Text style={[styles.tableHeaderCell, styles.qtyCol]}>{pdfTemplate.common.table.quantity}</Text>
+              <Text style={[styles.tableHeaderCell, styles.priceCol]}>{pdfTemplate.common.table.unitPrice}</Text>
+              <Text style={[styles.tableHeaderCell, styles.totalCol]}>{pdfTemplate.common.table.total}</Text>
             </View>
 
             {quote.items?.map((item: QuoteItem, index: number) => {
@@ -338,25 +399,101 @@ export function QuotePDF({ quote, customer, logoBase64 }: QuotePDFProps) {
             <Text style={styles.totalValue}>£{quote.tax_amount.toFixed(2)}</Text>
           </View>
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>TOTAL:</Text>
+            <Text style={styles.grandTotalLabel}>{pdfTemplate.quote.totalLabel}</Text>
             <Text style={styles.grandTotalValue}>£{quote.total.toFixed(2)}</Text>
           </View>
         </View>
 
-        {/* Terms */}
-        {quote.terms && (
-          <View style={styles.termsSection}>
-            <Text style={styles.termsTitle}>Terms & Conditions</Text>
-            <Text style={styles.termsText}>{quote.terms}</Text>
-          </View>
-        )}
-
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Dockyard Design • Valid until {quote.valid_until 
+            {pdfTemplate.quote.footerValidUntil(quote.valid_until 
               ? new Date(quote.valid_until).toLocaleDateString("en-GB") 
-              : "further notice"}
+              : "further notice")}
+          </Text>
+        </View>
+      </Page>
+      {quote.terms && (
+      <Page size="A4" style={styles.page}>
+        <View style={styles.headerContainer}>
+          <View style={styles.logoSection}>
+            <Logo logoBase64={logoBase64} />
+          </View>
+
+          <View style={styles.rightSection}>
+            <View style={styles.docTypeRow}>
+              <Text style={styles.docType}>{pdfTemplate.common.termsTitle}</Text>
+              <Text style={styles.docNumber}>{quoteReference}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.termsSection}>
+          <Text style={styles.termsTitle}>{pdfTemplate.common.termsTitle}</Text>
+          <Text style={styles.termsText}>{quote.terms}</Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            {pdfTemplate.brand.name} • {pdfTemplate.common.termsTitle} • {quoteReference}
+          </Text>
+        </View>
+      </Page>
+      )}
+      <Page size="A4" style={styles.page}>
+        <View style={styles.headerContainer}>
+          <View style={styles.logoSection}>
+            <Logo logoBase64={logoBase64} />
+          </View>
+
+          <View style={styles.rightSection}>
+            <View style={styles.docTypeRow}>
+              <Text style={styles.docType}>{pdfTemplate.paymentInstructions.documentTitle}</Text>
+              <Text style={styles.docNumber}>{quoteReference}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.instructionsHero}>
+          <Text style={styles.instructionsEyebrow}>{pdfTemplate.paymentInstructions.eyebrow}</Text>
+          <Text style={styles.instructionsTitle}>{pdfTemplate.paymentInstructions.quoteTitle}</Text>
+        </View>
+
+        <View style={styles.instructionsGrid}>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.referenceTitle}</Text>
+            <Text style={styles.instructionsText}>{quoteReference}</Text>
+          </View>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.quoteTotalTitle}</Text>
+            <Text style={styles.instructionsAmount}>£{quote.total.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.instructionsGrid}>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.startOfWorksTitle}</Text>
+            <Text style={styles.instructionsText}>£{startPaymentAmount.toFixed(2)}</Text>
+          </View>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.completionTitle}</Text>
+            <Text style={styles.instructionsText}>£{completionPaymentAmount.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.instructionsTextBlock}>
+          <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.instructionsTitle}</Text>
+          <Text style={styles.instructionsText}>{UK_PAYMENT_INSTRUCTIONS}</Text>
+        </View>
+
+        <View style={styles.instructionsTextBlock}>
+          <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.beforeSendingFundsTitle}</Text>
+          <Text style={styles.instructionsSmallText}>{pdfTemplate.paymentInstructions.quoteSafetyNote}</Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            {pdfTemplate.paymentInstructions.footer(quoteReference)}
           </Text>
         </View>
       </Page>

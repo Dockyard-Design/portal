@@ -96,6 +96,11 @@ export function QuotesWorkspace({
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    if (isCustomerRole && status === "sent") return "Waiting";
+    return status;
+  };
+
   const handleSendQuote = async (quoteId: string) => {
     setSendingId(quoteId);
     try {
@@ -150,9 +155,7 @@ export function QuotesWorkspace({
   };
 
   const openEditQuote = (quote: Quote) => {
-    setSelectedQuote(quote);
-    setQuoteModalMode("edit");
-    setQuoteModalOpen(true);
+    router.push(`/dashboard/quotes/${quote.id}/edit`);
   };
 
   const refreshData = () => {
@@ -169,6 +172,9 @@ export function QuotesWorkspace({
     validUntil.setHours(23, 59, 59, 999);
     return validUntil.getTime() >= Date.now();
   };
+  const canAdminSendQuote = (quote: Quote) => quote.status !== "accepted";
+  const canAdminEditQuote = (quote: Quote) =>
+    quote.status === "draft" || quote.status === "rejected";
 
   return (
     <div className="flex flex-col gap-6">
@@ -222,7 +228,7 @@ export function QuotesWorkspace({
                 <SelectContent>
                   <SelectItem value="all">all</SelectItem>
                   <SelectItem value="draft">draft</SelectItem>
-                  <SelectItem value="sent">sent</SelectItem>
+                  <SelectItem value="sent">{isCustomerRole ? "Waiting" : "sent"}</SelectItem>
                   <SelectItem value="accepted">accepted</SelectItem>
                   <SelectItem value="rejected">rejected</SelectItem>
                   <SelectItem value="expired">expired</SelectItem>
@@ -258,14 +264,34 @@ export function QuotesWorkspace({
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Total</TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  <TableHead className={isCustomerRole ? "w-44 text-right" : "w-10"}></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredQuotes.map((quote) => {
                   const customer = customers.find(c => c.id === quote.customer_id);
                   return (
-                    <TableRow key={quote.id}>
+                    <TableRow
+                      key={quote.id}
+                      role={isCustomerRole ? "button" : undefined}
+                      tabIndex={isCustomerRole ? 0 : undefined}
+                      className={isCustomerRole ? "cursor-pointer" : undefined}
+                      onClick={
+                        isCustomerRole
+                          ? () => openPdfModal(quote)
+                          : undefined
+                      }
+                      onKeyDown={
+                        isCustomerRole
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openPdfModal(quote);
+                              }
+                            }
+                          : undefined
+                      }
+                    >
                       <TableCell>
                         <div>
                           <p className="font-medium">{quote.title}</p>
@@ -283,7 +309,7 @@ export function QuotesWorkspace({
                       )}
                       <TableCell>
                         <Badge className={getStatusColor(quote.status)}>
-                          {quote.status}
+                          {getStatusLabel(quote.status)}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -292,7 +318,11 @@ export function QuotesWorkspace({
                       <TableCell className="text-right font-semibold">
                         £{quote.total.toLocaleString()}
                       </TableCell>
-                      <TableCell>
+                      <TableCell
+                        className={isCustomerRole ? "text-right" : undefined}
+                        onClick={isCustomerRole ? (event) => event.stopPropagation() : undefined}
+                        onKeyDown={isCustomerRole ? (event) => event.stopPropagation() : undefined}
+                      >
                         {!isCustomerRole && quote.status === "draft" && (
                           <Button
                             size="sm"
@@ -305,58 +335,85 @@ export function QuotesWorkspace({
                             {sendingId === quote.id ? "Sending..." : "Send"}
                           </Button>
                         )}
-                        <DropdownMenu>
-                          <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
-                            <MoreVertical className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52">
-                            <DropdownMenuItem onClick={() => isCustomerRole ? openPdfModal(quote) : openViewQuote(quote)}>
-                              <Eye className="size-4 mr-2" />
-                              View
-                            </DropdownMenuItem>
-                            {isCustomerRole ? (
+                        {isCustomerRole ? (
+                          canCustomerAcceptQuote(quote) && (
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => void handleAcceptQuote(quote.id)}
+                                disabled={actionId === quote.id}
+                              >
+                                <CheckCircle className="mr-2 size-4" />
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => void handleRejectQuote(quote.id)}
+                                disabled={actionId === quote.id}
+                              >
+                                <X className="mr-2 size-4" />
+                                Reject
+                              </Button>
+                            </div>
+                          )
+                        ) : (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
+                              <MoreVertical className="size-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem onClick={() => openViewQuote(quote)}>
+                                <Eye className="size-4 mr-2" />
+                                View
+                              </DropdownMenuItem>
                               <>
-                                <DropdownMenuItem
-                                  onClick={() => void handleAcceptQuote(quote.id)}
-                                  disabled={actionId === quote.id || !canCustomerAcceptQuote(quote)}
-                                >
-                                  <CheckCircle className="size-4 mr-2" />
-                                  Accept
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => void handleRejectQuote(quote.id)}
-                                  disabled={actionId === quote.id || !canCustomerAcceptQuote(quote)}
-                                >
-                                  <X className="size-4 mr-2" />
-                                  Reject
-                                </DropdownMenuItem>
-                              </>
-                            ) : (
-                              <>
-                                <DropdownMenuItem onClick={() => openEditQuote(quote)}>
-                                  <FileText className="size-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
+                                {canAdminEditQuote(quote) && (
+                                  <DropdownMenuItem onClick={() => openEditQuote(quote)}>
+                                    <FileText className="size-4 mr-2" />
+                                    Edit
+                                  </DropdownMenuItem>
+                                )}
+                                {quote.status === "sent" && (
+                                  <>
+                                    <DropdownMenuItem
+                                      onClick={() => void handleAcceptQuote(quote.id)}
+                                      disabled={actionId === quote.id}
+                                    >
+                                      <CheckCircle className="size-4 mr-2" />
+                                      Accept Quote
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => void handleRejectQuote(quote.id)}
+                                      disabled={actionId === quote.id}
+                                    >
+                                      <X className="size-4 mr-2" />
+                                      Reject Quote
+                                    </DropdownMenuItem>
+                                  </>
+                                )}
                                 <DropdownMenuItem onClick={() => openPdf(quote.id)}>
                                   <Download className="size-4 mr-2" />
                                   Download PDF
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => void handleSendQuote(quote.id)}
-                                  disabled={sendingId === quote.id}
-                                >
-                                  <Send className="size-4 mr-2" />
-                                  {sendingId === quote.id ? "Sending..." : "Send Message"}
-                                </DropdownMenuItem>
+                                {canAdminSendQuote(quote) && (
+                                  <DropdownMenuItem
+                                    onClick={() => void handleSendQuote(quote.id)}
+                                    disabled={sendingId === quote.id}
+                                  >
+                                    <Send className="size-4 mr-2" />
+                                    {sendingId === quote.id ? "Sending..." : "Send Message"}
+                                  </DropdownMenuItem>
+                                )}
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem className="text-destructive">
                                   <Trash2 className="size-4 mr-2" />
                                   Delete
                                 </DropdownMenuItem>
                               </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        )}
                       </TableCell>
                     </TableRow>
                   );

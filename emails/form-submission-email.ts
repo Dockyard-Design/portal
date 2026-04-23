@@ -7,6 +7,7 @@ import {
   formatDetailValue,
   styles,
 } from "./base-template";
+import { emailTemplate } from "@/config/templates";
 
 interface FormSubmissionEmailProps {
   formName: string;
@@ -38,9 +39,9 @@ export function getFormSubmissionEmailHtml({
   const content = `
     ${getEmailHeader()}
     ${getEmailHeading({
-      eyebrow: "Website submission",
-      title: `${formName} submission`,
-      body: `Submitted at ${submittedAt}`,
+      eyebrow: emailTemplate.formSubmission.eyebrow,
+      title: emailTemplate.formSubmission.title(formName),
+      body: emailTemplate.formSubmission.body(submittedAt),
     })}
     <tr>
       <td style="padding:2px 18px 6px;border:1px solid ${styles.border};border-radius:10px;background:${styles.surfaceRaised};">
@@ -52,5 +53,8 @@ export function getFormSubmissionEmailHtml({
     ${getEmailFooter()}
   `;
 
-  return getEmailLayout({ previewText: `${formName} submission`, children: content });
+  return getEmailLayout({
+    previewText: emailTemplate.formSubmission.preview(formName),
+    children: content,
+  });
 }

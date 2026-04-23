@@ -6,13 +6,16 @@ import type { NextRequest } from "next/server";
 // Consider using a (public) route group folder convention for new
 // public pages instead of maintaining this array (#21).
 const PUBLIC_ROUTES = ["/"];
+const PORTAL_SIGN_IN_PATH = "/";
 
 const isPublicRoute = (request: NextRequest) => {
   const { pathname } = request.nextUrl;
   if (PUBLIC_ROUTES.includes(pathname)) return true;
-  // Match /sign-in and any sub-paths like /sign-in/something
-  if (pathname.startsWith("/sign-in")) return true;
   return false;
+};
+
+const isSignInRoute = (request: NextRequest) => {
+  return request.nextUrl.pathname.startsWith("/sign-in");
 };
 
 const isPublicApiRoute = (request: NextRequest) => {
@@ -31,9 +34,14 @@ const isSignUpRoute = (request: NextRequest) => {
 };
 
 export default clerkMiddleware(async (auth, request) => {
+  // Keep all auth entry points on the custom portal login, not Clerk-hosted pages.
+  if (isSignInRoute(request)) {
+    return NextResponse.redirect(new URL(PORTAL_SIGN_IN_PATH, request.url));
+  }
+
   // Block sign-up routes entirely — this portal is invite-only
   if (isSignUpRoute(request)) {
-    return NextResponse.redirect(new URL("/", request.url));
+    return NextResponse.redirect(new URL(PORTAL_SIGN_IN_PATH, request.url));
   }
 
   // Public API-key endpoints handle their own auth. Other API routes stay behind Clerk.
@@ -53,6 +61,9 @@ export default clerkMiddleware(async (auth, request) => {
   }
 
   await auth.protect();
+}, {
+  signInUrl: PORTAL_SIGN_IN_PATH,
+  signUpUrl: PORTAL_SIGN_IN_PATH,
 });
 
 export const config = {

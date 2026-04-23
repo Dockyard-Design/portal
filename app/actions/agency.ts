@@ -4,12 +4,20 @@ import { revalidatePath } from "next/cache";
 import { supabaseAdmin as supabase } from "@/lib/api-keys";
 import { getCurrentUserAccess, requireAdmin } from "@/lib/authz";
 import { sendCustomerMessageEmail, sendSupportMessageEmail } from "@/lib/email";
+import type {
+  CustomerEmailNotification,
+  SupportEmailNotification,
+} from "@/config/email-notifications";
+import {
+  isAutomaticMessageEnabled,
+  type AutomaticMessage,
+} from "@/config/messaging-centre";
+import { documentTemplate, messagingTemplates } from "@/config/templates";
 import {
   DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS,
   SPLIT_PAYMENT_TERMS,
   getDefaultInvoiceDueDate,
   getInvoicePaymentPlan,
-  getInvoicePaymentStageLabel,
   roundCurrency,
 } from "@/lib/invoice-payments";
 import type {
@@ -29,16 +37,7 @@ const KNOWN_ERRORS: Record<string, string> = {
 };
 
 const DEFAULT_QUOTE_TERMS =
-  [
-    "This document is issued by Dockyard Design and is valid for 14 days from the date of issue unless otherwise stated.",
-    "Prices are shown in GBP and exclude any third-party costs, subscriptions, licences, hosting, stock assets, advertising spend, or payment processing fees unless they are explicitly listed as line items.",
-    "Work begins after written acceptance and the start-of-works payment has cleared. Project timelines depend on timely client feedback, asset delivery, and approval at each agreed milestone.",
-    "Changes outside the agreed scope may be quoted separately or billed at Dockyard Design's prevailing day rate before the extra work begins.",
-    SPLIT_PAYMENT_TERMS,
-    "Late payments may pause active work and access to deliverables until the account is brought up to date.",
-    "All intellectual property created by Dockyard Design transfers to the customer only after the related invoice has been paid in full. Dockyard Design may retain portfolio rights unless agreed otherwise in writing.",
-    "The customer is responsible for checking factual content, legal copy, compliance obligations, and approvals before launch or publication.",
-  ].join("\n\n");
+  documentTemplate.defaultQuoteTerms(SPLIT_PAYMENT_TERMS);
 
 const DEFAULT_DOCUMENT_CURRENCY = "GBP";
 
@@ -91,7 +90,7 @@ function getQuoteTerms(inputTerms?: string): string {
     return terms;
   }
 
-  if (normalizedTerms.includes("this quote is valid for 14 days from creation")) {
+  if (normalizedTerms.includes(documentTemplate.legacyQuoteTermsMarker)) {
     return DEFAULT_QUOTE_TERMS;
   }
 
@@ -104,6 +103,13 @@ function getQuoteReference(quote: Pick<Quote, "id">): string {
 
 function getInvoiceReference(invoice: Pick<Invoice, "invoice_number" | "title">): string {
   return invoice.invoice_number || invoice.title;
+}
+
+function formatDocumentCurrency(amount: number, currency = "GBP"): string {
+  return new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency,
+  }).format(amount);
 }
 
 type QuoteThreadCustomer = { name: string; company: string | null; email: string | null };
@@ -124,7 +130,11 @@ async function sendQuoteThreadEmails(
   thread: QuoteThreadRow,
   body: string,
   context: string,
-  recipients: { customer: boolean; support: boolean }
+  recipients: { customer: boolean; support: boolean },
+  notifications: {
+    customer: CustomerEmailNotification;
+    support: SupportEmailNotification;
+  }
 ): Promise<void> {
   const customer = getThreadCustomer(thread);
   const customerName = customer?.company || customer?.name || "Customer";
@@ -137,6 +147,7 @@ async function sendQuoteThreadEmails(
           recipientName: customerName,
           subject: thread.subject,
           body,
+          notification: notifications.customer,
         }).catch((emailError) => {
           console.error(`[${context}] Customer message email failed:`, emailError);
         })
@@ -147,6 +158,7 @@ async function sendQuoteThreadEmails(
           customerEmail,
           subject: thread.subject,
           body,
+          notification: notifications.support,
         }).catch((emailError) => {
           console.error(`[${context}] Support message email failed:`, emailError);
         })
@@ -171,7 +183,10 @@ async function getOrCreateQuoteThread(
     .insert({
       customer_id: quote.customer_id,
       quote_id: quote.id,
-      subject: `Quote ${getQuoteReference(quote)}: ${quote.title}`,
+      subject: messagingTemplates.quoteThreadSubject(
+        getQuoteReference(quote),
+        quote.title
+      ),
       created_by: quote.author_id,
       unread_admin: false,
       unread_customer: true,
@@ -190,9 +205,17 @@ async function addQuoteThreadMessage(input: {
   unreadCustomer?: boolean;
   notifyCustomer?: boolean;
   notifySupport?: boolean;
+  automaticMessage?: AutomaticMessage;
+  customerNotification?: CustomerEmailNotification;
+  supportNotification?: SupportEmailNotification;
   invoiceId?: string | null;
   context: string;
 }): Promise<void> {
+  const automaticMessage = input.automaticMessage ?? "quoteUpdated";
+  if (!isAutomaticMessageEnabled(automaticMessage)) {
+    return;
+  }
+
   const thread = await getOrCreateQuoteThread(input.quote);
   const now = new Date().toISOString();
 
@@ -224,6 +247,9 @@ async function addQuoteThreadMessage(input: {
   await sendQuoteThreadEmails(thread, input.body, input.context, {
     customer: input.notifyCustomer ?? input.unreadCustomer ?? true,
     support: input.notifySupport ?? false,
+  }, {
+    customer: input.customerNotification ?? "quoteUpdated",
+    support: input.supportNotification ?? "quoteUpdated",
   });
 }
 
@@ -268,6 +294,38 @@ export async function getQuote(id: string): Promise<Quote | null> {
 
   if (error) return null;
   return data as Quote;
+}
+
+export async function getCustomerDocumentActionCounts(): Promise<{
+  quotes: number;
+  invoices: number;
+}> {
+  const access = await getCurrentUserAccess();
+
+  if (access.role !== "customer" || !access.customerId) {
+    return { quotes: 0, invoices: 0 };
+  }
+
+  const [quotesResult, invoicesResult] = await Promise.all([
+    supabase
+      .from("quotes")
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", access.customerId)
+      .eq("status", "sent"),
+    supabase
+      .from("invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("customer_id", access.customerId)
+      .in("status", ["sent", "partial", "overdue"]),
+  ]);
+
+  if (quotesResult.error) throw new Error(sanitizeError(quotesResult.error));
+  if (invoicesResult.error) throw new Error(sanitizeError(invoicesResult.error));
+
+  return {
+    quotes: quotesResult.count ?? 0,
+    invoices: invoicesResult.count ?? 0,
+  };
 }
 
 export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
@@ -318,9 +376,15 @@ export async function createQuote(input: CreateQuoteInput): Promise<Quote> {
 
   await addQuoteThreadMessage({
     quote: quote as Quote,
-    body: `A new quote has been created: ${quote.title}. Total: ${new Intl.NumberFormat("en-GB", { style: "currency", currency: quote.currency || "GBP" }).format(total)}.`,
+    body: messagingTemplates.quoteCreated({
+      title: quote.title,
+      total: formatDocumentCurrency(total, quote.currency || "GBP"),
+    }),
     unreadCustomer: false,
     notifyCustomer: false,
+    automaticMessage: "quoteCreated",
+    customerNotification: "quoteCreated",
+    supportNotification: "quoteCreated",
     context: "createQuote",
   });
 
@@ -334,11 +398,33 @@ export async function updateQuote(
 ): Promise<Quote> {
   await requireAdmin();
 
-  const { data: currentQuote } = await supabase
+  const { data: currentQuote, error: currentQuoteError } = await supabase
     .from("quotes")
     .select("id, customer_id, title, author_id, status, currency, total")
     .eq("id", id)
     .single();
+
+  if (currentQuoteError || !currentQuote) throw new Error("Quote not found");
+
+  const editableFieldKeys: Array<keyof UpdateQuoteInput> = [
+    "title",
+    "description",
+    "tax_rate",
+    "valid_until",
+    "notes",
+    "terms",
+    "items",
+  ];
+  const hasEditableChanges = editableFieldKeys.some(
+    (key) => input[key] !== undefined
+  );
+  if (
+    hasEditableChanges &&
+    currentQuote.status !== "draft" &&
+    currentQuote.status !== "rejected"
+  ) {
+    throw new Error("Only draft or rejected quotes can be edited");
+  }
 
   const updateData: Record<string, unknown> = {};
   
@@ -401,15 +487,22 @@ export async function updateQuote(
 
   const updatedQuote = data as Quote;
   const statusChanged = input.status !== undefined && currentQuote?.status !== input.status;
+  const quoteNotification = statusChanged ? "quoteStatusChanged" : "quoteUpdated";
   const body = statusChanged
-    ? `Quote status changed to ${updatedQuote.status}: ${updatedQuote.title}.`
-    : `Quote updated: ${updatedQuote.title}.`;
+    ? messagingTemplates.quoteStatusChanged({
+        status: updatedQuote.status,
+        title: updatedQuote.title,
+      })
+    : messagingTemplates.quoteUpdated(updatedQuote.title);
   await addQuoteThreadMessage({
     quote: updatedQuote,
     body,
     unreadAdmin: false,
     unreadCustomer: true,
     notifySupport: true,
+    automaticMessage: quoteNotification,
+    customerNotification: quoteNotification,
+    supportNotification: quoteNotification,
     context: "updateQuote",
   });
 
@@ -520,9 +613,15 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<Invoice>
         title: invoice.title,
         author_id: invoice.author_id,
       },
-      body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been created for quote ${invoice.title}.`,
+      body: messagingTemplates.invoiceCreated({
+        invoiceReference: getInvoiceReference(invoice as Invoice),
+        title: invoice.title,
+      }),
       invoiceId: invoice.id,
       notifySupport: true,
+      automaticMessage: "invoiceCreated",
+      customerNotification: "invoiceCreated",
+      supportNotification: "invoiceCreated",
       context: "createInvoice",
     });
   }
@@ -631,9 +730,15 @@ export async function updateInvoice(
         title: updatedInvoice.title,
         author_id: updatedInvoice.author_id,
       },
-      body: `Invoice ${getInvoiceReference(updatedInvoice)} status changed to ${updatedInvoice.status}.`,
+      body: messagingTemplates.invoiceStatusChanged({
+        invoiceReference: getInvoiceReference(updatedInvoice),
+        status: updatedInvoice.status,
+      }),
       invoiceId: updatedInvoice.id,
       notifySupport: true,
+      automaticMessage: "invoiceStatusChanged",
+      customerNotification: "invoiceStatusChanged",
+      supportNotification: "invoiceStatusChanged",
       context: "updateInvoice",
     });
   }
@@ -722,9 +827,14 @@ async function createInvoiceFromAcceptedQuote(
 
   await addQuoteThreadMessage({
     quote,
-    body: `Invoice ${getInvoiceReference(invoice as Invoice)} has been created from the accepted quote.`,
+    body: messagingTemplates.invoiceCreatedFromAcceptedQuote(
+      getInvoiceReference(invoice as Invoice)
+    ),
     invoiceId: invoice.id,
     notifySupport: true,
+    automaticMessage: "invoiceCreatedFromAcceptedQuote",
+    customerNotification: "invoiceCreatedFromAcceptedQuote",
+    supportNotification: "invoiceCreatedFromAcceptedQuote",
     context: "createInvoiceFromAcceptedQuote",
   });
 
@@ -756,10 +866,13 @@ export async function acceptQuote(id: string): Promise<Invoice> {
   const acceptedQuote = { ...quote, status: "accepted" as const, accepted_at: quote.accepted_at ?? new Date().toISOString() };
   await addQuoteThreadMessage({
     quote: acceptedQuote,
-    body: `Quote accepted: ${quote.title}.`,
+    body: messagingTemplates.quoteAccepted(quote.title),
     unreadAdmin: true,
     unreadCustomer: false,
     notifySupport: true,
+    automaticMessage: "quoteAccepted",
+    customerNotification: "quoteStatusChanged",
+    supportNotification: "quoteAccepted",
     context: "acceptQuote",
   });
 
@@ -798,10 +911,13 @@ export async function rejectQuote(id: string): Promise<void> {
 
   await addQuoteThreadMessage({
     quote: quote as Quote,
-    body: "Quote rejected by the customer.",
+    body: messagingTemplates.quoteRejected,
     unreadAdmin: true,
     unreadCustomer: false,
     notifySupport: true,
+    automaticMessage: "quoteRejected",
+    customerNotification: "quoteStatusChanged",
+    supportNotification: "quoteRejected",
     context: "rejectQuote",
   });
 
@@ -853,10 +969,18 @@ export async function payInvoice(id: string, targetPaid?: number): Promise<void>
         author_id: invoice.author_id,
       },
       body: paidInFull
-        ? `Invoice ${getInvoiceReference(invoice as Invoice)} has been paid in full.`
-        : `Invoice ${getInvoiceReference(invoice as Invoice)} start-of-works payment has been paid. Remaining balance: £${balanceDue.toFixed(2)}.`,
+        ? messagingTemplates.invoicePaidInFull(
+            getInvoiceReference(invoice as Invoice)
+          )
+        : messagingTemplates.invoicePartialPaymentRecorded({
+            invoiceReference: getInvoiceReference(invoice as Invoice),
+            balanceDue: formatDocumentCurrency(balanceDue),
+          }),
       invoiceId: invoice.id,
       notifySupport: true,
+      automaticMessage: "invoicePaymentRecorded",
+      customerNotification: "invoicePaymentRecorded",
+      supportNotification: "invoicePaymentRecorded",
       context: "payInvoice",
     });
   }
@@ -934,6 +1058,9 @@ export async function sendQuoteToCustomer(id: string): Promise<void> {
 
   const quote = await getQuote(id);
   if (!quote) throw new Error("Quote not found");
+  if (quote.status === "accepted") {
+    throw new Error("Accepted quotes cannot be sent again");
+  }
 
   await updateQuote(id, { status: "sent" });
   revalidatePath("/dashboard/quotes");
@@ -947,76 +1074,4 @@ export async function sendInvoiceToCustomer(id: string): Promise<void> {
 
   await updateInvoice(id, { status: "sent" });
   revalidatePath("/dashboard/invoices");
-}
-
-function getAppBaseUrl(): string {
-  return (
-    process.env.APP_BASE_URL ||
-    (process.env.VERCEL_PROJECT_PRODUCTION_URL
-      ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
-      : "") ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "") ||
-    "http://localhost:4567"
-  );
-}
-
-export async function createInvoiceCheckoutSession(id: string): Promise<string> {
-  const access = await getCurrentUserAccess();
-  await assertCustomerDocumentAccess("invoices", id, access.role, access.customerId);
-
-  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-  if (!stripeSecretKey) {
-    throw new Error("Missing STRIPE_SECRET_KEY environment variable");
-  }
-
-  const invoice = await getInvoice(id);
-  if (!invoice) throw new Error("Invoice not found");
-  if (invoice.status === "paid" || invoice.status === "cancelled") {
-    throw new Error("This invoice is not payable");
-  }
-
-  const paymentPlan = getInvoicePaymentPlan(invoice);
-  if (paymentPlan.nextPaymentAmount <= 0 || paymentPlan.nextStage === "paid") {
-    throw new Error("This invoice has no balance due");
-  }
-
-  const baseUrl = getAppBaseUrl();
-  const body = new URLSearchParams();
-  body.set("mode", "payment");
-  body.set("success_url", `${baseUrl}/api/stripe/checkout/success?session_id={CHECKOUT_SESSION_ID}`);
-  body.set("cancel_url", `${baseUrl}/dashboard/invoices`);
-  body.set("client_reference_id", invoice.id);
-  body.set("metadata[invoice_id]", invoice.id);
-  body.set("metadata[payment_stage]", paymentPlan.nextStage);
-  body.set("metadata[payment_amount]", String(paymentPlan.nextPaymentAmount));
-  body.set("metadata[target_paid]", String(paymentPlan.nextTargetPaid));
-  body.set("line_items[0][quantity]", "1");
-  body.set("line_items[0][price_data][currency]", (invoice.currency || "GBP").toLowerCase());
-  body.set("line_items[0][price_data][unit_amount]", String(Math.round(paymentPlan.nextPaymentAmount * 100)));
-  body.set(
-    "line_items[0][price_data][product_data][name]",
-    `${getInvoicePaymentStageLabel(paymentPlan.nextStage)} - ${getInvoiceReference(invoice)}`
-  );
-  if (invoice.description) {
-    body.set(
-      "line_items[0][price_data][product_data][description]",
-      `${invoice.description}\n\n${getInvoicePaymentStageLabel(paymentPlan.nextStage)} of £${paymentPlan.nextPaymentAmount.toFixed(2)}.`
-    );
-  }
-
-  const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${stripeSecretKey}`,
-      "Content-Type": "application/x-www-form-urlencoded",
-    },
-    body,
-  });
-
-  const result = (await response.json()) as { url?: string; error?: { message?: string } };
-  if (!response.ok || !result.url) {
-    throw new Error(result.error?.message || "Failed to create Stripe Checkout session");
-  }
-
-  return result.url;
 }

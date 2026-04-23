@@ -28,7 +28,6 @@ import {
   SPLIT_PAYMENT_TERMS,
   getDefaultInvoiceDueDate,
   getInvoicePaymentPlan,
-  getInvoicePaymentStageLabel,
 } from "@/lib/invoice-payments";
 import { cn } from "@/lib/utils";
 import type { Invoice, Quote } from "@/types/agency";
@@ -166,6 +165,11 @@ function getInvoiceStatusColor(status: string) {
     default:
       return "bg-gray-100 text-gray-700 border-gray-200";
   }
+}
+
+function getCustomerInvoiceStatusLabel(status: string) {
+  if (status === "sent") return "Waiting";
+  return status;
 }
 
 export function InvoiceModal({
@@ -344,14 +348,8 @@ export function InvoiceModal({
   const handleMarkPaid = async () => {
     if (!invoice) return;
     try {
-      if (role === "customer") {
-        const { createInvoiceCheckoutSession } = await import("@/app/actions/agency");
-        window.location.href = await createInvoiceCheckoutSession(invoice.id);
-        return;
-      } else {
-        const { payInvoice } = await import("@/app/actions/agency");
-        await payInvoice(invoice.id);
-      }
+      const { payInvoice } = await import("@/app/actions/agency");
+      await payInvoice(invoice.id);
       toast.success("Invoice payment recorded");
       onSuccess?.();
     } catch {
@@ -374,7 +372,8 @@ export function InvoiceModal({
   if (isCustomerView && invoice) {
     const viewLinkedQuote = quotes.find((entry) => entry.id === invoice.quote_id) ?? null;
     const paymentPlan = getInvoicePaymentPlan(invoice);
-    const nextPaymentLabel = getInvoicePaymentStageLabel(paymentPlan.nextStage);
+    const paidInFull = paymentPlan.balanceDue <= 0 || invoice.status === "paid";
+    const amountPanelTitle = paidInFull ? "Payment Summary" : "Outstanding Balance";
 
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -386,17 +385,13 @@ export function InvoiceModal({
                 <p className="text-sm text-muted-foreground">{invoice.title}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className={getInvoiceStatusColor(invoice.status)}>{invoice.status}</Badge>
+                <Badge className={getInvoiceStatusColor(invoice.status)}>
+                  {getCustomerInvoiceStatusLabel(invoice.status)}
+                </Badge>
                 <Button variant="outline" size="sm" onClick={handleGeneratePdf}>
                   <Download className="mr-2 size-4" />
                   PDF
                 </Button>
-                {invoice.status !== "paid" && invoice.status !== "cancelled" && (
-                  <Button size="sm" onClick={handleMarkPaid}>
-                    <CheckCircle className="mr-2 size-4" />
-                    Pay {nextPaymentLabel}
-                  </Button>
-                )}
               </div>
             </div>
           </DialogHeader>
@@ -459,10 +454,12 @@ export function InvoiceModal({
             <aside>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Amount Due</CardTitle>
-                  <CardDescription>
-                    {invoice.due_date ? `Start payment due ${format(parseISO(invoice.due_date), "MMM d, yyyy")}` : "Start payment due immediately"}
-                  </CardDescription>
+                  <CardTitle className="text-base">{amountPanelTitle}</CardTitle>
+                  {!paidInFull && invoice.due_date && (
+                    <CardDescription>
+                      Target date {format(parseISO(invoice.due_date), "MMM d, yyyy")}
+                    </CardDescription>
+                  )}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div className="flex justify-between text-sm">
@@ -475,10 +472,18 @@ export function InvoiceModal({
                   </div>
                   <div className="border-t border-border/70 pt-3">
                     <div className="flex justify-between">
-                      <span className="text-sm text-muted-foreground">Next payment</span>
-                      <span className="text-xl font-semibold">£{paymentPlan.nextPaymentAmount.toLocaleString()}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {paidInFull ? "Outstanding" : "Remaining"}
+                      </span>
+                      <span className="text-xl font-semibold">
+                        £{paymentPlan.balanceDue.toLocaleString()}
+                      </span>
                     </div>
-                    <p className="mt-1 text-xs text-muted-foreground">{nextPaymentLabel}</p>
+                    {paymentPlan.amountPaid > 0 && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        £{paymentPlan.amountPaid.toLocaleString()} received
+                      </p>
+                    )}
                   </div>
                   <div className="rounded-lg border border-border/70 bg-muted/20 p-3 text-sm">
                     <div className="flex justify-between">

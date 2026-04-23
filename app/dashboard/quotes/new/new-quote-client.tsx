@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { createQuote } from "@/app/actions/agency";
+import { createQuote, updateQuote } from "@/app/actions/agency";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { SPLIT_PAYMENT_TERMS } from "@/lib/invoice-payments";
+import type { Quote } from "@/types/agency";
 import type { Customer } from "@/types/kanban";
 
 type DraftItem = {
@@ -24,18 +25,29 @@ type DraftItem = {
 interface NewQuoteClientProps {
   customers: Customer[];
   selectedCustomerId?: string;
+  quote?: Quote;
 }
 
-export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClientProps) {
+export function NewQuoteClient({ customers, selectedCustomerId, quote }: NewQuoteClientProps) {
   const router = useRouter();
+  const isEditing = Boolean(quote);
   const [saving, setSaving] = useState(false);
-  const [customerId, setCustomerId] = useState(selectedCustomerId ?? "");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [taxRate, setTaxRate] = useState(20);
-  const [notes, setNotes] = useState("");
-  const [terms, setTerms] = useState(SPLIT_PAYMENT_TERMS);
-  const [items, setItems] = useState<DraftItem[]>([{ description: "", quantity: 1, unit_price: 0 }]);
+  const [customerId, setCustomerId] = useState(quote?.customer_id ?? selectedCustomerId ?? "");
+  const [title, setTitle] = useState(quote?.title ?? "");
+  const [description, setDescription] = useState(quote?.description ?? "");
+  const [taxRate, setTaxRate] = useState(quote?.tax_rate ?? 20);
+  const [notes, setNotes] = useState(quote?.notes ?? "");
+  const [terms, setTerms] = useState(quote?.terms ?? SPLIT_PAYMENT_TERMS);
+  const [items, setItems] = useState<DraftItem[]>(
+    quote?.items?.length
+      ? quote.items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        }))
+      : [{ description: "", quantity: 1, unit_price: 0 }]
+  );
+  const selectedCustomer = customers.find((customer) => customer.id === customerId);
 
   const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0),
@@ -59,16 +71,28 @@ export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClient
 
     setSaving(true);
     try {
-      await createQuote({
-        customer_id: customerId,
-        title: title.trim(),
-        description: description.trim() || undefined,
-        tax_rate: taxRate,
-        notes: notes.trim() || undefined,
-        terms: terms.trim() || undefined,
-        items: cleanedItems,
-      });
-      toast.success("Quote created");
+      if (quote) {
+        await updateQuote(quote.id, {
+          title: title.trim(),
+          description: description.trim() || null,
+          tax_rate: taxRate,
+          notes: notes.trim() || null,
+          terms: terms.trim() || null,
+          items: cleanedItems,
+        });
+        toast.success("Quote updated");
+      } else {
+        await createQuote({
+          customer_id: customerId,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          tax_rate: taxRate,
+          notes: notes.trim() || undefined,
+          terms: terms.trim() || undefined,
+          items: cleanedItems,
+        });
+        toast.success("Quote created");
+      }
       router.push("/dashboard/quotes");
       router.refresh();
     } catch (error) {
@@ -87,8 +111,14 @@ export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClient
           </Link>
         </Button>
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Create Quote</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Create a quote and open a customer message thread.</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {isEditing ? "Edit Quote" : "Create Quote"}
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {isEditing
+              ? "Update the scope, terms, and line items."
+              : "Create a quote and open a customer message thread."}
+          </p>
         </div>
       </div>
 
@@ -101,18 +131,24 @@ export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClient
             <div className="grid gap-4 md:grid-cols-2">
               <div className="flex flex-col gap-2">
                 <Label>Customer</Label>
-                <Select value={customerId} onValueChange={(value) => setCustomerId(value ?? "")}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select customer" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {customers.map((customer) => (
-                      <SelectItem key={customer.id} value={customer.id}>
-                        {customer.company || customer.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {quote || selectedCustomerId ? (
+                  <div className="flex h-9 items-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium">
+                    {selectedCustomer?.company || selectedCustomer?.name || "Selected customer"}
+                  </div>
+                ) : (
+                  <Select value={customerId} onValueChange={(value) => setCustomerId(value ?? "")}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select customer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {customers.map((customer) => (
+                        <SelectItem key={customer.id} value={customer.id}>
+                          {customer.company || customer.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="flex flex-col gap-2">
                 <Label>Title</Label>
@@ -214,7 +250,7 @@ export function NewQuoteClient({ customers, selectedCustomerId }: NewQuoteClient
             <div className="flex justify-between"><span className="text-muted-foreground">Tax</span><span>{taxRate}%</span></div>
             <div className="flex justify-between border-t border-border pt-3 text-base font-semibold"><span>Total</span><span>GBP {total.toFixed(2)}</span></div>
             <Button onClick={() => void submit()} disabled={saving} className="mt-3">
-              {saving ? "Creating..." : "Create Quote"}
+              {saving ? "Saving..." : isEditing ? "Save Quote" : "Create Quote"}
             </Button>
           </CardContent>
         </Card>

@@ -45,6 +45,8 @@ CREATE TABLE projects (
 
   -- Metadata
   featured_image_url TEXT,
+  featured_desktop_image_url TEXT,
+  featured_phone_image_url TEXT,
   brief_text TEXT NOT NULL DEFAULT '' CHECK (char_length(brief_text) <= 500),
   brief_gallery JSONB NOT NULL DEFAULT '[]'::jsonb,
   prototyping_text TEXT NOT NULL DEFAULT '' CHECK (char_length(prototyping_text) <= 500),

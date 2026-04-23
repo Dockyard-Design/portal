@@ -1,4 +1,6 @@
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://dockyard.design";
+import { emailTemplate } from "@/config/templates";
+
+const BASE_URL = emailTemplate.brand.baseUrl;
 
 function escapeHtml(value: string): string {
   return value
@@ -16,20 +18,7 @@ function formatDetailValue(value: string | number | boolean | null | undefined):
   return String(value);
 }
 
-const styles = {
-  background: "#0f1728",
-  surface: "#152033",
-  surfaceRaised: "#1b2a42",
-  surfaceSoft: "#22324d",
-  border: "#31415d",
-  borderStrong: "#4f6788",
-  text: "#f7fbff",
-  textMuted: "#a8b6ca",
-  primary: "#63c7ff",
-  primaryDark: "#14324a",
-  accent: "#f4c95d",
-  success: "#6ee7b7",
-};
+const styles = emailTemplate.theme;
 
 function getEmailHeader(): string {
   return `
@@ -40,14 +29,14 @@ function getEmailHeader(): string {
             <td style="vertical-align:middle;">
               <img
                 src="${BASE_URL}/logo.svg"
-                alt="Dockyard"
+                alt="${emailTemplate.brand.shortName}"
                 width="164"
                 style="height:auto;display:block;border:0;outline:none;text-decoration:none;"
               />
             </td>
             <td align="right" style="vertical-align:middle;">
               <span style="display:inline-block;border:1px solid ${styles.border};border-radius:999px;padding:7px 11px;color:${styles.textMuted};font-size:11px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;">
-                Portal
+                ${escapeHtml(emailTemplate.brand.portalLabel)}
               </span>
             </td>
           </tr>
@@ -64,11 +53,11 @@ function getEmailFooter(): string {
         <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="border-top:1px solid ${styles.border};">
           <tr>
             <td style="padding:22px 0 0;color:${styles.textMuted};font-size:13px;">
-              <p style="margin:0 0 6px;color:${styles.text};font-weight:700;">Dockyard Design</p>
-              <p style="margin:0;">Project delivery, documents and client communication.</p>
+              <p style="margin:0 0 6px;color:${styles.text};font-weight:700;">${escapeHtml(emailTemplate.brand.name)}</p>
+              <p style="margin:0;">${escapeHtml(emailTemplate.brand.footerDescription)}</p>
             </td>
             <td align="right" style="padding:22px 0 0;font-size:13px;">
-              <a href="${BASE_URL}" style="color:${styles.primary};text-decoration:none;font-weight:700;">dockyard.design</a>
+              <a href="${BASE_URL}" style="color:${styles.primary};text-decoration:none;font-weight:700;">${escapeHtml(emailTemplate.brand.domain)}</a>
             </td>
           </tr>
         </table>

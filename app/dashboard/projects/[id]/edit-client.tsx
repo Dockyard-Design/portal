@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -46,15 +45,12 @@ export function EditProjectClient({ project }: EditProjectClientProps) {
         </div>
       </div>
 
-      <Card className="border-border/40 shadow-sm">
-        <CardContent className="p-6">
-          <ProjectForm
-            initialData={project}
-            onSubmit={handleSubmit}
-            isPending={isPending}
-          />
-        </CardContent>
-      </Card>
+      <ProjectForm
+        initialData={project}
+        onSubmit={handleSubmit}
+        isPending={isPending}
+        onCancel={() => router.push("/dashboard/projects")}
+      />
     </div>
   );
 }

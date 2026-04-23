@@ -112,6 +112,11 @@ function getQuoteStatusColor(status: string) {
   }
 }
 
+function getCustomerQuoteStatusLabel(status: string) {
+  if (status === "sent") return "Waiting";
+  return status;
+}
+
 function canAcceptQuote(quote: Quote): boolean {
   if (quote.status !== "sent") return false;
   if (!quote.valid_until) return true;
@@ -276,7 +281,9 @@ export function QuoteModal({
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className={getQuoteStatusColor(quote.status)}>{quote.status}</Badge>
+                <Badge className={getQuoteStatusColor(quote.status)}>
+                  {getCustomerQuoteStatusLabel(quote.status)}
+                </Badge>
                 <Button variant="outline" size="sm" onClick={handleGeneratePdf}>
                   <Download className="mr-2 size-4" />
                   PDF

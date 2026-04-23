@@ -7,6 +7,7 @@ import {
   escapeHtml,
   styles,
 } from "./base-template";
+import { emailTemplate } from "@/config/templates";
 
 interface CustomerMessageEmailProps {
   recipientName: string;
@@ -22,9 +23,9 @@ export function getCustomerMessageEmailHtml({
   const content = `
     ${getEmailHeader()}
     ${getEmailHeading({
-      eyebrow: "New portal message",
+      eyebrow: emailTemplate.customerMessage.eyebrow,
       title: subject,
-      body: "A new message is waiting for you in the Dockyard portal.",
+      body: emailTemplate.customerMessage.body,
     })}
     ${getGreeting({ name: recipientName })}
     <tr>
@@ -36,7 +37,7 @@ export function getCustomerMessageEmailHtml({
   `;
 
   return getEmailLayout({
-    previewText: `New message: ${subject}`,
+    previewText: emailTemplate.customerMessage.preview(subject),
     children: content,
   });
 }

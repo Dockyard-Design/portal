@@ -27,15 +27,15 @@ export function PdfViewDialog({
       <DialogContent className="flex h-[92vh] w-[96vw] max-w-6xl flex-col overflow-hidden p-0">
         <DialogHeader className="shrink-0 border-b px-5 py-4">
           <div className="flex items-center justify-between gap-4 pr-8">
-          <DialogTitle className="truncate text-base">{title}</DialogTitle>
-          {pdfUrl && (
-            <Button variant="outline" size="sm" asChild>
-              <a href={pdfUrl} download>
-                <Download className="mr-2 size-4" />
-                Download
-              </a>
-            </Button>
-          )}
+            <DialogTitle className="truncate text-base">{title}</DialogTitle>
+            {pdfUrl && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={pdfUrl} download>
+                  <Download className="mr-2 size-4" />
+                  Download
+                </a>
+              </Button>
+            )}
           </div>
         </DialogHeader>
         {pdfUrl ? (

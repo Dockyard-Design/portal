@@ -6,14 +6,17 @@ import { supabaseAdmin } from "@/lib/api-keys";
 import { getCurrentUserAccess, requireUser } from "@/lib/authz";
 import { sendCustomerMessageEmail, sendSupportMessageEmail } from "@/lib/email";
 import type {
+  CustomerEmailNotification,
+  SupportEmailNotification,
+} from "@/config/email-notifications";
+import { isAutomaticMessageEnabled } from "@/config/messaging-centre";
+import { messagingTemplates } from "@/config/templates";
+import type {
   Message,
   MessageThread,
   MessageThreadStatus,
   MessageThreadWithMessages,
 } from "@/types/messaging";
-
-const AUTO_REPLY =
-  "Thanks for your message. A member of the Dockyard team will respond within 24 hours.";
 
 type ThreadRowWithCustomer = MessageThread & {
   customers: { name: string; company: string | null; email: string | null } | null;
@@ -24,6 +27,8 @@ async function sendMessageEmailNotification(input: {
   thread: ThreadRowWithCustomer;
   senderRole: "admin" | "customer" | "system";
   body: string;
+  customerNotification?: CustomerEmailNotification;
+  supportNotification?: SupportEmailNotification;
 }): Promise<void> {
   const customerName =
     input.thread.customers?.company || input.thread.customers?.name || "Customer";
@@ -36,6 +41,7 @@ async function sendMessageEmailNotification(input: {
       recipientName: customerName,
       subject: input.thread.subject,
       body: input.body,
+      notification: input.customerNotification ?? "portalReplyFromDockyard",
     });
     return;
   }
@@ -45,6 +51,7 @@ async function sendMessageEmailNotification(input: {
     customerEmail,
     subject: input.thread.subject,
     body: input.body,
+    notification: input.supportNotification ?? "portalReplyFromCustomer",
   });
 }
 
@@ -192,12 +199,14 @@ export async function createMessageThread(input: {
   ];
 
   if (access.role === "customer") {
-    messages.push({
-      thread_id: thread.id,
-      sender_id: "system",
-      sender_role: "system",
-      body: AUTO_REPLY,
-    });
+    if (isAutomaticMessageEnabled("portalAutoReply")) {
+      messages.push({
+        thread_id: thread.id,
+        sender_id: "system",
+        sender_role: "system",
+        body: messagingTemplates.portalAutoReply,
+      });
+    }
   }
 
   const { data: createdMessages, error: messageError } = await supabaseAdmin
@@ -213,6 +222,11 @@ export async function createMessageThread(input: {
         thread: thread as ThreadRowWithCustomer,
         senderRole: messageInput.sender_role,
         body: messageInput.body,
+        customerNotification:
+          messageInput.sender_role === "admin"
+            ? "portalThreadStartedByDockyard"
+            : "portalAutoReply",
+        supportNotification: "portalThreadStartedByCustomer",
       }).catch((emailError) => {
         console.error("[createMessageThread] Email notification failed:", emailError);
       })
@@ -264,6 +278,8 @@ export async function replyToThread(threadId: string, body: string): Promise<{
     thread: thread as ThreadRowWithCustomer,
     senderRole: access.role,
     body,
+    customerNotification: "portalReplyFromDockyard",
+    supportNotification: "portalReplyFromCustomer",
   }).catch((emailError) => {
     console.error("[replyToThread] Email notification failed:", emailError);
   });

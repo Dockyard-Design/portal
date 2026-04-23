@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
 
   let query = supabaseAdmin
     .from("projects")
-    .select("id, title, slug, excerpt, status, is_public, seo_title, seo_description, seo_keywords, featured_image_url, created_at, updated_at")
+    .select("id, title, slug, excerpt, status, is_public, seo_title, seo_description, seo_keywords, featured_image_url, featured_desktop_image_url, featured_phone_image_url, created_at, updated_at")
     .order("updated_at", { ascending: false })
     .range(offset, offset + limit - 1);
 

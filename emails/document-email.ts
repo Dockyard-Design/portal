@@ -10,6 +10,7 @@ import {
   escapeHtml,
   styles,
 } from "./base-template";
+import { emailTemplate } from "@/config/templates";
 
 interface DocumentEmailProps {
   documentType: "quote" | "invoice";
@@ -37,9 +38,9 @@ export function getDocumentEmailHtml({
   const content = `
     ${getEmailHeader()}
     ${getEmailHeading({
-      eyebrow: `${label} ready`,
+      eyebrow: emailTemplate.document.readyEyebrow(label),
       title: title,
-      body: `Your ${documentType} is ready to review in the Dockyard portal.`,
+      body: emailTemplate.document.body(documentType),
     })}
     ${getGreeting({ name: recipientName })}
     ${getEmailPanel(`
@@ -50,18 +51,18 @@ export function getDocumentEmailHtml({
     `)}
     ${getEmailSpacer(20)}
     <tr>
-      <td style="padding:0 0 8px;">${getEmailButton({ href: pdfUrl, children: `View ${label}` })}</td>
+      <td style="padding:0 0 8px;">${getEmailButton({ href: pdfUrl, children: emailTemplate.document.buttonLabel(label) })}</td>
     </tr>
     <tr>
       <td>
-        <a href="${escapeHtml(pdfUrl)}" style="font-size:13px;color:${styles.textMuted};">Download as PDF</a>
+        <a href="${escapeHtml(pdfUrl)}" style="font-size:13px;color:${styles.textMuted};">${escapeHtml(emailTemplate.document.downloadLabel)}</a>
       </td>
     </tr>
     ${getEmailFooter()}
   `;
 
   return getEmailLayout({
-    previewText: `Your ${label.toLowerCase()} is ready`,
+    previewText: emailTemplate.document.preview(label),
     children: content,
   });
 }

@@ -38,7 +38,6 @@ import {
   Send,
   Trash2,
   Edit,
-  CreditCard,
   CheckCircle,
   ArrowLeft,
 } from "lucide-react";
@@ -46,10 +45,10 @@ import { format } from "date-fns";
 import type { Customer } from "@/types/kanban";
 import type { Invoice, Quote } from "@/types/agency";
 import type { UserRole } from "@/types/auth";
-import { createInvoiceCheckoutSession, payInvoice, sendInvoiceToCustomer } from "@/app/actions/agency";
+import { payInvoice, sendInvoiceToCustomer } from "@/app/actions/agency";
 import { InvoiceModal } from "@/app/dashboard/components/invoice-modal-v2";
 import { PdfViewDialog } from "@/app/dashboard/components/pdf-view-dialog";
-import { getInvoicePaymentPlan, getInvoicePaymentStageLabel } from "@/lib/invoice-payments";
+import { getInvoicePaymentPlan } from "@/lib/invoice-payments";
 import { toast } from "sonner";
 
 export interface InvoicesWorkspaceProps {
@@ -100,6 +99,11 @@ export function InvoicesWorkspace({
     }
   };
 
+  const getStatusLabel = (status: string) => {
+    if (isCustomerRole && status === "sent") return "Waiting";
+    return status;
+  };
+
   const getCustomerName = (customerId: string) => {
     return customers.find(c => c.id === customerId)?.name || "Unknown";
   };
@@ -114,18 +118,6 @@ export function InvoicesWorkspace({
       toast.error(error instanceof Error ? error.message : "Failed to send invoice");
     } finally {
       setSendingId(null);
-    }
-  };
-
-  const handlePayInvoice = async (invoiceId: string) => {
-    setPayingId(invoiceId);
-    try {
-      const checkoutUrl = await createInvoiceCheckoutSession(invoiceId);
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to start payment");
-    } finally {
-      setPayingId(null);
     }
   };
 
@@ -164,9 +156,7 @@ export function InvoicesWorkspace({
   };
 
   const openEditInvoice = (invoice: Invoice) => {
-    setSelectedInvoice(invoice);
-    setInvoiceModalMode("edit");
-    setInvoiceModalOpen(true);
+    router.push(`/dashboard/invoices/${invoice.id}/edit`);
   };
 
   const refreshData = () => {
@@ -193,7 +183,7 @@ export function InvoicesWorkspace({
               {selectedCustomer
                 ? `Invoices for ${selectedCustomer.name}`
                 : isCustomerRole
-                ? "Review invoices and pay securely"
+                ? "Review invoices and payment instructions"
                 : "Manage invoices and payments"}
             </p>
           </div>
@@ -221,7 +211,7 @@ export function InvoicesWorkspace({
                 <SelectContent>
                   <SelectItem value="all">all</SelectItem>
                   <SelectItem value="draft">draft</SelectItem>
-                  <SelectItem value="sent">sent</SelectItem>
+                  <SelectItem value="sent">{isCustomerRole ? "Waiting" : "sent"}</SelectItem>
                   <SelectItem value="paid">paid</SelectItem>
                   <SelectItem value="partial">partial</SelectItem>
                   <SelectItem value="overdue">overdue</SelectItem>
@@ -257,18 +247,36 @@ export function InvoicesWorkspace({
                   {!isCustomerRole && <TableHead>Customer</TableHead>}
                   <TableHead>Title</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Due Date</TableHead>
+                  <TableHead>{isCustomerRole ? "Target Date" : "Due Date"}</TableHead>
                   <TableHead className="text-right">Amount</TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  {!isCustomerRole && <TableHead className="w-10"></TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredInvoices.map((invoice) => {
                   const paymentPlan = getInvoicePaymentPlan(invoice);
-                  const nextPaymentLabel = getInvoicePaymentStageLabel(paymentPlan.nextStage);
-
                   return (
-                    <TableRow key={invoice.id}>
+                    <TableRow
+                      key={invoice.id}
+                      role={isCustomerRole ? "button" : undefined}
+                      tabIndex={isCustomerRole ? 0 : undefined}
+                      className={isCustomerRole ? "cursor-pointer" : undefined}
+                      onClick={
+                        isCustomerRole
+                          ? () => openPdfModal(invoice)
+                          : undefined
+                      }
+                      onKeyDown={
+                        isCustomerRole
+                          ? (event) => {
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                openPdfModal(invoice);
+                              }
+                            }
+                          : undefined
+                      }
+                    >
                       <TableCell>
                         <span className="font-medium">{invoice.invoice_number}</span>
                       </TableCell>
@@ -282,7 +290,7 @@ export function InvoicesWorkspace({
                       </TableCell>
                       <TableCell>
                         <Badge className={getStatusColor(invoice.status)}>
-                          {invoice.status}
+                          {getStatusLabel(invoice.status)}
                         </Badge>
                       </TableCell>
                       <TableCell className="text-muted-foreground">
@@ -295,31 +303,21 @@ export function InvoicesWorkspace({
                         <div className="font-semibold">£{invoice.total.toLocaleString()}</div>
                         {invoice.status !== "paid" && invoice.status !== "cancelled" && (
                           <div className="text-xs font-normal text-muted-foreground">
-                            Next: £{paymentPlan.nextPaymentAmount.toLocaleString()}
+                            {isCustomerRole ? "Remaining" : "Next"}: £{paymentPlan.nextPaymentAmount.toLocaleString()}
                           </div>
                         )}
                       </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
-                            <MoreVertical className="size-4" />
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52">
-                            <DropdownMenuItem onClick={() => isCustomerRole ? openPdfModal(invoice) : openViewInvoice(invoice)}>
-                              <Eye className="size-4 mr-2" />
-                              View
-                            </DropdownMenuItem>
-                            {isCustomerRole ? (
-                              invoice.status !== "paid" && invoice.status !== "cancelled" && (
-                                <DropdownMenuItem
-                                  onClick={() => void handlePayInvoice(invoice.id)}
-                                  disabled={payingId === invoice.id}
-                                >
-                                  <CreditCard className="size-4 mr-2" />
-                                  {payingId === invoice.id ? "Opening..." : `Pay ${nextPaymentLabel}`}
-                                </DropdownMenuItem>
-                              )
-                            ) : (
+                      {!isCustomerRole && (
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger className="inline-flex items-center justify-center rounded-md text-sm font-medium size-8 hover:bg-accent hover:text-accent-foreground">
+                              <MoreVertical className="size-4" />
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              <DropdownMenuItem onClick={() => openViewInvoice(invoice)}>
+                                <Eye className="size-4 mr-2" />
+                                View
+                              </DropdownMenuItem>
                               <>
                                 <DropdownMenuItem onClick={() => openEditInvoice(invoice)}>
                                   <Edit className="size-4 mr-2" />
@@ -337,7 +335,7 @@ export function InvoicesWorkspace({
                                       onClick={() => void handleRecordManualPayment(invoice, "next")}
                                       disabled={payingId === invoice.id}
                                     >
-                                      <CreditCard className="size-4 mr-2" />
+                                      <CheckCircle className="size-4 mr-2" />
                                       Record Next Payment
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
@@ -362,10 +360,10 @@ export function InvoicesWorkspace({
                                   Delete
                                 </DropdownMenuItem>
                               </>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

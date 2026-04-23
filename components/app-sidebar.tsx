@@ -7,7 +7,6 @@ import {
   FolderKanban,
   Key,
   MessageSquare,
-  User,
   LogOut,
   KanbanSquare,
   Building,
@@ -80,6 +79,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useKanbanStore, useSidebarStore } from "@/lib/store";
 import { wipeDatabase } from "@/app/actions/dev-wipe";
+import { getCustomerDocumentActionCounts } from "@/app/actions/agency";
 import { getBoards, getCustomers } from "@/app/actions/kanban";
 import { getUnreadMessageCount } from "@/app/actions/messaging";
 import { getUnreadContactSubmissionCount } from "@/app/actions/contact";
@@ -173,6 +173,7 @@ const NAV_SETTINGS: SingleMenuItem[] = [
 ];
 
 const ALLOWED_WIPE_EMAIL = "fredericomelogarcia@outlook.com";
+const SETTINGS_PATH = "/dashboard/settings";
 
 function getCustomerLabel(customer: Customer | undefined): string {
   return customer?.company || customer?.name || "Selected customer";
@@ -233,6 +234,10 @@ function getRoutePath(href: string): string {
   return href.split("?")[0] ?? href;
 }
 
+function isSettingsPath(pathname: string): boolean {
+  return pathname === SETTINGS_PATH || pathname.startsWith(`${SETTINGS_PATH}/`);
+}
+
 export default function AppSidebar({
   initialUnreadMessageCount,
   initialUnreadContactSubmissionCount,
@@ -266,8 +271,14 @@ export default function AppSidebar({
   );
   const [unreadContactSubmissionCount, setUnreadContactSubmissionCount] =
     useState(initialUnreadContactSubmissionCount);
+  const [documentActionCounts, setDocumentActionCounts] = useState({
+    quotes: 0,
+    invoices: 0,
+  });
   const [showPasswordChangePrompt, setShowPasswordChangePrompt] =
     useState(false);
+  const [dismissedPasswordPromptPath, setDismissedPasswordPromptPath] =
+    useState<string | null>(null);
   const isCustomerRole = role === "customer";
   const isSubMenuItemActive = useCallback(
     (item: SubMenuItem) =>
@@ -285,18 +296,44 @@ export default function AppSidebar({
     user?.primaryEmailAddress?.emailAddress === ALLOWED_WIPE_EMAIL;
 
   useEffect(() => {
-    if (!isLoaded || !user || !isCustomerRole) return;
+    if (!isLoaded || !user || !isCustomerRole) {
+      setShowPasswordChangePrompt(false);
+      setDismissedPasswordPromptPath(null);
+      return;
+    }
 
     const metadata = user.publicMetadata as {
       initialPasswordChangeRequired?: unknown;
       firstLoginAt?: unknown;
     };
 
-    if (metadata.initialPasswordChangeRequired === true) {
-      setShowPasswordChangePrompt(true);
+    if (metadata.initialPasswordChangeRequired !== true) {
+      setShowPasswordChangePrompt(false);
+      setDismissedPasswordPromptPath(null);
+      return;
     }
 
-  }, [isCustomerRole, isLoaded, user]);
+    if (isSettingsPath(pathname)) {
+      setShowPasswordChangePrompt(false);
+      setDismissedPasswordPromptPath(null);
+      return;
+    }
+
+    setShowPasswordChangePrompt(dismissedPasswordPromptPath !== pathname);
+  }, [dismissedPasswordPromptPath, isCustomerRole, isLoaded, pathname, user]);
+
+  const handlePasswordPromptOpenChange = (open: boolean) => {
+    setShowPasswordChangePrompt(open);
+    if (!open) {
+      setDismissedPasswordPromptPath(pathname);
+    }
+  };
+
+  const openPasswordSettings = () => {
+    setShowPasswordChangePrompt(false);
+    setDismissedPasswordPromptPath(null);
+    router.push(SETTINGS_PATH);
+  };
 
   const handleWipe = async () => {
     const result = await wipeDatabase(wipePassword);
@@ -404,6 +441,31 @@ export default function AppSidebar({
       window.removeEventListener("messages:changed", refreshUnreadMessageCount);
     };
   }, [refreshUnreadMessageCount]);
+
+  const refreshDocumentActionCounts = useCallback(() => {
+    if (!isCustomerRole) return;
+    getCustomerDocumentActionCounts()
+      .then(setDocumentActionCounts)
+      .catch(() => {
+        setDocumentActionCounts({ quotes: 0, invoices: 0 });
+      });
+  }, [isCustomerRole]);
+
+  useEffect(() => {
+    refreshDocumentActionCounts();
+  }, [pathname, refreshDocumentActionCounts]);
+
+  useEffect(() => {
+    if (!isCustomerRole) return;
+
+    window.addEventListener("focus", refreshDocumentActionCounts);
+    window.addEventListener("messages:changed", refreshDocumentActionCounts);
+
+    return () => {
+      window.removeEventListener("focus", refreshDocumentActionCounts);
+      window.removeEventListener("messages:changed", refreshDocumentActionCounts);
+    };
+  }, [isCustomerRole, refreshDocumentActionCounts]);
 
   const loadCustomers = useCallback(() => {
     if (isCustomerRole) {
@@ -657,6 +719,10 @@ export default function AppSidebar({
               <>
                 {[NAV_QUOTES, NAV_INVOICES].map((item) => {
                   const isActive = pathname === item.href;
+                  const actionCount =
+                    item.href === NAV_QUOTES.href
+                      ? documentActionCounts.quotes
+                      : documentActionCounts.invoices;
 
                   return (
                     <SidebarMenuItem key={item.href}>
@@ -679,6 +745,14 @@ export default function AppSidebar({
                           <span className="min-w-0 flex-1 truncate font-medium">
                             {item.title}
                           </span>
+                          {actionCount > 0 && (
+                            <span
+                              aria-label={`${actionCount} ${item.title.toLowerCase()} need action`}
+                              className="ml-auto inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold leading-none text-primary-foreground"
+                            >
+                              {actionCount > 99 ? "99+" : actionCount}
+                            </span>
+                          )}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>
@@ -1009,23 +1083,23 @@ export default function AppSidebar({
       </div>
       <AlertDialog
         open={showPasswordChangePrompt}
-        onOpenChange={setShowPasswordChangePrompt}
+        onOpenChange={handlePasswordPromptOpenChange}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Change your temporary password</AlertDialogTitle>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="size-5 text-amber-600" />
+              Change your temporary password
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This account was created with a temporary password. Open your
-              account settings and set a new password before continuing.
+              This account was created with a temporary password. You can keep
+              using the portal for now, but this reminder will appear on each
+              page until you update your password in settings.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogAction
-              onClick={() => {
-                window.location.href = "/dashboard/settings";
-                setShowPasswordChangePrompt(false);
-              }}
-            >
+            <AlertDialogCancel>Close</AlertDialogCancel>
+            <AlertDialogAction onClick={openPasswordSettings}>
               Open Settings
             </AlertDialogAction>
           </AlertDialogFooter>

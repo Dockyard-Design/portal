@@ -15,6 +15,8 @@ export interface Project {
   seo_description: string;
   seo_keywords: string;
   featured_image_url: string;
+  featured_desktop_image_url: string;
+  featured_phone_image_url: string;
   brief_text: string;
   brief_gallery: ProjectGallery;
   prototyping_text: string;

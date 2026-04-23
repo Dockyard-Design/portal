@@ -80,6 +80,8 @@ export async function createProject(
       status: data.status,
       is_public: data.is_public,
       featured_image_url: data.featured_image_url,
+      featured_desktop_image_url: data.featured_desktop_image_url,
+      featured_phone_image_url: data.featured_phone_image_url,
     },
   }).catch((emailError) => {
     console.error("[createProject] Email notification failed:", emailError);

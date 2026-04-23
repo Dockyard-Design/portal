@@ -15,6 +15,8 @@ const PROJECT_SELECT = [
   "seo_description",
   "seo_keywords",
   "featured_image_url",
+  "featured_desktop_image_url",
+  "featured_phone_image_url",
   "brief_text",
   "brief_gallery",
   "prototyping_text",

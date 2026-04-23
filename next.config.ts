@@ -18,7 +18,8 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "base-uri 'self'",
-      "frame-ancestors 'none'",
+      "frame-ancestors 'self'",
+      "worker-src 'self' blob:",
       "object-src 'none'",
       "form-action 'self'",
       "img-src 'self' data: https: https://*.clerk.com https://*.clerk.accounts.dev",
@@ -29,21 +30,23 @@ const securityHeaders = [
     ].join("; "),
   },
 ];
-module.exports = {
-  allowedDevOrigins: ["frederico.tailfac618.ts.net"],
-};
 
 const nextConfig: NextConfig = {
+  allowedDevOrigins: ["frederico.tailfac618.ts.net"],
   poweredByHeader: false,
+  serverExternalPackages: ["sharp"],
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
+  },
   images: {
     remotePatterns: [
       {
         protocol: "https",
-        hostname: "*.public.blob.vercel-storage.com",
-      },
-      {
-        protocol: "https",
-        hostname: "images.unsplash.com",
+        hostname: "**.public.blob.vercel-storage.com",
+        port: "",
+        pathname: "/**",
       },
     ],
   },

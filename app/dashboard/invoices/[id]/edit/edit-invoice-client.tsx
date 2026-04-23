@@ -1,0 +1,311 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { format, parseISO } from "date-fns";
+import { toast } from "sonner";
+import { updateInvoice } from "@/app/actions/agency";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { Invoice, Quote } from "@/types/agency";
+import type { Customer } from "@/types/kanban";
+
+type DraftItem = {
+  description: string;
+  quantity: number;
+  unit_price: number;
+};
+
+interface EditInvoiceClientProps {
+  invoice: Invoice;
+  quotes: Quote[];
+  customers: Customer[];
+}
+
+export function EditInvoiceClient({
+  invoice,
+  quotes,
+  customers,
+}: EditInvoiceClientProps) {
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
+  const [title, setTitle] = useState(invoice.title);
+  const [description, setDescription] = useState(invoice.description ?? "");
+  const [taxRate, setTaxRate] = useState(invoice.tax_rate);
+  const [dueDate, setDueDate] = useState(
+    invoice.due_date ? format(parseISO(invoice.due_date), "yyyy-MM-dd") : ""
+  );
+  const [notes, setNotes] = useState(invoice.notes ?? "");
+  const [terms, setTerms] = useState(invoice.terms ?? "");
+  const [paymentInstructions, setPaymentInstructions] = useState(
+    invoice.payment_instructions ?? ""
+  );
+  const [items, setItems] = useState<DraftItem[]>(
+    invoice.items?.length
+      ? invoice.items.map((item) => ({
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+        }))
+      : [{ description: "", quantity: 1, unit_price: 0 }]
+  );
+
+  const customer = customers.find((entry) => entry.id === invoice.customer_id);
+  const linkedQuote = quotes.find((entry) => entry.id === invoice.quote_id);
+  const subtotal = useMemo(
+    () => items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0),
+    [items]
+  );
+  const total = subtotal + subtotal * (taxRate / 100);
+
+  const updateItem = (index: number, update: Partial<DraftItem>) => {
+    setItems((current) =>
+      current.map((item, itemIndex) =>
+        itemIndex === index ? { ...item, ...update } : item
+      )
+    );
+  };
+
+  const submit = async () => {
+    const cleanedItems = items
+      .map((item) => ({ ...item, description: item.description.trim() }))
+      .filter((item) => item.description.length > 0);
+
+    if (!title.trim() || cleanedItems.length === 0) {
+      toast.error("Add a title and at least one line item");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await updateInvoice(invoice.id, {
+        title: title.trim(),
+        description: description.trim() || null,
+        tax_rate: taxRate,
+        due_date: dueDate || null,
+        notes: notes.trim() || null,
+        terms: terms.trim() || null,
+        payment_instructions: paymentInstructions.trim() || null,
+        items: cleanedItems,
+      });
+      toast.success("Invoice updated");
+      router.push("/dashboard/invoices");
+      router.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Failed to update invoice");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex w-full flex-col gap-6">
+      <div className="flex items-center gap-4">
+        <Button variant="outline" size="icon" asChild>
+          <Link href="/dashboard/invoices">
+            <ArrowLeft className="size-4" />
+          </Link>
+        </Button>
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Edit Invoice</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Update invoice details, payment instructions, and line items.
+          </p>
+        </div>
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <Card>
+          <CardHeader>
+            <CardTitle>{invoice.invoice_number}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label>Customer</Label>
+                <div className="flex h-9 items-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium">
+                  {customer?.company || customer?.name || "Selected customer"}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Linked Quote</Label>
+                <div className="flex h-9 items-center rounded-md border border-border bg-muted/30 px-3 text-sm font-medium">
+                  {linkedQuote?.title || "None"}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Title</Label>
+                <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Due Date</Label>
+                <Input
+                  type="date"
+                  value={dueDate}
+                  onChange={(event) => setDueDate(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Description</Label>
+              <Textarea
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                className="min-h-28"
+              />
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-3">
+                <Label>Line Items</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setItems((current) => [
+                      ...current,
+                      { description: "", quantity: 1, unit_price: 0 },
+                    ])
+                  }
+                >
+                  <Plus className="size-4" />
+                  Add Item
+                </Button>
+              </div>
+              <div className="flex flex-col gap-3">
+                {items.map((item, index) => (
+                  <div
+                    key={index}
+                    className="grid gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 md:grid-cols-[minmax(0,1fr)_120px_150px_130px_40px] md:items-end"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor={`invoice-item-description-${index}`}>Description</Label>
+                      <Input
+                        id={`invoice-item-description-${index}`}
+                        value={item.description}
+                        onChange={(event) =>
+                          updateItem(index, { description: event.target.value })
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor={`invoice-item-quantity-${index}`}>Quantity / units</Label>
+                      <Input
+                        id={`invoice-item-quantity-${index}`}
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={item.quantity}
+                        onChange={(event) =>
+                          updateItem(index, { quantity: Number(event.target.value) })
+                        }
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor={`invoice-item-price-${index}`}>Unit price</Label>
+                      <div className="relative">
+                        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">£</span>
+                        <Input
+                          id={`invoice-item-price-${index}`}
+                          className="pl-7"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={item.unit_price}
+                          onChange={(event) =>
+                            updateItem(index, { unit_price: Number(event.target.value) })
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label>Line total</Label>
+                      <div className="flex h-9 items-center rounded-md border border-dashed border-border bg-background px-3 text-sm font-medium">
+                        £{(item.quantity * item.unit_price).toLocaleString()}
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={items.length === 1}
+                      onClick={() =>
+                        setItems((current) =>
+                          current.filter((_, itemIndex) => itemIndex !== index)
+                        )
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <Label>Tax Rate</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={taxRate}
+                  onChange={(event) => setTaxRate(Number(event.target.value))}
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label>Notes</Label>
+                <Input value={notes} onChange={(event) => setNotes(event.target.value)} />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Terms</Label>
+              <Textarea value={terms} onChange={(event) => setTerms(event.target.value)} className="min-h-24" />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label>Payment Instructions</Label>
+              <Textarea
+                value={paymentInstructions}
+                onChange={(event) => setPaymentInstructions(event.target.value)}
+                className="min-h-24"
+              />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="h-fit">
+          <CardHeader>
+            <CardTitle>Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>GBP {subtotal.toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tax</span>
+              <span>{taxRate}%</span>
+            </div>
+            <div className="flex justify-between border-t border-border pt-3 text-base font-semibold">
+              <span>Total</span>
+              <span>GBP {total.toFixed(2)}</span>
+            </div>
+            <Button onClick={() => void submit()} disabled={saving} className="mt-3">
+              {saving ? "Saving..." : "Save Invoice"}
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}

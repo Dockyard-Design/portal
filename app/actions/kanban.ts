@@ -211,7 +211,7 @@ export async function createCustomer(customer: CreateCustomerInput): Promise<Cus
       recipientName: [firstName, lastName].filter(Boolean).join(" ") || name,
       companyName: company || name,
       password: temporaryPassword,
-      signInUrl: `${baseUrl}/sign-in`,
+      signInUrl: baseUrl,
     });
   }
 

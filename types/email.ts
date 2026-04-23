@@ -1,3 +1,8 @@
+import type {
+  CustomerEmailNotification,
+  SupportEmailNotification,
+} from "@/config/email-notifications";
+
 export interface EmailAttachment {
   filename: string;
   content: string;
@@ -42,6 +47,7 @@ export interface CustomerMessageEmailInput {
   recipientName: string;
   subject: string;
   body: string;
+  notification: CustomerEmailNotification;
 }
 
 export interface SupportMessageEmailInput {
@@ -49,4 +55,5 @@ export interface SupportMessageEmailInput {
   customerEmail: string | null;
   subject: string;
   body: string;
+  notification: SupportEmailNotification;
 }

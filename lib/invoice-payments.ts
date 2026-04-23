@@ -1,3 +1,5 @@
+import { pdfTemplate } from "@/config/templates";
+
 export type InvoicePaymentStage = "start" | "final" | "paid";
 
 export interface InvoicePaymentSnapshot {
@@ -20,8 +22,11 @@ export interface InvoicePaymentPlan {
 export const SPLIT_PAYMENT_TERMS =
   "Payment is split into two equal stages: 50% is due at the start of works before delivery work begins, and the remaining 50% is due at completion before final handover, launch, file release, or transfer of intellectual property.";
 
+export const UK_PAYMENT_INSTRUCTIONS =
+  pdfTemplate.paymentInstructions.defaultText;
+
 export const DEFAULT_INVOICE_PAYMENT_INSTRUCTIONS =
-  "This invoice is paid in two halves. Pay the first 50% to start works; the remaining 50% is due at completion before final handover.";
+  UK_PAYMENT_INSTRUCTIONS;
 
 export function roundCurrency(value: number): number {
   return Number((Math.round((value + Number.EPSILON) * 100) / 100).toFixed(2));

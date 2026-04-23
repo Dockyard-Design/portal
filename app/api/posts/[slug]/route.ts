@@ -57,7 +57,7 @@ export async function GET(
 
   let query = supabaseAdmin
     .from("projects")
-    .select("id, title, slug, content, excerpt, status, is_public, is_indexable, seo_title, seo_description, seo_keywords, featured_image_url, created_at, updated_at")
+    .select("id, title, slug, content, excerpt, status, is_public, is_indexable, seo_title, seo_description, seo_keywords, featured_image_url, featured_desktop_image_url, featured_phone_image_url, created_at, updated_at")
     .eq("slug", slug);
 
   if (!isClerk) {

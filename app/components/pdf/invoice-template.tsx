@@ -6,7 +6,11 @@ import {
   StyleSheet,
 } from "@react-pdf/renderer";
 import { Logo } from "./logo";
-import { getInvoicePaymentPlan, getInvoicePaymentStageLabel } from "@/lib/invoice-payments";
+import {
+  UK_PAYMENT_INSTRUCTIONS,
+  getInvoicePaymentPlan,
+} from "@/lib/invoice-payments";
+import { pdfTemplate } from "@/config/templates";
 import type { Invoice, InvoiceItem } from "@/types/agency";
 import type { Customer } from "@/types/kanban";
 
@@ -268,6 +272,61 @@ const styles = StyleSheet.create({
     color: "#333333",
     lineHeight: 1.5,
   },
+  instructionsHero: {
+    marginTop: 30,
+    paddingBottom: 16,
+    borderBottomWidth: 2,
+    borderBottomColor: "#000000",
+  },
+  instructionsEyebrow: {
+    fontSize: 9,
+    color: "#666666",
+    textTransform: "uppercase",
+    letterSpacing: 1.5,
+    marginBottom: 8,
+  },
+  instructionsTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+  },
+  instructionsGrid: {
+    marginTop: 24,
+    flexDirection: "row",
+    gap: 16,
+  },
+  instructionsCard: {
+    flex: 1,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#000000",
+    backgroundColor: "#FAFAFA",
+  },
+  instructionsCardTitle: {
+    fontSize: 10,
+    fontWeight: "bold",
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  instructionsAmount: {
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  instructionsTextBlock: {
+    marginTop: 24,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#000000",
+  },
+  instructionsText: {
+    fontSize: 11,
+    lineHeight: 1.55,
+    color: "#222222",
+  },
+  instructionsSmallText: {
+    fontSize: 9,
+    lineHeight: 1.45,
+    color: "#444444",
+  },
   footer: {
     position: "absolute",
     bottom: 30,
@@ -288,9 +347,20 @@ interface InvoicePDFProps {
 }
 
 export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
-  const balanceDue = invoice.balance_due || 0;
   const paymentPlan = getInvoicePaymentPlan(invoice);
-  const nextPaymentLabel = getInvoicePaymentStageLabel(paymentPlan.nextStage);
+  const amountPaid = paymentPlan.amountPaid;
+  const balanceDue = paymentPlan.balanceDue;
+  const paidInFull = balanceDue <= 0 || invoice.status === "paid";
+  const partiallyPaid = !paidInFull && amountPaid > 0;
+  const statusLabel =
+    invoice.status === "partial"
+      ? "PARTIALLY PAID"
+      : invoice.status.replace("_", " ").toUpperCase();
+  const startPaymentReceived =
+    amountPaid >= paymentPlan.startPaymentAmount || paidInFull;
+  const finalPaymentReceived = paidInFull;
+  const paymentInstructions =
+    invoice.payment_instructions?.trim() || UK_PAYMENT_INSTRUCTIONS;
 
   return (
     <Document>
@@ -303,11 +373,11 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
           
           <View style={styles.rightSection}>
             <View style={styles.docTypeRow}>
-              <Text style={styles.docType}>INVOICE</Text>
+              <Text style={styles.docType}>{pdfTemplate.invoice.documentTitle}</Text>
               <Text style={styles.docNumber}>{invoice.invoice_number}</Text>
             </View>
             <View style={styles.statusBadge}>
-              <Text style={styles.statusText}>{invoice.status.toUpperCase()}</Text>
+              <Text style={styles.statusText}>{statusLabel}</Text>
             </View>
           </View>
         </View>
@@ -315,7 +385,7 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
         {/* Info Section */}
         <View style={styles.twoColumn}>
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Bill To</Text>
+            <Text style={styles.sectionTitle}>{pdfTemplate.common.billTo}</Text>
             <Text style={styles.customerName}>{customer.name}</Text>
             {customer.company && (
               <Text style={styles.customerDetail}>{customer.company}</Text>
@@ -326,20 +396,26 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
           </View>
 
           <View style={styles.column}>
-            <Text style={styles.sectionTitle}>Invoice Details</Text>
+            <Text style={styles.sectionTitle}>{pdfTemplate.invoice.detailsTitle}</Text>
             <View style={styles.infoRow}>
-              <Text style={styles.infoLabel}>Issue Date:</Text>
+              <Text style={styles.infoLabel}>{pdfTemplate.invoice.issueDateLabel}</Text>
               <Text style={styles.infoValue}>{new Date(invoice.created_at).toLocaleDateString("en-GB")}</Text>
             </View>
-            {invoice.due_date && (
+            {!paidInFull && invoice.due_date && (
               <View style={styles.infoRow}>
-                <Text style={styles.infoLabel}>Due Date:</Text>
+                <Text style={styles.infoLabel}>{pdfTemplate.invoice.targetDateLabel}</Text>
                 <Text style={styles.infoValue}>{new Date(invoice.due_date).toLocaleDateString("en-GB")}</Text>
+              </View>
+            )}
+            {paidInFull && invoice.paid_at && (
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>{pdfTemplate.invoice.paidDateLabel}</Text>
+                <Text style={styles.infoValue}>{new Date(invoice.paid_at).toLocaleDateString("en-GB")}</Text>
               </View>
             )}
             <View style={styles.infoRow}>
               <Text style={styles.infoLabel}>Currency:</Text>
-              <Text style={styles.infoValue}>GBP (£)</Text>
+              <Text style={styles.infoValue}>{pdfTemplate.currencyLabel}</Text>
             </View>
           </View>
         </View>
@@ -347,20 +423,20 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
         {/* Description */}
         {invoice.description && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Description</Text>
+            <Text style={styles.sectionTitle}>{pdfTemplate.common.description}</Text>
             <Text style={{ color: "#333333" }}>{invoice.description}</Text>
           </View>
         )}
 
         {/* Line Items */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Items</Text>
+          <Text style={styles.sectionTitle}>{pdfTemplate.common.items}</Text>
           <View style={styles.table}>
             <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, styles.descriptionCol]}>Description</Text>
-              <Text style={[styles.tableHeaderCell, styles.qtyCol]}>Qty</Text>
-              <Text style={[styles.tableHeaderCell, styles.priceCol]}>Unit Price</Text>
-              <Text style={[styles.tableHeaderCell, styles.totalCol]}>Total</Text>
+              <Text style={[styles.tableHeaderCell, styles.descriptionCol]}>{pdfTemplate.common.table.description}</Text>
+              <Text style={[styles.tableHeaderCell, styles.qtyCol]}>{pdfTemplate.common.table.quantity}</Text>
+              <Text style={[styles.tableHeaderCell, styles.priceCol]}>{pdfTemplate.common.table.unitPrice}</Text>
+              <Text style={[styles.tableHeaderCell, styles.totalCol]}>{pdfTemplate.common.table.total}</Text>
             </View>
 
             {invoice.items?.map((item: InvoiceItem, index: number) => {
@@ -380,21 +456,31 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
         {/* Totals */}
         <View style={styles.totalsSection}>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Subtotal:</Text>
+            <Text style={styles.totalLabel}>{pdfTemplate.invoice.subtotalLabel}</Text>
             <Text style={styles.totalValue}>£{invoice.subtotal.toFixed(2)}</Text>
           </View>
           <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>VAT ({invoice.tax_rate}%):</Text>
+            <Text style={styles.totalLabel}>{pdfTemplate.invoice.vatLabel(invoice.tax_rate)}</Text>
             <Text style={styles.totalValue}>£{invoice.tax_amount.toFixed(2)}</Text>
           </View>
           <View style={styles.grandTotalRow}>
-            <Text style={styles.grandTotalLabel}>TOTAL DUE:</Text>
+            <Text style={styles.grandTotalLabel}>{pdfTemplate.invoice.totalLabel}</Text>
             <Text style={styles.grandTotalValue}>£{invoice.total.toFixed(2)}</Text>
           </View>
-          
-          {invoice.status !== "paid" && balanceDue > 0 && (
+          {amountPaid > 0 && (
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>{pdfTemplate.invoice.amountReceivedLabel}</Text>
+              <Text style={styles.totalValue}>£{amountPaid.toFixed(2)}</Text>
+            </View>
+          )}
+          {paidInFull ? (
             <View style={styles.balanceDue}>
-              <Text style={styles.balanceDueLabel}>BALANCE DUE:</Text>
+              <Text style={styles.balanceDueLabel}>{pdfTemplate.invoice.paidInFullLabel}</Text>
+              <Text style={styles.balanceDueValue}>£0.00</Text>
+            </View>
+          ) : (
+            <View style={styles.balanceDue}>
+              <Text style={styles.balanceDueLabel}>{pdfTemplate.invoice.outstandingLabel}</Text>
               <Text style={styles.balanceDueValue}>£{balanceDue.toFixed(2)}</Text>
             </View>
           )}
@@ -403,39 +489,125 @@ export function InvoicePDF({ invoice, customer, logoBase64 }: InvoicePDFProps) {
         {/* Payment Schedule */}
         <View style={styles.paymentSchedule}>
           <View style={styles.scheduleHeader}>
-            <Text style={styles.scheduleTitle}>Payment Schedule</Text>
+            <Text style={styles.scheduleTitle}>{pdfTemplate.invoice.paymentScheduleTitle}</Text>
           </View>
           <View style={styles.scheduleRow}>
-            <Text style={styles.scheduleLabel}>Start of works payment due {invoice.due_date ? new Date(invoice.due_date).toLocaleDateString("en-GB") : "on acceptance"}</Text>
-            <Text style={styles.scheduleValue}>£{paymentPlan.startPaymentAmount.toFixed(2)}</Text>
+            <Text style={styles.scheduleLabel}>
+              {pdfTemplate.invoice.startPaymentLabel(startPaymentReceived ? "received" : "outstanding")}
+            </Text>
+            <Text style={styles.scheduleValue}>
+              £{paymentPlan.startPaymentAmount.toFixed(2)}
+            </Text>
           </View>
           <View style={styles.scheduleRow}>
-            <Text style={styles.scheduleLabel}>Completion payment due before final handover</Text>
-            <Text style={styles.scheduleValue}>£{paymentPlan.finalPaymentAmount.toFixed(2)}</Text>
+            <Text style={styles.scheduleLabel}>
+              {pdfTemplate.invoice.completionPaymentLabel(finalPaymentReceived ? "received" : partiallyPaid ? "outstanding" : "scheduled")}
+            </Text>
+            <Text style={styles.scheduleValue}>
+              £{paymentPlan.finalPaymentAmount.toFixed(2)}
+            </Text>
           </View>
-          {invoice.status !== "paid" && paymentPlan.nextPaymentAmount > 0 && (
+          {!paidInFull && paymentPlan.nextPaymentAmount > 0 && (
             <View style={styles.scheduleRowLast}>
-              <Text style={styles.scheduleLabel}>Next payment: {nextPaymentLabel}</Text>
+              <Text style={styles.scheduleLabel}>{pdfTemplate.invoice.remainingPaymentLabel}</Text>
               <Text style={styles.scheduleValue}>£{paymentPlan.nextPaymentAmount.toFixed(2)}</Text>
             </View>
           )}
         </View>
 
-        {/* Terms */}
-        {invoice.terms && (
-          <View style={styles.termsSection}>
-            <Text style={styles.termsTitle}>Terms & Conditions</Text>
-            <Text style={styles.termsText}>{invoice.terms}</Text>
-          </View>
-        )}
-
         {/* Footer */}
         <View style={styles.footer}>
           <Text style={styles.footerText}>
-            Dockyard Design • {invoice.invoice_number}
+            {pdfTemplate.brand.name} • {invoice.invoice_number}
           </Text>
         </View>
       </Page>
+      {invoice.terms && (
+      <Page size="A4" style={styles.page}>
+        <View style={styles.headerContainer}>
+          <View style={styles.logoSection}>
+            <Logo logoBase64={logoBase64} />
+          </View>
+
+          <View style={styles.rightSection}>
+            <View style={styles.docTypeRow}>
+              <Text style={styles.docType}>{pdfTemplate.common.termsTitle}</Text>
+              <Text style={styles.docNumber}>{invoice.invoice_number}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.termsSection}>
+          <Text style={styles.termsTitle}>{pdfTemplate.common.termsTitle}</Text>
+          <Text style={styles.termsText}>{invoice.terms}</Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            {pdfTemplate.brand.name} • {pdfTemplate.common.termsTitle} • {invoice.invoice_number}
+          </Text>
+        </View>
+      </Page>
+      )}
+      {!paidInFull && (
+      <Page size="A4" style={styles.page}>
+        <View style={styles.headerContainer}>
+          <View style={styles.logoSection}>
+            <Logo logoBase64={logoBase64} />
+          </View>
+
+          <View style={styles.rightSection}>
+            <View style={styles.docTypeRow}>
+              <Text style={styles.docType}>{pdfTemplate.paymentInstructions.documentTitle}</Text>
+              <Text style={styles.docNumber}>{invoice.invoice_number}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.instructionsHero}>
+          <Text style={styles.instructionsEyebrow}>{pdfTemplate.paymentInstructions.eyebrow}</Text>
+          <Text style={styles.instructionsTitle}>{pdfTemplate.paymentInstructions.invoiceTitle}</Text>
+        </View>
+
+        <View style={styles.instructionsGrid}>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.referenceTitle}</Text>
+            <Text style={styles.instructionsText}>{invoice.invoice_number}</Text>
+          </View>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.outstandingBalanceTitle}</Text>
+            <Text style={styles.instructionsAmount}>£{balanceDue.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.instructionsGrid}>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.startOfWorksTitle}</Text>
+            <Text style={styles.instructionsText}>£{paymentPlan.startPaymentAmount.toFixed(2)}</Text>
+          </View>
+          <View style={styles.instructionsCard}>
+            <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.completionTitle}</Text>
+            <Text style={styles.instructionsText}>£{paymentPlan.finalPaymentAmount.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        <View style={styles.instructionsTextBlock}>
+          <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.instructionsTitle}</Text>
+          <Text style={styles.instructionsText}>{paymentInstructions}</Text>
+        </View>
+
+        <View style={styles.instructionsTextBlock}>
+          <Text style={styles.instructionsCardTitle}>{pdfTemplate.paymentInstructions.beforeSendingFundsTitle}</Text>
+          <Text style={styles.instructionsSmallText}>{pdfTemplate.paymentInstructions.invoiceSafetyNote}</Text>
+        </View>
+
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            {pdfTemplate.paymentInstructions.footer(invoice.invoice_number)}
+          </Text>
+        </View>
+      </Page>
+      )}
     </Document>
   );
 }

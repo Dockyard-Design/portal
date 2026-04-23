@@ -7,7 +7,6 @@ import { ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { createProject } from "@/app/actions/projects";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { ProjectForm, type ProjectFormValues } from "../project-form";
 
 export function NewProjectClient() {
@@ -42,15 +41,11 @@ export function NewProjectClient() {
         </div>
       </div>
 
-      <Card className="border-border/40 shadow-sm">
-        <CardContent className="p-6">
-          <ProjectForm
-            onSubmit={handleSubmit}
-            isPending={isPending}
-            onCancel={() => router.push("/dashboard/projects")}
-          />
-        </CardContent>
-      </Card>
+      <ProjectForm
+        onSubmit={handleSubmit}
+        isPending={isPending}
+        onCancel={() => router.push("/dashboard/projects")}
+      />
     </div>
   );
 }

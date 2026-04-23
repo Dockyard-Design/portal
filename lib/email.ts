@@ -13,6 +13,12 @@ import {
   getSupportMessageEmailHtml,
   getCustomerWelcomeEmailHtml,
 } from "@/emails";
+import {
+  isCustomerEmailEnabled,
+  isSupportEmailEnabled,
+  type SupportEmailNotification,
+} from "@/config/email-notifications";
+import { emailTemplate } from "@/config/templates";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 const SUPPORT_EMAIL = "support@dockyard.design";
@@ -29,6 +35,14 @@ function getTextVersion(input: Record<string, unknown>): string {
     ([key, value]) => `${key}: ${formatDetailValue(value as string | number | boolean | null | undefined)}`
   );
   return entries.join("\n");
+}
+
+function getFormSubmissionNotification(
+  formName: string
+): SupportEmailNotification {
+  return formName.toLowerCase() === "project"
+    ? "projectNotifications"
+    : "contactSubmissions";
 }
 
 export async function sendEmail(input: SendEmailInput): Promise<void> {
@@ -58,6 +72,10 @@ export async function sendEmail(input: SendEmailInput): Promise<void> {
 }
 
 export async function sendFormSubmissionEmail(input: FormSubmissionEmailInput): Promise<void> {
+  if (!isSupportEmailEnabled(getFormSubmissionNotification(input.formName))) {
+    return;
+  }
+
   const html = await getFormSubmissionEmailHtml({
     formName: input.formName,
     submittedAt: input.submittedAt,
@@ -67,13 +85,18 @@ export async function sendFormSubmissionEmail(input: FormSubmissionEmailInput): 
   await sendEmail({
     to: [SUPPORT_EMAIL],
     from: SUPPORT_EMAIL,
-    subject: `${input.formName} submission`,
+    subject: emailTemplate.formSubmission.subject(input.formName),
     text: `${input.formName} submission\nSubmitted at: ${input.submittedAt}\n${getTextVersion(input.details)}`,
     html,
   });
 }
 
 export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void> {
+  const notification = input.documentType === "quote" ? "quoteReady" : "invoiceReady";
+  if (!isCustomerEmailEnabled(notification)) {
+    return;
+  }
+
   const label = input.documentType === "quote" ? "Quote" : "Invoice";
   const formattedTotal = new Intl.NumberFormat("en-GB", {
     style: "currency",
@@ -92,7 +115,7 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
   await sendEmail({
     to: [input.recipientEmail],
     from: SUPPORT_EMAIL,
-    subject: `${label}: ${input.title}`,
+    subject: emailTemplate.document.subject(label, input.title),
     text: [
       `Hello ${input.recipientName},`,
       "",
@@ -100,7 +123,7 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
       `Total: ${formattedTotal}`,
       `View/download: ${input.pdfUrl}`,
       "",
-      "Dockyard Design",
+      emailTemplate.brand.name,
     ].join("\n"),
     html,
   });
@@ -109,6 +132,10 @@ export async function sendDocumentEmail(input: DocumentEmailInput): Promise<void
 export async function sendCustomerMessageEmail(
   input: CustomerMessageEmailInput
 ): Promise<void> {
+  if (!isCustomerEmailEnabled(input.notification)) {
+    return;
+  }
+
   const html = await getCustomerMessageEmailHtml({
     recipientName: input.recipientName,
     subject: input.subject,
@@ -118,15 +145,15 @@ export async function sendCustomerMessageEmail(
   await sendEmail({
     to: [input.recipientEmail],
     from: NO_REPLY_EMAIL,
-    subject: `New portal message: ${input.subject}`,
+    subject: emailTemplate.customerMessage.subject(input.subject),
     text: [
       `Hello ${input.recipientName},`,
       "",
-      "You have a new message in your Dockyard portal.",
+      emailTemplate.customerMessage.textIntro,
       "",
       input.body,
       "",
-      "Dockyard Design",
+      emailTemplate.brand.name,
     ].join("\n"),
     html,
   });
@@ -135,6 +162,10 @@ export async function sendCustomerMessageEmail(
 export async function sendSupportMessageEmail(
   input: SupportMessageEmailInput
 ): Promise<void> {
+  if (!isSupportEmailEnabled(input.notification)) {
+    return;
+  }
+
   const html = await getSupportMessageEmailHtml({
     customerName: input.customerName,
     customerEmail: input.customerEmail,
@@ -145,7 +176,7 @@ export async function sendSupportMessageEmail(
   await sendEmail({
     to: [SUPPORT_EMAIL],
     from: NO_REPLY_EMAIL,
-    subject: `Customer portal message: ${input.subject}`,
+    subject: emailTemplate.supportMessage.subject(input.subject),
     text: [
       `Customer: ${input.customerName}`,
       `Email: ${input.customerEmail || "Not provided"}`,
@@ -159,6 +190,10 @@ export async function sendSupportMessageEmail(
 export async function sendCustomerWelcomeEmail(
   input: CustomerWelcomeEmailInput
 ): Promise<void> {
+  if (!isCustomerEmailEnabled("accountWelcome")) {
+    return;
+  }
+
   const html = await getCustomerWelcomeEmailHtml({
     recipientName: input.recipientName,
     companyName: input.companyName,
@@ -169,17 +204,17 @@ export async function sendCustomerWelcomeEmail(
   await sendEmail({
     to: [input.recipientEmail],
     from: SUPPORT_EMAIL,
-    subject: `Your Dockyard portal account for ${input.companyName}`,
+    subject: emailTemplate.customerWelcome.subject(input.companyName),
     text: [
       `Hello ${input.recipientName},`,
       "",
-      `Your Dockyard portal account for ${input.companyName} is ready.`,
-      `Sign in: ${input.signInUrl}`,
-      `Temporary password: ${input.password}`,
+      emailTemplate.customerWelcome.textIntro(input.companyName),
+      `${emailTemplate.customerWelcome.signInTextLabel}: ${input.signInUrl}`,
+      `${emailTemplate.customerWelcome.temporaryPasswordLabel}: ${input.password}`,
       "",
-      "You will be asked to change this password after your first sign-in.",
+      emailTemplate.customerWelcome.passwordNotice,
       "",
-      "Dockyard Design",
+      emailTemplate.brand.name,
     ].join("\n"),
     html,
   });
